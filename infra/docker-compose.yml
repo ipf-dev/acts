@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: acts-postgres
+    environment:
+      POSTGRES_DB: acts
+      POSTGRES_USER: acts
+      POSTGRES_PASSWORD: acts
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U acts -d acts"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  localstack:
+    image: localstack/localstack:3.7
+    container_name: acts-localstack
+    environment:
+      - SERVICES=s3,secretsmanager
+      - DEBUG=0
+      - PERSISTENCE=1
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  postgres_data:
+  localstack_data:
+

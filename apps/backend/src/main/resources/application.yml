@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: acts-backend
+
+server:
+  port: ${SERVER_PORT:8088}
+
+# Provide Google OAuth registration through environment variables when ready:
+# SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=...
+# SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=...
+acts:
+  auth:
+    allowed-domain: iportfolio.co.kr
+    backend-base-url: ${BACKEND_BASE_URL:http://localhost:8088}
+    frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+    admin-emails:
+      - minsungkim@iportfolio.co.kr
