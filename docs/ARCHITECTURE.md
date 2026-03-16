@@ -46,7 +46,7 @@ Expected first-slice backend capabilities:
 - audit logging for login success plus admin org and permission changes
 - asset metadata in PostgreSQL with binary files stored in object storage
 - direct upload session orchestration and post-upload verification
-- asset catalog and metadata management
+- asset catalog with tags, origin metadata, duplicate detection, and version history
 - generation request orchestration
 - IP guide retrieval for AI workflows
 - revision and activity history recording
@@ -66,7 +66,7 @@ Expected first-slice frontend surfaces:
 - user-facing auth failure notification after login redirects
 - searchable admin user table with per-user organization assignment
 - admin allowlist management and audit log views
-- asset hub pages
+- asset hub pages with tag and creator filters
 - generation request forms and result views
 - searchable asset detail flows
 - guide-aware creation UI
