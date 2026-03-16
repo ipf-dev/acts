@@ -22,11 +22,8 @@ class UserAccountEntity(
     @Column(name = "display_name", nullable = false)
     var displayName: String,
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "department_id")
-    var department: DepartmentEntity? = null,
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "team_id")
-    var team: TeamEntity? = null,
+    @JoinColumn(name = "organization_id")
+    var organization: OrganizationEntity? = null,
     @Column(name = "position_title")
     var positionTitle: String? = null,
     @Enumerated(EnumType.STRING)

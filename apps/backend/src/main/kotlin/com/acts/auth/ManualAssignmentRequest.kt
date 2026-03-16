@@ -1,7 +1,6 @@
 package com.acts.auth
 
 data class ManualAssignmentRequest(
-    val departmentId: Long,
-    val teamId: Long,
+    val organizationId: Long,
     val positionTitle: String?,
 )

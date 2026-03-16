@@ -2,10 +2,9 @@ import type {
   AuditLogView,
   AppHealthView,
   AuthSessionView,
-  DepartmentOptionView,
   AuthUserView,
   ManualAssignmentInput,
-  TeamOptionView,
+  OrganizationOptionView,
   ViewerAllowlistEntryView,
   ViewerAllowlistInput
 } from "./dashboard-types";
@@ -13,8 +12,7 @@ import type {
 export interface DashboardApi {
   health(): Promise<AppHealthView>;
   getSession(): Promise<AuthSessionView>;
-  listDepartments(): Promise<DepartmentOptionView[]>;
-  listTeams(): Promise<TeamOptionView[]>;
+  listOrganizations(): Promise<OrganizationOptionView[]>;
   listUsers(): Promise<AuthUserView[]>;
   listViewerAllowlist(): Promise<ViewerAllowlistEntryView[]>;
   addViewerAllowlist(input: ViewerAllowlistInput): Promise<ViewerAllowlistEntryView[]>;
@@ -41,11 +39,8 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     async getSession() {
       return readJson<AuthSessionView>("/api/auth/me");
     },
-    async listDepartments() {
-      return readJson<DepartmentOptionView[]>("/api/auth/admin/departments");
-    },
-    async listTeams() {
-      return readJson<TeamOptionView[]>("/api/auth/admin/teams");
+    async listOrganizations() {
+      return readJson<OrganizationOptionView[]>("/api/auth/admin/organizations");
     },
     async listUsers() {
       return readJson<AuthUserView[]>("/api/auth/admin/users");

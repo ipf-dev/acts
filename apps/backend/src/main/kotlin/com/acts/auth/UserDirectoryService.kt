@@ -8,8 +8,7 @@ import java.time.Instant
 class UserDirectoryService(
     private val authProperties: ActsAuthProperties,
     private val userAccountRepository: UserAccountRepository,
-    private val departmentRepository: DepartmentRepository,
-    private val teamRepository: TeamRepository,
+    private val organizationRepository: OrganizationRepository,
     private val viewerAllowlistRepository: ViewerAllowlistRepository,
     private val adminAuditLogService: AdminAuditLogService,
 ) {
@@ -41,29 +40,18 @@ class UserDirectoryService(
         .map { it.toProfile() }
 
     @Transactional
-    fun listDepartments(): List<DepartmentOptionResponse> = departmentRepository.findAllByOrderByNameAsc()
-        .map { department ->
-            DepartmentOptionResponse(
-                id = requireNotNull(department.id),
-                name = department.name,
-            )
-        }
-
-    @Transactional
-    fun listTeams(): List<TeamOptionResponse> = teamRepository.findAllByOrderByNameAsc()
-        .map { team ->
-            TeamOptionResponse(
-                id = requireNotNull(team.id),
-                name = team.name,
-                departmentId = requireNotNull(team.department.id),
+    fun listOrganizations(): List<OrganizationOptionResponse> = organizationRepository.findAllByOrderByNameAsc()
+        .map { organization ->
+            OrganizationOptionResponse(
+                id = requireNotNull(organization.id),
+                name = organization.name,
             )
         }
 
     @Transactional
     fun saveManualAssignment(
         email: String,
-        departmentId: Long,
-        teamId: Long,
+        organizationId: Long,
         positionTitle: String?,
         actorEmail: String,
         actorName: String?,
@@ -81,17 +69,10 @@ class UserDirectoryService(
                 )
             }
         val beforeProfile = account.toProfile()
-        val department = departmentRepository.findById(departmentId)
-            .orElseThrow { IllegalArgumentException("Department does not exist.") }
-        val team = teamRepository.findById(teamId)
-            .orElseThrow { IllegalArgumentException("Team does not exist.") }
+        val organization = organizationRepository.findById(organizationId)
+            .orElseThrow { IllegalArgumentException("Organization does not exist.") }
 
-        if (team.department.id != department.id) {
-            throw IllegalArgumentException("Team does not belong to department.")
-        }
-
-        account.department = department
-        account.team = team
+        account.organization = organization
         account.positionTitle = positionTitle.normalizedOrNull()
         account.mappingMode = UserMappingMode.MANUAL
         account.role = resolvedRole
@@ -226,15 +207,13 @@ class UserDirectoryService(
 private fun UserAccountEntity.toProfile(): AuthUserProfile = AuthUserProfile(
     email = email,
     displayName = displayName,
-    departmentId = department?.id,
-    departmentName = department?.name,
-    teamId = team?.id,
-    teamName = team?.name,
+    organizationId = organization?.id,
+    organizationName = organization?.name,
     positionTitle = positionTitle,
     mappingMode = mappingMode,
     role = role,
     companyWideViewer = companyWideViewer,
-    manualAssignmentRequired = department == null || team == null,
+    manualAssignmentRequired = organization == null,
 )
 
 private fun String?.normalizedOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }

@@ -6,15 +6,9 @@ export interface AppHealthView {
 export type UserRole = "USER" | "ADMIN";
 export type UserMappingMode = "MANUAL" | "UNMAPPED";
 
-export interface DepartmentOptionView {
+export interface OrganizationOptionView {
   id: number;
   name: string;
-}
-
-export interface TeamOptionView {
-  id: number;
-  name: string;
-  departmentId: number;
 }
 
 export interface ViewerAllowlistEntryView {
@@ -41,10 +35,8 @@ export interface AuditLogView {
 export interface AuthUserView {
   email: string;
   displayName: string;
-  departmentId: number | null;
-  departmentName: string | null;
-  teamId: number | null;
-  teamName: string | null;
+  organizationId: number | null;
+  organizationName: string | null;
   positionTitle: string | null;
   mappingMode: UserMappingMode;
   role: UserRole;
@@ -60,8 +52,7 @@ export interface AuthSessionView {
 }
 
 export interface ManualAssignmentInput {
-  departmentId: number;
-  teamId: number;
+  organizationId: number;
   positionTitle: string;
 }
 

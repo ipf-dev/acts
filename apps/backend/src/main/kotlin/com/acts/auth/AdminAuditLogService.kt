@@ -153,18 +153,16 @@ class AdminAuditLogService(
         beforeProfile: AuthUserProfile,
         afterProfile: AuthUserProfile,
     ): String {
-        val beforeOrg = beforeProfile.teamName ?: beforeProfile.departmentName ?: "미지정"
-        val afterOrg = afterProfile.teamName ?: afterProfile.departmentName ?: "미지정"
+        val beforeOrg = beforeProfile.organizationName ?: "미지정"
+        val afterOrg = afterProfile.organizationName ?: "미지정"
         return "${afterProfile.displayName}: ${beforeOrg} -> ${afterOrg}"
     }
 }
 
 private data class UserAssignmentAuditSnapshot(
     val email: String,
-    val departmentId: Long?,
-    val departmentName: String?,
-    val teamId: Long?,
-    val teamName: String?,
+    val organizationId: Long?,
+    val organizationName: String?,
     val positionTitle: String?,
     val role: String,
     val companyWideViewer: Boolean,
@@ -172,10 +170,8 @@ private data class UserAssignmentAuditSnapshot(
     companion object {
         fun from(profile: AuthUserProfile): UserAssignmentAuditSnapshot = UserAssignmentAuditSnapshot(
             email = profile.email,
-            departmentId = profile.departmentId,
-            departmentName = profile.departmentName,
-            teamId = profile.teamId,
-            teamName = profile.teamName,
+            organizationId = profile.organizationId,
+            organizationName = profile.organizationName,
             positionTitle = profile.positionTitle,
             role = profile.role.name,
             companyWideViewer = profile.companyWideViewer,

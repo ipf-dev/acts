@@ -21,8 +21,7 @@ import type {
   AuditLogView,
   AuthSessionView,
   AuthUserView,
-  DepartmentOptionView,
-  TeamOptionView,
+  OrganizationOptionView,
   ViewerAllowlistEntryView
 } from "../../dashboard-types";
 
@@ -31,7 +30,6 @@ interface DashboardHomePageProps {
   auditLogs: AuditLogView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
-  departments: DepartmentOptionView[];
   health: AppHealthView | null;
   healthErrorMessage: string | null;
   isLoading: boolean;
@@ -42,19 +40,17 @@ interface DashboardHomePageProps {
   onRemoveViewerAllowlist: (email: string) => Promise<void>;
   onSaveManualAssignment: (
     email: string,
-    departmentId: number,
-    teamId: number,
+    organizationId: number,
     positionTitle: string
   ) => Promise<void>;
+  organizations: OrganizationOptionView[];
   session: AuthSessionView;
-  teams: TeamOptionView[];
   viewerAllowlist: ViewerAllowlistEntryView[];
 }
 
 interface UserAssignmentDraft {
-  departmentId: string;
+  organizationId: string;
   positionTitle: string;
-  teamId: string;
 }
 
 const auditTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
@@ -64,7 +60,7 @@ const auditTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
 
 const auditActionLabelMap: Record<string, string> = {
   LOGIN_SUCCESS: "로그인 성공",
-  USER_ASSIGNMENT_UPDATED: "사용자 부서/팀 변경",
+  USER_ASSIGNMENT_UPDATED: "사용자 조직 변경",
   VIEWER_ALLOWLIST_ADDED: "전사 열람자 추가",
   VIEWER_ALLOWLIST_REMOVED: "전사 열람자 제거"
 };
@@ -79,7 +75,6 @@ export function DashboardHomePage({
   auditLogs,
   authErrorMessage,
   authSuccessMessage,
-  departments,
   health,
   healthErrorMessage,
   isLoading,
@@ -89,8 +84,8 @@ export function DashboardHomePage({
   onLogout,
   onRemoveViewerAllowlist,
   onSaveManualAssignment,
+  organizations,
   session,
-  teams,
   viewerAllowlist
 }: DashboardHomePageProps): React.JSX.Element {
   const [allowlistEmail, setAllowlistEmail] = useState("");
@@ -100,7 +95,7 @@ export function DashboardHomePage({
   const healthLabel = isLoading ? "Checking" : health?.ok ? "Connected" : "Unavailable";
   const healthMessage = isLoading
     ? "Calling the Spring Boot backend."
-      : healthErrorMessage
+    : healthErrorMessage
       ? healthErrorMessage
       : `Connected to ${health?.service}.`;
   const currentUser = session.user;
@@ -113,7 +108,7 @@ export function DashboardHomePage({
       tone: "bg-sky-100 text-sky-700"
     },
     {
-      description: "최초 로그인 사용자는 미지정 상태로 저장하고, 팀/부서는 관리자 화면에서 수동으로 지정합니다.",
+      description: "최초 로그인 사용자는 미지정 상태로 저장하고, 조직은 관리자 화면에서 수동으로 지정합니다.",
       title: "수동 지정",
       tone: "bg-violet-100 text-violet-700"
     },
@@ -123,7 +118,7 @@ export function DashboardHomePage({
       tone: "bg-emerald-100 text-emerald-700"
     },
     {
-      description: "사용자 지정과 allowlist 변경은 전후 값과 변경자를 감사 로그에 남깁니다.",
+      description: "조직 지정과 allowlist 변경은 전후 값과 변경자를 감사 로그에 남깁니다.",
       title: "감사 로그",
       tone: "bg-rose-100 text-rose-700"
     }
@@ -132,8 +127,7 @@ export function DashboardHomePage({
   const signedInSummary = [
     { label: "이름", value: currentUser?.displayName ?? "미로그인" },
     { label: "역할", value: currentUser?.role ?? "게스트" },
-    { label: "팀", value: currentUser?.teamName ?? "지정 전" },
-    { label: "부서", value: currentUser?.departmentName ?? "지정 전" },
+    { label: "조직", value: currentUser?.organizationName ?? "지정 전" },
     { label: "직급", value: currentUser?.positionTitle ?? "미지정" },
     { label: "전사 열람", value: currentUser?.companyWideViewer ? "허용" : "미허용" }
   ];
@@ -160,26 +154,16 @@ export function DashboardHomePage({
 
   function getDraft(user: AuthUserView): UserAssignmentDraft {
     return draftsByEmail[user.email] ?? {
-      departmentId: user.departmentId?.toString() ?? "",
-      positionTitle: user.positionTitle ?? "",
-      teamId: user.teamId?.toString() ?? ""
+      organizationId: user.organizationId?.toString() ?? "",
+      positionTitle: user.positionTitle ?? ""
     };
-  }
-
-  function getTeamsForDepartment(departmentId: string): TeamOptionView[] {
-    if (isBlank(departmentId)) {
-      return [];
-    }
-
-    return teams.filter((team) => team.departmentId === Number(departmentId));
   }
 
   function updateDraft(email: string, partialDraft: Partial<UserAssignmentDraft>): void {
     setDraftsByEmail((currentDrafts) => {
       const previousDraft = currentDrafts[email] ?? {
-        departmentId: "",
-        positionTitle: "",
-        teamId: ""
+        organizationId: "",
+        positionTitle: ""
       };
 
       return {
@@ -195,16 +179,11 @@ export function DashboardHomePage({
   async function handleAssignmentSave(user: AuthUserView): Promise<void> {
     const draft = getDraft(user);
 
-    if (isBlank(draft.departmentId) || isBlank(draft.teamId)) {
+    if (isBlank(draft.organizationId)) {
       return;
     }
 
-    await onSaveManualAssignment(
-      user.email,
-      Number(draft.departmentId),
-      Number(draft.teamId),
-      draft.positionTitle
-    );
+    await onSaveManualAssignment(user.email, Number(draft.organizationId), draft.positionTitle);
     setDraftsByEmail((currentDrafts) => {
       const nextDrafts = { ...currentDrafts };
       delete nextDrafts[user.email];
@@ -233,8 +212,7 @@ export function DashboardHomePage({
           <div className="space-y-1">
             <h1 className="text-3xl font-semibold tracking-tight">관리자 설정</h1>
             <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              자동 매핑은 제외하고, 현재는 PostgreSQL 기반 사용자 디렉터리와 전사 열람자 allowlist를
-              운영하는 화면입니다.
+              조직 디렉터리, 전사 열람자 allowlist, 감사 로그를 운영하는 화면입니다.
             </p>
           </div>
         </div>
@@ -355,7 +333,7 @@ export function DashboardHomePage({
                 <div>
                   <CardTitle>사용자 관리</CardTitle>
                   <CardDescription>
-                    최초 로그인 사용자는 미지정 상태로 저장되며, 관리자가 팀/부서를 수동 지정하면 즉시
+                    최초 로그인 사용자는 미지정 상태로 저장되며, 관리자가 조직을 수동 지정하면 즉시
                     권한을 다시 계산합니다.
                   </CardDescription>
                 </div>
@@ -371,7 +349,7 @@ export function DashboardHomePage({
                     />
                   </div>
                   <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                    자동 매핑은 아직 꺼두고, 관리자 지정과 감사 로그만 먼저 구현했습니다.
+                    조직 구조는 단일 `organizations` 테이블로 단순화했습니다.
                   </div>
                 </div>
               </CardHeader>
@@ -384,8 +362,7 @@ export function DashboardHomePage({
                           <tr>
                             <th className="px-4 py-3 font-medium">사용자</th>
                             <th className="px-4 py-3 font-medium">이메일</th>
-                            <th className="px-4 py-3 font-medium">부서</th>
-                            <th className="px-4 py-3 font-medium">팀</th>
+                            <th className="px-4 py-3 font-medium">조직</th>
                             <th className="px-4 py-3 font-medium">직급</th>
                             <th className="px-4 py-3 font-medium">역할</th>
                             <th className="px-4 py-3 font-medium">전사 열람자</th>
@@ -396,11 +373,8 @@ export function DashboardHomePage({
                           {visibleUsers.length > 0 ? (
                             visibleUsers.map((user) => {
                               const draft = getDraft(user);
-                              const availableTeams = getTeamsForDepartment(draft.departmentId);
                               const canSaveAssignment =
-                                !isSavingAssignment &&
-                                !isBlank(draft.departmentId) &&
-                                !isBlank(draft.teamId);
+                                !isSavingAssignment && !isBlank(draft.organizationId);
 
                               return (
                                 <tr className="align-top" key={user.email}>
@@ -418,36 +392,17 @@ export function DashboardHomePage({
                                     </div>
                                   </td>
                                   <td className="px-4 py-4 text-muted-foreground">{user.email}</td>
-                                  <td className="min-w-44 px-4 py-4">
+                                  <td className="min-w-48 px-4 py-4">
                                     <Select
                                       onChange={(event) =>
-                                        updateDraft(user.email, {
-                                          departmentId: event.target.value,
-                                          teamId: ""
-                                        })
+                                        updateDraft(user.email, { organizationId: event.target.value })
                                       }
-                                      value={draft.departmentId}
+                                      value={draft.organizationId}
                                     >
-                                      <option value="">부서를 선택하세요</option>
-                                      {departments.map((department) => (
-                                        <option key={department.id} value={department.id}>
-                                          {department.name}
-                                        </option>
-                                      ))}
-                                    </Select>
-                                  </td>
-                                  <td className="min-w-44 px-4 py-4">
-                                    <Select
-                                      disabled={isBlank(draft.departmentId)}
-                                      onChange={(event) =>
-                                        updateDraft(user.email, { teamId: event.target.value })
-                                      }
-                                      value={draft.teamId}
-                                    >
-                                      <option value="">팀을 선택하세요</option>
-                                      {availableTeams.map((team) => (
-                                        <option key={team.id} value={team.id}>
-                                          {team.name}
+                                      <option value="">조직을 선택하세요</option>
+                                      {organizations.map((organization) => (
+                                        <option key={organization.id} value={organization.id}>
+                                          {organization.name}
                                         </option>
                                       ))}
                                     </Select>
@@ -487,7 +442,7 @@ export function DashboardHomePage({
                             })
                           ) : (
                             <tr>
-                              <td className="px-4 py-8 text-center text-muted-foreground" colSpan={8}>
+                              <td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>
                                 검색 조건에 맞는 사용자가 없습니다. 먼저 사용자가 로그인하면 여기에 나타납니다.
                               </td>
                             </tr>
@@ -498,7 +453,7 @@ export function DashboardHomePage({
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                    관리자 권한이 있는 계정으로 로그인하면 여기서 사용자별 팀/부서와 직급을 저장할 수 있습니다.
+                    관리자 권한이 있는 계정으로 로그인하면 여기서 사용자별 조직과 직급을 저장할 수 있습니다.
                   </div>
                 )}
               </CardContent>
@@ -579,9 +534,7 @@ export function DashboardHomePage({
             <Card>
               <CardHeader>
                 <CardTitle>권한 규칙 요약</CardTitle>
-                <CardDescription>
-                  현재 구현된 조직/권한 규칙만 요약합니다.
-                </CardDescription>
+                <CardDescription>현재 구현된 조직/권한 규칙만 요약합니다.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {permissionRules.map((rule) => (
@@ -600,7 +553,7 @@ export function DashboardHomePage({
             <CardHeader>
               <CardTitle>정책 설정</CardTitle>
               <CardDescription>
-                자동 매핑 규칙과 상세 권한 체계는 아직 미정입니다. 현재는 수동 지정, allowlist, 감사 로그까지 구현했습니다.
+                자동 매핑 규칙과 상세 권한 체계는 아직 미정입니다. 현재는 조직 수동 지정, allowlist, 감사 로그까지 구현했습니다.
               </CardDescription>
             </CardHeader>
             <CardContent>

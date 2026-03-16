@@ -78,11 +78,8 @@ class AuthController(
     @GetMapping("/admin/users")
     fun listUsers(): List<AuthUserProfile> = userDirectoryService.listKnownUsers()
 
-    @GetMapping("/admin/departments")
-    fun listDepartments(): List<DepartmentOptionResponse> = userDirectoryService.listDepartments()
-
-    @GetMapping("/admin/teams")
-    fun listTeams(): List<TeamOptionResponse> = userDirectoryService.listTeams()
+    @GetMapping("/admin/organizations")
+    fun listOrganizations(): List<OrganizationOptionResponse> = userDirectoryService.listOrganizations()
 
     @GetMapping("/admin/viewer-allowlist")
     fun listViewerAllowlist(): List<ViewerAllowlistEntryResponse> = userDirectoryService.listViewerAllowlist()
@@ -128,7 +125,7 @@ class AuthController(
         @RequestBody request: ManualAssignmentRequest,
         authentication: Authentication?,
     ): ResponseEntity<AuthUserProfile> {
-        if (request.departmentId <= 0L || request.teamId <= 0L) {
+        if (request.organizationId <= 0L) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
         }
 
@@ -136,8 +133,7 @@ class AuthController(
             ResponseEntity.ok(
                 userDirectoryService.saveManualAssignment(
                     email = email,
-                    departmentId = request.departmentId,
-                    teamId = request.teamId,
+                    organizationId = request.organizationId,
                     positionTitle = request.positionTitle,
                     actorEmail = currentActorEmail(authentication),
                     actorName = currentActorName(authentication),

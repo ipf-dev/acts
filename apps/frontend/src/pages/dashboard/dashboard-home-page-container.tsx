@@ -7,12 +7,11 @@ import {
   getLoginSuccessMessage
 } from "../../dashboard-auth";
 import type {
-  AuditLogView,
   AppHealthView,
+  AuditLogView,
   AuthSessionView,
   AuthUserView,
-  DepartmentOptionView,
-  TeamOptionView,
+  OrganizationOptionView,
   ViewerAllowlistEntryView
 } from "../../dashboard-types";
 import { DashboardHomePage } from "./dashboard-home-page";
@@ -22,14 +21,13 @@ interface DashboardHomePageState {
   auditLogs: AuditLogView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
-  departments: DepartmentOptionView[];
   health: AppHealthView | null;
   healthErrorMessage: string | null;
   isLoading: boolean;
   isSavingAssignment: boolean;
   isSavingAllowlist: boolean;
+  organizations: OrganizationOptionView[];
   session: AuthSessionView;
-  teams: TeamOptionView[];
   viewerAllowlist: ViewerAllowlistEntryView[];
 }
 
@@ -39,14 +37,12 @@ const initialLocationSearch = window.location.search;
 async function loadAdminData(): Promise<{
   adminUsers: AuthUserView[];
   auditLogs: AuditLogView[];
-  departments: DepartmentOptionView[];
-  teams: TeamOptionView[];
+  organizations: OrganizationOptionView[];
   viewerAllowlist: ViewerAllowlistEntryView[];
 }> {
-  const [adminUsers, departments, teams, viewerAllowlist, auditLogs] = await Promise.all([
+  const [adminUsers, organizations, viewerAllowlist, auditLogs] = await Promise.all([
     dashboardApi.listUsers(),
-    dashboardApi.listDepartments(),
-    dashboardApi.listTeams(),
+    dashboardApi.listOrganizations(),
     dashboardApi.listViewerAllowlist(),
     dashboardApi.listAuditLogs()
   ]);
@@ -54,8 +50,7 @@ async function loadAdminData(): Promise<{
   return {
     adminUsers,
     auditLogs,
-    departments,
-    teams,
+    organizations,
     viewerAllowlist
   };
 }
@@ -66,14 +61,13 @@ export function DashboardHomePageContainer(): React.JSX.Element {
     auditLogs: [],
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
-    departments: [],
     health: null,
     healthErrorMessage: null,
     isLoading: true,
     isSavingAssignment: false,
     isSavingAllowlist: false,
+    organizations: [],
     session: createAnonymousSession(),
-    teams: [],
     viewerAllowlist: []
   });
 
@@ -97,15 +91,14 @@ export function DashboardHomePageContainer(): React.JSX.Element {
 
         let adminUsers: AuthUserView[] = [];
         let auditLogs: AuditLogView[] = [];
-        let departments: DepartmentOptionView[] = [];
-        let teams: TeamOptionView[] = [];
+        let organizations: OrganizationOptionView[] = [];
         let viewerAllowlist: ViewerAllowlistEntryView[] = [];
         let authErrorMessage = getLoginFailureMessage(initialLocationSearch);
         let authSuccessMessage = getLoginSuccessMessage(initialLocationSearch);
 
         if (session.authenticated && session.user?.role === "ADMIN") {
           try {
-            ({ adminUsers, auditLogs, departments, teams, viewerAllowlist } = await loadAdminData());
+            ({ adminUsers, auditLogs, organizations, viewerAllowlist } = await loadAdminData());
           } catch (error: unknown) {
             authErrorMessage = error instanceof Error ? error.message : "Unknown error.";
             authSuccessMessage = null;
@@ -117,14 +110,13 @@ export function DashboardHomePageContainer(): React.JSX.Element {
           auditLogs,
           authErrorMessage,
           authSuccessMessage,
-          departments,
           health: "health" in healthResult ? healthResult.health : healthResult,
           healthErrorMessage: "errorMessage" in healthResult ? healthResult.errorMessage : null,
           isLoading: false,
           isSavingAssignment: false,
           isSavingAllowlist: false,
+          organizations,
           session,
-          teams,
           viewerAllowlist
         };
 
@@ -145,7 +137,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
       }
     }
 
-    void loadPage();
+    void loadPage()
 
     return () => {
       isActive = false;
@@ -159,8 +151,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
 
   async function handleSaveManualAssignment(
     email: string,
-    departmentId: number,
-    teamId: number,
+    organizationId: number,
     positionTitle: string
   ): Promise<void> {
     setState((currentState) => ({
@@ -172,8 +163,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
 
     try {
       await dashboardApi.saveManualAssignment(email, {
-        departmentId,
-        teamId,
+        organizationId,
         positionTitle
       });
 
@@ -186,10 +176,9 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         ...currentState,
         adminUsers: adminData.adminUsers,
         auditLogs: adminData.auditLogs,
-        departments: adminData.departments,
         isSavingAssignment: false,
+        organizations: adminData.organizations,
         session,
-        teams: adminData.teams,
         viewerAllowlist: adminData.viewerAllowlist
       }));
     } catch (error: unknown) {
@@ -221,10 +210,9 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         ...currentState,
         adminUsers: adminData.adminUsers,
         auditLogs: adminData.auditLogs,
-        departments: adminData.departments,
         isSavingAllowlist: false,
+        organizations: adminData.organizations,
         session,
-        teams: adminData.teams,
         viewerAllowlist: adminData.viewerAllowlist
       }));
     } catch (error: unknown) {
@@ -256,10 +244,9 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         ...currentState,
         adminUsers: adminData.adminUsers,
         auditLogs: adminData.auditLogs,
-        departments: adminData.departments,
         isSavingAllowlist: false,
+        organizations: adminData.organizations,
         session,
-        teams: adminData.teams,
         viewerAllowlist: adminData.viewerAllowlist
       }));
     } catch (error: unknown) {
@@ -277,7 +264,6 @@ export function DashboardHomePageContainer(): React.JSX.Element {
       auditLogs={state.auditLogs}
       authErrorMessage={state.authErrorMessage}
       authSuccessMessage={state.authSuccessMessage}
-      departments={state.departments}
       health={state.health}
       healthErrorMessage={state.healthErrorMessage}
       isLoading={state.isLoading}
@@ -287,8 +273,8 @@ export function DashboardHomePageContainer(): React.JSX.Element {
       onLogout={handleLogout}
       onRemoveViewerAllowlist={handleRemoveViewerAllowlist}
       onSaveManualAssignment={handleSaveManualAssignment}
+      organizations={state.organizations}
       session={state.session}
-      teams={state.teams}
       viewerAllowlist={state.viewerAllowlist}
     />
   );

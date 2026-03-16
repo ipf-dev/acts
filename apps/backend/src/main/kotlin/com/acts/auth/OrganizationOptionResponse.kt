@@ -1,7 +1,6 @@
 package com.acts.auth
 
-data class TeamOptionResponse(
+data class OrganizationOptionResponse(
     val id: Long,
     val name: String,
-    val departmentId: Long,
 )
