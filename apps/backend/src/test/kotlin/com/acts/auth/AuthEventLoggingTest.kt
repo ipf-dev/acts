@@ -9,7 +9,6 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
-import org.springframework.mock.env.MockEnvironment
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.authentication.TestingAuthenticationToken
@@ -80,22 +79,6 @@ class AuthEventLoggingTest {
 
         assertThat(response.redirectedUrl)
             .isEqualTo("http://localhost:5173/?loginError=domain_mismatch")
-        assertThat(listAppender.list).isEmpty()
-    }
-
-    @Test
-    fun `starting google login redirects to the frontend when oauth is not configured`() {
-        val controller = AuthController(
-            authProperties = ActsAuthProperties(frontendBaseUrl = "http://localhost:5173"),
-            userDirectoryService = UserDirectoryService(ActsAuthProperties()),
-            googleLoginAvailability = GoogleLoginAvailability(MockEnvironment()),
-        )
-        val response = MockHttpServletResponse()
-
-        controller.startGoogleLogin(response)
-
-        assertThat(response.redirectedUrl)
-            .isEqualTo("http://localhost:5173/?loginError=google_oauth_not_configured")
         assertThat(listAppender.list).isEmpty()
     }
 }

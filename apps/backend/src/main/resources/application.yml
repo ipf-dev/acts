@@ -1,6 +1,14 @@
 spring:
   application:
     name: acts-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/acts}
+    username: ${SPRING_DATASOURCE_USERNAME:acts}
+    password: ${SPRING_DATASOURCE_PASSWORD:acts}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
 
 server:
   port: ${SERVER_PORT:8088}

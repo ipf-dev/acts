@@ -1,85 +1,98 @@
 package com.acts.auth
 
+import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
-import java.util.concurrent.ConcurrentHashMap
+import java.time.Instant
 
 @Service
 class UserDirectoryService(
     private val authProperties: ActsAuthProperties,
+    private val userAccountRepository: UserAccountRepository,
+    private val departmentRepository: DepartmentRepository,
 ) {
-    private val knownUsers = ConcurrentHashMap<String, AuthUserProfile>()
-    private val manualAssignments = ConcurrentHashMap<String, UserAssignment>()
-
+    @Transactional
     fun syncLogin(email: String, displayName: String): AuthUserProfile {
         val normalizedEmail = email.lowercase()
-        val resolvedProfile = resolveProfile(
-            email = normalizedEmail,
-            displayName = displayName,
-        )
+        val account = userAccountRepository.findById(normalizedEmail)
+            .orElseGet {
+                UserAccountEntity(
+                    email = normalizedEmail,
+                    displayName = displayName,
+                    role = resolveRole(normalizedEmail),
+                    mappingMode = UserMappingMode.UNMAPPED,
+                    companyWideViewer = resolveRole(normalizedEmail) == UserRole.ADMIN,
+                )
+            }
 
-        knownUsers[normalizedEmail] = resolvedProfile
-        return resolvedProfile
+        account.displayName = displayName.trim()
+        account.role = resolveRole(normalizedEmail)
+        if (account.role == UserRole.ADMIN) {
+            account.companyWideViewer = true
+        }
+        account.lastLoginAt = Instant.now()
+
+        return userAccountRepository.save(account).toProfile()
     }
 
-    fun listKnownUsers(): List<AuthUserProfile> = knownUsers.values
-        .sortedBy { it.email }
+    @Transactional
+    fun listKnownUsers(): List<AuthUserProfile> = userAccountRepository.findAllByOrderByDisplayNameAscEmailAsc()
+        .map { it.toProfile() }
 
-    fun saveManualAssignment(
-        email: String,
-        teamName: String,
-        departmentName: String,
-    ): AuthUserProfile {
-        val normalizedEmail = email.lowercase()
-
-        manualAssignments[normalizedEmail] = UserAssignment(
-            teamName = teamName.trim(),
-            departmentName = departmentName.trim(),
-            mappingMode = UserMappingMode.MANUAL,
-        )
-
-        val displayName = knownUsers[normalizedEmail]?.displayName
-            ?: normalizedEmail.substringBefore("@")
-
-        val resolvedProfile = resolveProfile(
-            email = normalizedEmail,
-            displayName = displayName,
-        )
-
-        knownUsers[normalizedEmail] = resolvedProfile
-        return resolvedProfile
-    }
-
-    private fun resolveProfile(
-        email: String,
-        displayName: String,
-    ): AuthUserProfile {
-        val assignment = manualAssignments[email]
-            ?: UserAssignment(
-                teamName = "Pending assignment",
-                departmentName = "Pending assignment",
-                mappingMode = UserMappingMode.UNMAPPED,
+    @Transactional
+    fun listDepartments(): List<DepartmentOptionResponse> = departmentRepository.findAllByOrderByNameAsc()
+        .map { department ->
+            DepartmentOptionResponse(
+                id = requireNotNull(department.id),
+                name = department.name,
             )
-
-        val role = if (authProperties.adminEmails.any { it.equals(email, ignoreCase = true) }) {
-            UserRole.ADMIN
-        } else {
-            UserRole.USER
         }
 
-        return AuthUserProfile(
-            email = email,
-            displayName = displayName,
-            teamName = assignment.teamName,
-            departmentName = assignment.departmentName,
-            mappingMode = assignment.mappingMode,
-            role = role,
-            manualAssignmentRequired = assignment.mappingMode == UserMappingMode.UNMAPPED,
-        )
+    @Transactional
+    fun saveManualAssignment(
+        email: String,
+        departmentId: Long,
+        positionTitle: String?,
+    ): AuthUserProfile {
+        val normalizedEmail = email.lowercase()
+        val account = userAccountRepository.findById(normalizedEmail)
+            .orElseGet {
+                UserAccountEntity(
+                    email = normalizedEmail,
+                    displayName = normalizedEmail.substringBefore("@"),
+                    role = resolveRole(normalizedEmail),
+                    mappingMode = UserMappingMode.UNMAPPED,
+                    companyWideViewer = resolveRole(normalizedEmail) == UserRole.ADMIN,
+                )
+            }
+        val department = departmentRepository.findById(departmentId)
+            .orElseThrow { IllegalArgumentException("Department does not exist.") }
+
+        account.department = department
+        account.positionTitle = positionTitle.normalizedOrNull()
+        account.mappingMode = UserMappingMode.MANUAL
+
+        return userAccountRepository.save(account).toProfile()
+    }
+
+    private fun resolveRole(email: String): UserRole = if (
+        authProperties.adminEmails.any { it.equals(email, ignoreCase = true) }
+    ) {
+        UserRole.ADMIN
+    } else {
+        UserRole.USER
     }
 }
 
-private data class UserAssignment(
-    val teamName: String,
-    val departmentName: String,
-    val mappingMode: UserMappingMode,
+private fun UserAccountEntity.toProfile(): AuthUserProfile = AuthUserProfile(
+    email = email,
+    displayName = displayName,
+    departmentId = department?.id,
+    departmentName = department?.name,
+    positionTitle = positionTitle,
+    mappingMode = mappingMode,
+    role = role,
+    companyWideViewer = companyWideViewer,
+    manualAssignmentRequired = department == null,
 )
+
+private fun String?.normalizedOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }

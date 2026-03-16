@@ -6,13 +6,19 @@ import {
   getLoginFailureMessage,
   getLoginSuccessMessage
 } from "../../dashboard-auth";
-import type { AppHealthView, AuthSessionView, AuthUserView } from "../../dashboard-types";
+import type {
+  AppHealthView,
+  AuthSessionView,
+  AuthUserView,
+  DepartmentOptionView
+} from "../../dashboard-types";
 import { DashboardHomePage } from "./dashboard-home-page";
 
 interface DashboardHomePageState {
   adminUsers: AuthUserView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  departments: DepartmentOptionView[];
   health: AppHealthView | null;
   healthErrorMessage: string | null;
   isLoading: boolean;
@@ -28,6 +34,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
     adminUsers: [],
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+    departments: [],
     health: null,
     healthErrorMessage: null,
     isLoading: true,
@@ -54,12 +61,16 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         }
 
         let adminUsers: AuthUserView[] = [];
+        let departments: DepartmentOptionView[] = [];
         let authErrorMessage = getLoginFailureMessage(initialLocationSearch);
         let authSuccessMessage = getLoginSuccessMessage(initialLocationSearch);
 
         if (session.authenticated && session.user?.role === "ADMIN") {
           try {
-            adminUsers = await dashboardApi.listUsers();
+            [adminUsers, departments] = await Promise.all([
+              dashboardApi.listUsers(),
+              dashboardApi.listDepartments()
+            ]);
           } catch (error: unknown) {
             authErrorMessage = error instanceof Error ? error.message : "Unknown error.";
             authSuccessMessage = null;
@@ -70,6 +81,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
           adminUsers,
           authErrorMessage,
           authSuccessMessage,
+          departments,
           health: "health" in healthResult ? healthResult.health : healthResult,
           healthErrorMessage: "errorMessage" in healthResult ? healthResult.errorMessage : null,
           isLoading: false,
@@ -108,8 +120,8 @@ export function DashboardHomePageContainer(): React.JSX.Element {
 
   async function handleSaveManualAssignment(
     email: string,
-    teamName: string,
-    departmentName: string
+    departmentId: number,
+    positionTitle: string
   ): Promise<void> {
     setState((currentState) => ({
       ...currentState,
@@ -120,8 +132,8 @@ export function DashboardHomePageContainer(): React.JSX.Element {
 
     try {
       await dashboardApi.saveManualAssignment(email, {
-        departmentName,
-        teamName
+        departmentId,
+        positionTitle
       });
 
       const [session, adminUsers] = await Promise.all([
@@ -149,6 +161,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
       adminUsers={state.adminUsers}
       authErrorMessage={state.authErrorMessage}
       authSuccessMessage={state.authSuccessMessage}
+      departments={state.departments}
       health={state.health}
       healthErrorMessage={state.healthErrorMessage}
       isLoading={state.isLoading}

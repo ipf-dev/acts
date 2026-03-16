@@ -3,47 +3,50 @@ import {
   AlertTriangle,
   Clock3,
   LockKeyhole,
+  Search,
   Shield,
   Sparkles,
-  UserCog,
   Users
 } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
+import { Select } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
 import { isBlank } from "../../lib/utils";
-import type { AppHealthView, AuthSessionView, AuthUserView } from "../../dashboard-types";
+import type {
+  AppHealthView,
+  AuthSessionView,
+  AuthUserView,
+  DepartmentOptionView
+} from "../../dashboard-types";
 
 interface DashboardHomePageProps {
   adminUsers: AuthUserView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  departments: DepartmentOptionView[];
   health: AppHealthView | null;
   healthErrorMessage: string | null;
   isLoading: boolean;
   isSavingAssignment: boolean;
   onLogout: () => Promise<void>;
-  onSaveManualAssignment: (
-    email: string,
-    teamName: string,
-    departmentName: string
-  ) => Promise<void>;
+  onSaveManualAssignment: (email: string, departmentId: number, positionTitle: string) => Promise<void>;
   session: AuthSessionView;
 }
 
-interface ManualAssignmentFormState {
-  departmentName: string;
-  email: string;
-  teamName: string;
+interface UserAssignmentDraft {
+  departmentId: string;
+  positionTitle: string;
 }
 
 export function DashboardHomePage({
   adminUsers,
   authErrorMessage,
   authSuccessMessage,
+  departments,
   health,
   healthErrorMessage,
   isLoading,
@@ -52,11 +55,8 @@ export function DashboardHomePage({
   onSaveManualAssignment,
   session
 }: DashboardHomePageProps): React.JSX.Element {
-  const [formState, setFormState] = useState<ManualAssignmentFormState>({
-    departmentName: "",
-    email: "",
-    teamName: ""
-  });
+  const [draftsByEmail, setDraftsByEmail] = useState<Record<string, UserAssignmentDraft>>({});
+  const [searchQuery, setSearchQuery] = useState("");
   const healthLabel = isLoading ? "Checking" : health?.ok ? "Connected" : "Unavailable";
   const healthMessage = isLoading
     ? "Calling the Spring Boot backend."
@@ -64,12 +64,7 @@ export function DashboardHomePage({
       ? healthErrorMessage
       : `Connected to ${health?.service}.`;
   const currentUser = session.user;
-  const canSaveAssignment =
-    !isSavingAssignment &&
-    !isBlank(formState.email) &&
-    !isBlank(formState.teamName) &&
-    !isBlank(formState.departmentName);
-  const defaultTab = session.authenticated && currentUser?.role === "ADMIN" ? "allowlist" : "users";
+  const defaultTab = "users";
 
   const permissionRules = [
     {
@@ -97,17 +92,54 @@ export function DashboardHomePage({
   const signedInSummary = [
     { label: "이름", value: currentUser?.displayName ?? "미로그인" },
     { label: "역할", value: currentUser?.role ?? "게스트" },
-    { label: "팀", value: currentUser?.teamName ?? "지정 전" },
-    { label: "부서", value: currentUser?.departmentName ?? "지정 전" }
+    { label: "부서", value: currentUser?.departmentName ?? "지정 전" },
+    { label: "직급", value: currentUser?.positionTitle ?? "미지정" }
   ];
 
-  async function handleAssignmentSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    await onSaveManualAssignment(formState.email, formState.teamName, formState.departmentName);
-    setFormState({
-      departmentName: "",
-      email: "",
-      teamName: ""
+  const visibleUsers = adminUsers.filter((user) => {
+    if (isBlank(searchQuery)) {
+      return true;
+    }
+
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return (
+      user.displayName.toLowerCase().includes(normalizedQuery) ||
+      user.email.toLowerCase().includes(normalizedQuery)
+    );
+  });
+
+  function getDraft(user: AuthUserView): UserAssignmentDraft {
+    return draftsByEmail[user.email] ?? {
+      departmentId: user.departmentId?.toString() ?? "",
+      positionTitle: user.positionTitle ?? ""
+    };
+  }
+
+  function updateDraft(email: string, partialDraft: Partial<UserAssignmentDraft>): void {
+    setDraftsByEmail((currentDrafts) => {
+      const previousDraft = currentDrafts[email] ?? { departmentId: "", positionTitle: "" };
+      return {
+        ...currentDrafts,
+        [email]: {
+          ...previousDraft,
+          ...partialDraft
+        }
+      };
+    });
+  }
+
+  async function handleAssignmentSave(user: AuthUserView): Promise<void> {
+    const draft = getDraft(user);
+
+    if (isBlank(draft.departmentId)) {
+      return;
+    }
+
+    await onSaveManualAssignment(user.email, Number(draft.departmentId), draft.positionTitle);
+    setDraftsByEmail((currentDrafts) => {
+      const nextDrafts = { ...currentDrafts };
+      delete nextDrafts[user.email];
+      return nextDrafts;
     });
   }
 
@@ -163,7 +195,7 @@ export function DashboardHomePage({
         </TabsList>
 
         <TabsContent value="users">
-          <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>현재 로그인 상태</CardTitle>
@@ -227,19 +259,136 @@ export function DashboardHomePage({
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>접근 정책 요약</CardTitle>
-                <CardDescription>
-                  현재 MVP에서 실제로 적용되는 인증 및 운영 규칙만 보여줍니다.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {permissionRules.map((rule) => (
-                  <div className={`rounded-2xl p-4 ${rule.tone}`} key={rule.title}>
-                    <p className="font-medium">{rule.title}</p>
-                    <p className="mt-2 text-sm leading-6">{rule.description}</p>
+              <CardHeader className="space-y-4">
+                <div>
+                  <CardTitle>사용자 관리</CardTitle>
+                  <CardDescription>
+                    PostgreSQL에 저장된 사용자와 부서 수동 지정 상태를 관리합니다. 자동 매핑은 이후 단계에서 붙입니다.
+                  </CardDescription>
+                </div>
+
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,360px)_1fr] lg:items-center">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      className="pl-10"
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="이름 또는 이메일로 검색..."
+                      value={searchQuery}
+                    />
                   </div>
-                ))}
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                    권한 모델은 아직 확정 전이라 현재는 부서와 직급 수동 지정만 저장합니다.
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {session.authenticated && currentUser?.role === "ADMIN" ? (
+                  <div className="overflow-hidden rounded-2xl border border-border">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-border text-sm">
+                        <thead className="bg-muted/40 text-left text-muted-foreground">
+                          <tr>
+                            <th className="px-4 py-3 font-medium">사용자</th>
+                            <th className="px-4 py-3 font-medium">이메일</th>
+                            <th className="px-4 py-3 font-medium">부서</th>
+                            <th className="px-4 py-3 font-medium">직급</th>
+                            <th className="px-4 py-3 font-medium">역할</th>
+                            <th className="px-4 py-3 font-medium">전사 열람자</th>
+                            <th className="px-4 py-3 font-medium">액션</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border bg-card">
+                          {visibleUsers.length > 0 ? (
+                            visibleUsers.map((user) => {
+                              const draft = getDraft(user);
+                              const canSaveAssignment = !isSavingAssignment && !isBlank(draft.departmentId);
+
+                              return (
+                                <tr className="align-top" key={user.email}>
+                                  <td className="px-4 py-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                                        {user.displayName.slice(0, 1)}
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">{user.displayName}</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                          {user.mappingMode === "MANUAL" ? "수동 지정됨" : "지정 필요"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-4 text-muted-foreground">{user.email}</td>
+                                  <td className="min-w-48 px-4 py-4">
+                                    <Select
+                                      onChange={(event) =>
+                                        updateDraft(user.email, { departmentId: event.target.value })
+                                      }
+                                      value={draft.departmentId}
+                                    >
+                                      <option value="">부서를 선택하세요</option>
+                                      {departments.map((department) => (
+                                        <option key={department.id} value={department.id}>
+                                          {department.name}
+                                        </option>
+                                      ))}
+                                    </Select>
+                                  </td>
+                                  <td className="min-w-40 px-4 py-4">
+                                    <Input
+                                      onChange={(event) =>
+                                        updateDraft(user.email, { positionTitle: event.target.value })
+                                      }
+                                      placeholder="직급 입력"
+                                      value={draft.positionTitle}
+                                    />
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <Badge variant={user.role === "ADMIN" ? "default" : "outline"}>
+                                      {user.role === "ADMIN" ? "Admin" : "일반"}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <label className="inline-flex cursor-not-allowed items-center">
+                                      <input
+                                        checked={user.companyWideViewer}
+                                        className="h-5 w-9 cursor-not-allowed rounded-full accent-primary"
+                                        disabled
+                                        type="checkbox"
+                                      />
+                                    </label>
+                                  </td>
+                                  <td className="px-4 py-4">
+                                    <Button
+                                      disabled={!canSaveAssignment}
+                                      onClick={() => void handleAssignmentSave(user)}
+                                      size="sm"
+                                      type="button"
+                                      variant="secondary"
+                                    >
+                                      {isSavingAssignment ? "저장 중..." : "저장"}
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            <tr>
+                              <td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>
+                                검색 조건에 맞는 사용자가 없습니다. 먼저 사용자가 로그인하면 여기에 나타납니다.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                    관리자 권한이 있는 계정으로 로그인하면 여기서 사용자별 부서와 직급을 저장할 수 있습니다.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -249,85 +398,15 @@ export function DashboardHomePage({
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
             <Card>
               <CardHeader>
-                <CardTitle>사용자 수동 지정</CardTitle>
+                <CardTitle>권한/Allowlist</CardTitle>
                 <CardDescription>
-                  이메일로 부서를 추론하지 않기 때문에, 관리자 판단으로 팀과 부서를 연결합니다.
+                  부서 자동 매핑 규칙과 상세 권한 모델은 아직 확정 전입니다. 현재는 사용자 관리 탭에서 수동 부서 지정을 먼저 운영합니다.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
-                {session.authenticated && currentUser?.role === "ADMIN" ? (
-                  <>
-                    <form className="grid gap-3 md:grid-cols-[1.4fr_1fr_1fr_auto]" onSubmit={(event) => void handleAssignmentSubmit(event)}>
-                      <Input
-                        onChange={(event) =>
-                          setFormState((currentState) => ({
-                            ...currentState,
-                            email: event.target.value
-                          }))
-                        }
-                        placeholder="이메일 주소 (예: name@iportfolio.co.kr)"
-                        type="email"
-                        value={formState.email}
-                      />
-                      <Input
-                        onChange={(event) =>
-                          setFormState((currentState) => ({
-                            ...currentState,
-                            teamName: event.target.value
-                          }))
-                        }
-                        placeholder="팀 이름"
-                        value={formState.teamName}
-                      />
-                      <Input
-                        onChange={(event) =>
-                          setFormState((currentState) => ({
-                            ...currentState,
-                            departmentName: event.target.value
-                          }))
-                        }
-                        placeholder="부서 이름"
-                        value={formState.departmentName}
-                      />
-                      <Button disabled={!canSaveAssignment} type="submit">
-                        {isSavingAssignment ? "저장 중..." : "추가"}
-                      </Button>
-                    </form>
-
-                    <div className="space-y-3">
-                      {adminUsers.length > 0 ? (
-                        adminUsers.map((user) => (
-                          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/30 p-4 md:flex-row md:items-center md:justify-between" key={user.email}>
-                            <div className="flex items-start gap-3">
-                              <div className="rounded-xl bg-primary/10 p-2 text-primary">
-                                <UserCog className="h-4 w-4" />
-                              </div>
-                              <div>
-                                <p className="font-medium">{user.displayName}</p>
-                                <p className="text-sm text-muted-foreground">{user.email}</p>
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Badge variant="outline">{user.teamName}</Badge>
-                              <Badge variant="outline">{user.departmentName}</Badge>
-                              <Badge variant={user.mappingMode === "MANUAL" ? "secondary" : "warning"}>
-                                {user.mappingMode}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                          아직 조회된 사용자가 없습니다. 먼저 사용자가 로그인한 뒤 관리자 지정이 가능합니다.
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                    관리자 권한이 있는 계정으로 로그인하면 여기서 팀/부서 수동 지정을 처리할 수 있습니다.
-                  </div>
-                )}
+                <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                  권한 테이블과 자동 매핑 규칙은 다음 단계에서 확정합니다. 현재는 PostgreSQL에 저장되는 부서 수동 지정과 사용자 디렉터리만 운영합니다.
+                </div>
               </CardContent>
             </Card>
 

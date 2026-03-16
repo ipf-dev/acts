@@ -1,6 +1,7 @@
 import type {
   AppHealthView,
   AuthSessionView,
+  DepartmentOptionView,
   AuthUserView,
   ManualAssignmentInput
 } from "./dashboard-types";
@@ -8,6 +9,7 @@ import type {
 export interface DashboardApi {
   health(): Promise<AppHealthView>;
   getSession(): Promise<AuthSessionView>;
+  listDepartments(): Promise<DepartmentOptionView[]>;
   listUsers(): Promise<AuthUserView[]>;
   logout(): Promise<void>;
   saveManualAssignment(email: string, input: ManualAssignmentInput): Promise<AuthUserView>;
@@ -29,6 +31,9 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     },
     async getSession() {
       return readJson<AuthSessionView>("/api/auth/me");
+    },
+    async listDepartments() {
+      return readJson<DepartmentOptionView[]>("/api/auth/admin/departments");
     },
     async listUsers() {
       return readJson<AuthUserView[]>("/api/auth/admin/users");

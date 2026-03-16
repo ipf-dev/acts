@@ -77,21 +77,28 @@ class AuthController(
     @GetMapping("/admin/users")
     fun listUsers(): List<AuthUserProfile> = userDirectoryService.listKnownUsers()
 
+    @GetMapping("/admin/departments")
+    fun listDepartments(): List<DepartmentOptionResponse> = userDirectoryService.listDepartments()
+
     @PutMapping("/admin/users/{email}/assignment")
     fun updateManualAssignment(
         @PathVariable email: String,
         @RequestBody request: ManualAssignmentRequest,
     ): ResponseEntity<AuthUserProfile> {
-        if (request.teamName.isBlank() || request.departmentName.isBlank()) {
+        if (request.departmentId <= 0L) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
         }
 
-        return ResponseEntity.ok(
-            userDirectoryService.saveManualAssignment(
+        return try {
+            ResponseEntity.ok(
+                userDirectoryService.saveManualAssignment(
                 email = email,
-                teamName = request.teamName,
-                departmentName = request.departmentName,
-            ),
-        )
+                    departmentId = request.departmentId,
+                    positionTitle = request.positionTitle,
+                ),
+            )
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
     }
 }
