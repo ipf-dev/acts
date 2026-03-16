@@ -12,6 +12,7 @@ import org.springframework.web.util.UriComponentsBuilder
 class AuthSuccessHandler(
     private val authProperties: ActsAuthProperties,
     private val authEventLogger: AuthEventLogger,
+    private val adminAuditLogService: AdminAuditLogService,
 ) : AuthenticationSuccessHandler {
     override fun onAuthenticationSuccess(
         request: HttpServletRequest,
@@ -24,10 +25,18 @@ class AuthSuccessHandler(
         } else {
             UserRole.USER
         }
+        val actorName = (authentication.principal as? OidcUser)?.fullName
+            ?: (authentication.principal as? OidcUser)?.givenName
+            ?: email.substringBefore("@")
 
         authEventLogger.logLoginSuccess(
             request = request,
             email = email,
+            role = role,
+        )
+        adminAuditLogService.recordLoginSuccess(
+            email = email,
+            actorName = actorName,
             role = role,
         )
 

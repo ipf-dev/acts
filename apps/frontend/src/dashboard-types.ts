@@ -25,9 +25,14 @@ export interface ViewerAllowlistEntryView {
 
 export interface AuditLogView {
   id: number;
+  category: string;
+  outcome: string;
+  actorName: string | null;
   actorEmail: string;
   actionType: string;
+  targetName: string | null;
   targetEmail: string;
+  detail: string | null;
   beforeState: string | null;
   afterState: string | null;
   createdAt: string;

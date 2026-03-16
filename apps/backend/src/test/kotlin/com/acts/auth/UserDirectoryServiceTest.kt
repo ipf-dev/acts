@@ -60,6 +60,7 @@ class UserDirectoryServiceTest @Autowired constructor(
             teamId = marketingTeam.id!!,
             positionTitle = "마케터",
             actorEmail = "minsungkim@iportfolio.co.kr",
+            actorName = "Min Sung Kim",
         )
 
         val auditLogs = userDirectoryService.listAuditLogs()
@@ -93,6 +94,7 @@ class UserDirectoryServiceTest @Autowired constructor(
         val allowlistEntries = userDirectoryService.addViewerAllowlist(
             email = "leader@iportfolio.co.kr",
             actorEmail = "minsungkim@iportfolio.co.kr",
+            actorName = "Min Sung Kim",
         )
         val refreshedProfile = userDirectoryService.listKnownUsers()
             .first { user -> user.email == "leader@iportfolio.co.kr" }
@@ -119,12 +121,14 @@ class UserDirectoryServiceTest @Autowired constructor(
         userDirectoryService.addViewerAllowlist(
             email = "viewer@iportfolio.co.kr",
             actorEmail = "minsungkim@iportfolio.co.kr",
+            actorName = "Min Sung Kim",
         )
         adminAuditLogRepository.deleteAll()
 
         userDirectoryService.removeViewerAllowlist(
             email = "viewer@iportfolio.co.kr",
             actorEmail = "minsungkim@iportfolio.co.kr",
+            actorName = "Min Sung Kim",
         )
 
         val refreshedProfile = userDirectoryService.listKnownUsers()

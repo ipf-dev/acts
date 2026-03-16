@@ -66,6 +66,7 @@ class UserDirectoryService(
         teamId: Long,
         positionTitle: String?,
         actorEmail: String,
+        actorName: String?,
     ): AuthUserProfile {
         val normalizedEmail = email.lowercase()
         val resolvedRole = resolveRole(normalizedEmail)
@@ -99,6 +100,7 @@ class UserDirectoryService(
         val savedProfile = userAccountRepository.save(account).toProfile()
         adminAuditLogService.recordUserAssignmentChange(
             actorEmail = actorEmail,
+            actorName = actorName,
             beforeProfile = beforeProfile,
             afterProfile = savedProfile,
         )
@@ -123,6 +125,7 @@ class UserDirectoryService(
     fun addViewerAllowlist(
         email: String,
         actorEmail: String,
+        actorName: String?,
     ): List<ViewerAllowlistEntryResponse> {
         val normalizedEmail = email.lowercase()
         validateAllowedDomain(normalizedEmail)
@@ -136,7 +139,9 @@ class UserDirectoryService(
             recalculateEffectivePermissions(normalizedEmail)
             adminAuditLogService.recordViewerAllowlistAdded(
                 actorEmail = actorEmail,
+                actorName = actorName,
                 targetEmail = normalizedEmail,
+                targetName = existingAccount?.displayName,
                 beforeState = beforeState,
                 afterState = viewerAllowlistAuditSnapshot(
                     normalizedEmail,
@@ -152,6 +157,7 @@ class UserDirectoryService(
     fun removeViewerAllowlist(
         email: String,
         actorEmail: String,
+        actorName: String?,
     ): List<ViewerAllowlistEntryResponse> {
         val normalizedEmail = email.lowercase()
         val existingEntry = viewerAllowlistRepository.findById(normalizedEmail).orElse(null)
@@ -164,7 +170,9 @@ class UserDirectoryService(
 
         adminAuditLogService.recordViewerAllowlistRemoved(
             actorEmail = actorEmail,
+            actorName = actorName,
             targetEmail = normalizedEmail,
+            targetName = existingAccount?.displayName,
             beforeState = beforeState,
             afterState = viewerAllowlistAuditSnapshot(
                 normalizedEmail,

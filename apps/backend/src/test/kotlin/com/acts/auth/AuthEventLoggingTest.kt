@@ -9,12 +9,20 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.authentication.TestingAuthenticationToken
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException
+import org.springframework.transaction.annotation.Transactional
 
-class AuthEventLoggingTest {
+@SpringBootTest
+@Transactional
+class AuthEventLoggingTest @Autowired constructor(
+    private val adminAuditLogRepository: AdminAuditLogRepository,
+    private val authSuccessHandler: AuthSuccessHandler,
+) {
     private val logger = LoggerFactory.getLogger(AuthEventLogger::class.java) as Logger
     private val listAppender = ListAppender<ILoggingEvent>()
 
@@ -31,11 +39,7 @@ class AuthEventLoggingTest {
     }
 
     @Test
-    fun `successful login is logged and redirected back to the frontend`() {
-        val handler = AuthSuccessHandler(
-            authProperties = ActsAuthProperties(frontendBaseUrl = "http://localhost:5173"),
-            authEventLogger = AuthEventLogger(),
-        )
+    fun `successful login is logged persisted and redirected back to the frontend`() {
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google").apply {
             remoteAddr = "127.0.0.1"
             addHeader("User-Agent", "JUnit")
@@ -47,7 +51,9 @@ class AuthEventLoggingTest {
             "ROLE_ADMIN",
         )
 
-        handler.onAuthenticationSuccess(request, response, authentication)
+        authSuccessHandler.onAuthenticationSuccess(request, response, authentication)
+
+        val auditLog = adminAuditLogRepository.findTop50ByOrderByCreatedAtDescIdDesc().single()
 
         assertThat(response.redirectedUrl).isEqualTo("http://localhost:5173/?login=success")
         assertThat(listAppender.list).hasSize(1)
@@ -57,6 +63,13 @@ class AuthEventLoggingTest {
             .contains("outcome=success")
             .contains("email=minsungkim@iportfolio.co.kr")
             .contains("role=ADMIN")
+
+        assertThat(auditLog.category).isEqualTo(AuditLogCategory.AUTH)
+        assertThat(auditLog.outcome).isEqualTo(AuditLogOutcome.SUCCESS)
+        assertThat(auditLog.actionType).isEqualTo(AdminAuditLogAction.LOGIN_SUCCESS)
+        assertThat(auditLog.actorEmail).isEqualTo("minsungkim@iportfolio.co.kr")
+        assertThat(auditLog.targetEmail).isEqualTo("minsungkim@iportfolio.co.kr")
+        assertThat(auditLog.detail).contains("Google SSO 로그인 성공")
     }
 
     @Test

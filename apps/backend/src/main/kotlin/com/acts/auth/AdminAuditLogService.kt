@@ -8,8 +8,28 @@ class AdminAuditLogService(
     private val adminAuditLogRepository: AdminAuditLogRepository,
     private val objectMapper: ObjectMapper,
 ) {
+    fun recordLoginSuccess(
+        email: String,
+        actorName: String?,
+        role: UserRole,
+    ) {
+        saveAuditLog(
+            category = AuditLogCategory.AUTH,
+            outcome = AuditLogOutcome.SUCCESS,
+            actorEmail = email,
+            actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.LOGIN_SUCCESS,
+            targetEmail = email,
+            targetName = actorName.normalizedAuditName(),
+            detail = "Google SSO 로그인 성공 (${role.name})",
+            beforeState = null,
+            afterState = null,
+        )
+    }
+
     fun recordUserAssignmentChange(
         actorEmail: String,
+        actorName: String?,
         beforeProfile: AuthUserProfile,
         afterProfile: AuthUserProfile,
     ) {
@@ -18,9 +38,14 @@ class AdminAuditLogService(
         }
 
         saveAuditLog(
+            category = AuditLogCategory.PERMISSION,
+            outcome = AuditLogOutcome.SUCCESS,
             actorEmail = actorEmail,
+            actorName = actorName.normalizedAuditName(),
             actionType = AdminAuditLogAction.USER_ASSIGNMENT_UPDATED,
             targetEmail = afterProfile.email,
+            targetName = afterProfile.displayName,
+            detail = buildUserAssignmentDetail(beforeProfile, afterProfile),
             beforeState = objectMapper.writeValueAsString(UserAssignmentAuditSnapshot.from(beforeProfile)),
             afterState = objectMapper.writeValueAsString(UserAssignmentAuditSnapshot.from(afterProfile)),
         )
@@ -28,7 +53,9 @@ class AdminAuditLogService(
 
     fun recordViewerAllowlistAdded(
         actorEmail: String,
+        actorName: String?,
         targetEmail: String,
+        targetName: String?,
         beforeState: ViewerAllowlistAuditSnapshot,
         afterState: ViewerAllowlistAuditSnapshot,
     ) {
@@ -37,9 +64,14 @@ class AdminAuditLogService(
         }
 
         saveAuditLog(
+            category = AuditLogCategory.PERMISSION,
+            outcome = AuditLogOutcome.SUCCESS,
             actorEmail = actorEmail,
+            actorName = actorName.normalizedAuditName(),
             actionType = AdminAuditLogAction.VIEWER_ALLOWLIST_ADDED,
             targetEmail = targetEmail,
+            targetName = targetName.normalizedAuditName(),
+            detail = "${targetName.normalizedAuditName() ?: targetEmail} 전사 열람자 추가",
             beforeState = objectMapper.writeValueAsString(beforeState),
             afterState = objectMapper.writeValueAsString(afterState),
         )
@@ -47,7 +79,9 @@ class AdminAuditLogService(
 
     fun recordViewerAllowlistRemoved(
         actorEmail: String,
+        actorName: String?,
         targetEmail: String,
+        targetName: String?,
         beforeState: ViewerAllowlistAuditSnapshot,
         afterState: ViewerAllowlistAuditSnapshot,
     ) {
@@ -56,9 +90,14 @@ class AdminAuditLogService(
         }
 
         saveAuditLog(
+            category = AuditLogCategory.PERMISSION,
+            outcome = AuditLogOutcome.SUCCESS,
             actorEmail = actorEmail,
+            actorName = actorName.normalizedAuditName(),
             actionType = AdminAuditLogAction.VIEWER_ALLOWLIST_REMOVED,
             targetEmail = targetEmail,
+            targetName = targetName.normalizedAuditName(),
+            detail = "${targetName.normalizedAuditName() ?: targetEmail} 전사 열람자 제거",
             beforeState = objectMapper.writeValueAsString(beforeState),
             afterState = objectMapper.writeValueAsString(afterState),
         )
@@ -68,9 +107,14 @@ class AdminAuditLogService(
         .map { entity ->
             AuditLogResponse(
                 id = requireNotNull(entity.id),
+                category = entity.category.name,
+                outcome = entity.outcome.name,
+                actorName = entity.actorName,
                 actorEmail = entity.actorEmail,
                 actionType = entity.actionType.name,
+                targetName = entity.targetName,
                 targetEmail = entity.targetEmail,
+                detail = entity.detail,
                 beforeState = entity.beforeState,
                 afterState = entity.afterState,
                 createdAt = entity.createdAt,
@@ -78,21 +122,40 @@ class AdminAuditLogService(
         }
 
     private fun saveAuditLog(
+        category: AuditLogCategory,
+        outcome: AuditLogOutcome,
         actorEmail: String,
+        actorName: String?,
         actionType: AdminAuditLogAction,
         targetEmail: String,
+        targetName: String?,
+        detail: String?,
         beforeState: String?,
         afterState: String?,
     ) {
         adminAuditLogRepository.save(
             AdminAuditLogEntity(
+                category = category,
+                outcome = outcome,
                 actorEmail = actorEmail,
+                actorName = actorName,
                 actionType = actionType,
                 targetEmail = targetEmail,
+                targetName = targetName,
+                detail = detail,
                 beforeState = beforeState,
                 afterState = afterState,
             ),
         )
+    }
+
+    private fun buildUserAssignmentDetail(
+        beforeProfile: AuthUserProfile,
+        afterProfile: AuthUserProfile,
+    ): String {
+        val beforeOrg = beforeProfile.teamName ?: beforeProfile.departmentName ?: "미지정"
+        val afterOrg = afterProfile.teamName ?: afterProfile.departmentName ?: "미지정"
+        return "${afterProfile.displayName}: ${beforeOrg} -> ${afterOrg}"
     }
 }
 
@@ -125,3 +188,5 @@ data class ViewerAllowlistAuditSnapshot(
     val allowlisted: Boolean,
     val effectiveCompanyWideViewer: Boolean,
 )
+
+private fun String?.normalizedAuditName(): String? = this?.trim()?.takeIf { it.isNotEmpty() }

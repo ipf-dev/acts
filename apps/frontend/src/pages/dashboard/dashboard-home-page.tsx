@@ -63,9 +63,15 @@ const auditTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
 });
 
 const auditActionLabelMap: Record<string, string> = {
+  LOGIN_SUCCESS: "로그인 성공",
   USER_ASSIGNMENT_UPDATED: "사용자 부서/팀 변경",
   VIEWER_ALLOWLIST_ADDED: "전사 열람자 추가",
   VIEWER_ALLOWLIST_REMOVED: "전사 열람자 제거"
+};
+
+const auditCategoryLabelMap: Record<string, string> = {
+  AUTH: "로그인",
+  PERMISSION: "권한"
 };
 
 export function DashboardHomePage({
@@ -88,6 +94,7 @@ export function DashboardHomePage({
   viewerAllowlist
 }: DashboardHomePageProps): React.JSX.Element {
   const [allowlistEmail, setAllowlistEmail] = useState("");
+  const [auditFilter, setAuditFilter] = useState("ALL");
   const [draftsByEmail, setDraftsByEmail] = useState<Record<string, UserAssignmentDraft>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const healthLabel = isLoading ? "Checking" : health?.ok ? "Connected" : "Unavailable";
@@ -100,7 +107,8 @@ export function DashboardHomePage({
 
   const permissionRules = [
     {
-      description: "Google SSO는 @iportfolio.co.kr 도메인으로 제한하고, 로그인 성공은 시스템 로그에 남깁니다.",
+      description:
+        "Google SSO는 @iportfolio.co.kr 도메인으로 제한하고, 로그인 성공은 시스템 로그와 감사 로그에 함께 저장합니다.",
       title: "로그인 정책",
       tone: "bg-sky-100 text-sky-700"
     },
@@ -140,6 +148,14 @@ export function DashboardHomePage({
       user.displayName.toLowerCase().includes(normalizedQuery) ||
       user.email.toLowerCase().includes(normalizedQuery)
     );
+  });
+
+  const visibleAuditLogs = auditLogs.filter((log) => {
+    if (auditFilter === "ALL") {
+      return true;
+    }
+
+    return log.category === auditFilter;
   });
 
   function getDraft(user: AuthUserView): UserAssignmentDraft {
@@ -597,47 +613,72 @@ export function DashboardHomePage({
 
         <TabsContent value="audit">
           <Card>
-            <CardHeader>
-              <CardTitle>감사 로그</CardTitle>
-              <CardDescription>
-                사용자 조직 변경과 전사 열람자 allowlist 변경의 전후 값과 변경자를 기록합니다.
-              </CardDescription>
+            <CardHeader className="space-y-4">
+              <div>
+                <CardTitle>감사 로그</CardTitle>
+                <CardDescription>
+                  로그인 성공, 사용자 조직 변경, 전사 열람자 allowlist 변경을 저장하고 조회합니다.
+                </CardDescription>
+              </div>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="w-full max-w-xs">
+                  <Select onChange={(event) => setAuditFilter(event.target.value)} value={auditFilter}>
+                    <option value="ALL">전체 로그</option>
+                    <option value="AUTH">로그인</option>
+                    <option value="PERMISSION">권한 변경</option>
+                  </Select>
+                </div>
+                <p className="text-sm text-muted-foreground">{visibleAuditLogs.length}건의 로그</p>
+              </div>
             </CardHeader>
             <CardContent>
-              {auditLogs.length > 0 ? (
+              {visibleAuditLogs.length > 0 ? (
                 <div className="overflow-hidden rounded-2xl border border-border">
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-border text-sm">
                       <thead className="bg-muted/40 text-left text-muted-foreground">
                         <tr>
-                          <th className="px-4 py-3 font-medium">시각</th>
+                          <th className="px-4 py-3 font-medium">유형</th>
                           <th className="px-4 py-3 font-medium">액션</th>
-                          <th className="px-4 py-3 font-medium">대상</th>
-                          <th className="px-4 py-3 font-medium">변경자</th>
-                          <th className="px-4 py-3 font-medium">이전 값</th>
-                          <th className="px-4 py-3 font-medium">이후 값</th>
+                          <th className="px-4 py-3 font-medium">사용자</th>
+                          <th className="px-4 py-3 font-medium">이메일</th>
+                          <th className="px-4 py-3 font-medium">상세</th>
+                          <th className="px-4 py-3 font-medium">시간</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border bg-card">
-                        {auditLogs.map((log) => (
+                        {visibleAuditLogs.map((log) => (
                           <tr className="align-top" key={log.id}>
-                            <td className="px-4 py-4 text-muted-foreground">
-                              {auditTimeFormatter.format(new Date(log.createdAt))}
+                            <td className="px-4 py-4">
+                              <Badge variant={log.category === "AUTH" ? "outline" : "secondary"}>
+                                {auditCategoryLabelMap[log.category] ?? log.category}
+                              </Badge>
                             </td>
                             <td className="px-4 py-4 font-medium">
-                              {auditActionLabelMap[log.actionType] ?? log.actionType}
+                              <div className="space-y-2">
+                                <p>{auditActionLabelMap[log.actionType] ?? log.actionType}</p>
+                                <Badge variant={log.outcome === "SUCCESS" ? "success" : "warning"}>
+                                  {log.outcome === "SUCCESS" ? "성공" : "주의"}
+                                </Badge>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <p className="font-medium">{log.targetName ?? log.actorName ?? "시스템"}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                실행자 {log.actorName ?? log.actorEmail}
+                              </p>
                             </td>
                             <td className="px-4 py-4 text-muted-foreground">{log.targetEmail}</td>
-                            <td className="px-4 py-4 text-muted-foreground">{log.actorEmail}</td>
-                            <td className="max-w-sm px-4 py-4">
-                              <code className="whitespace-pre-wrap break-all text-xs text-muted-foreground">
-                                {log.beforeState ?? "-"}
-                              </code>
+                            <td className="max-w-md px-4 py-4 text-muted-foreground">
+                              <p>{log.detail ?? "-"}</p>
+                              {log.beforeState || log.afterState ? (
+                                <p className="mt-2 text-xs">
+                                  변경 전후 값은 감사 로그 원문에 함께 저장됩니다.
+                                </p>
+                              ) : null}
                             </td>
-                            <td className="max-w-sm px-4 py-4">
-                              <code className="whitespace-pre-wrap break-all text-xs text-muted-foreground">
-                                {log.afterState ?? "-"}
-                              </code>
+                            <td className="px-4 py-4 text-muted-foreground">
+                              {auditTimeFormatter.format(new Date(log.createdAt))}
                             </td>
                           </tr>
                         ))}

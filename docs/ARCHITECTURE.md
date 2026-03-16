@@ -43,7 +43,7 @@ Expected first-slice backend capabilities:
 - PostgreSQL-backed user directory plus department/team catalog
 - user org assignment lookup with admin override support
 - company-wide viewer allowlist with immediate permission recalculation
-- audit logging for admin org and permission changes
+- audit logging for login success plus admin org and permission changes
 - asset catalog and metadata management
 - generation request orchestration
 - IP guide retrieval for AI workflows

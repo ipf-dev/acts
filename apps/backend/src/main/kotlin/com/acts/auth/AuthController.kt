@@ -101,6 +101,7 @@ class AuthController(
                 userDirectoryService.addViewerAllowlist(
                     email = request.email.trim(),
                     actorEmail = currentActorEmail(authentication),
+                    actorName = currentActorName(authentication),
                 ),
             )
         } catch (_: IllegalArgumentException) {
@@ -115,6 +116,7 @@ class AuthController(
     ): List<ViewerAllowlistEntryResponse> = userDirectoryService.removeViewerAllowlist(
         email = email,
         actorEmail = currentActorEmail(authentication),
+        actorName = currentActorName(authentication),
     )
 
     @GetMapping("/admin/audit-logs")
@@ -138,6 +140,7 @@ class AuthController(
                     teamId = request.teamId,
                     positionTitle = request.positionTitle,
                     actorEmail = currentActorEmail(authentication),
+                    actorName = currentActorName(authentication),
                 ),
             )
         } catch (_: IllegalArgumentException) {
@@ -146,4 +149,9 @@ class AuthController(
     }
 
     private fun currentActorEmail(authentication: Authentication?): String = authentication?.name?.lowercase() ?: "system"
+
+    private fun currentActorName(authentication: Authentication?): String = when (val principal = authentication?.principal) {
+        is OidcUser -> principal.fullName ?: principal.givenName ?: principal.email ?: authentication.name
+        else -> authentication?.name?.substringBefore("@") ?: "시스템"
+    }
 }
