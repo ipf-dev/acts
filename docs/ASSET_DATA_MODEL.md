@@ -12,6 +12,30 @@
 - 자산의 버전, 이력, 복구, 중복 판정을 추적할 것
 - 조직/제작자 기준 조회와 통계를 낼 수 있을 것
 
+## Current Slice
+
+현재 실제 구현은 아래 최소 세트만 먼저 들어갔다.
+
+- `assets`
+- `asset_files`
+- `asset_tags`
+- `asset_events`
+
+이 네 테이블로 먼저 해결하는 범위:
+
+- LocalStack S3 업로드
+- 제목/파일명/태그/제작자/조직 기준 검색 기반
+- 등록 이력 시작점
+- 이후 버전/중복/파생본 확장을 위한 anchor
+
+아직 미구현이지만 설계만 열어둔 항목:
+
+- `asset_versions`
+- `asset_file_media_metadata`
+- `asset_derivatives`
+- `upload_sessions`
+- duplicate candidate/linking 계열 테이블
+
 ## Storage Decision
 
 권장 저장 구조:

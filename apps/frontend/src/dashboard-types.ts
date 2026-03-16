@@ -59,3 +59,40 @@ export interface ManualAssignmentInput {
 export interface ViewerAllowlistInput {
   email: string;
 }
+
+export type AssetTypeView = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" | "SCENARIO" | "OTHER";
+export type AssetStatusView = "READY";
+export type AssetSourceTypeView = "EXTERNAL_UPLOAD";
+
+export interface AssetSummaryView {
+  id: number;
+  title: string;
+  type: AssetTypeView;
+  status: AssetStatusView;
+  description: string | null;
+  sourceType: AssetSourceTypeView;
+  sourceDetail: string | null;
+  originalFileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  fileExtension: string | null;
+  versionNumber: number;
+  ownerEmail: string;
+  ownerName: string;
+  organizationId: number | null;
+  organizationName: string | null;
+  widthPx: number | null;
+  heightPx: number | null;
+  durationMs: number | null;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetUploadInput {
+  file: File;
+  title?: string;
+  description?: string;
+  sourceDetail?: string;
+  tags: string[];
+}

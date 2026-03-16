@@ -14,23 +14,32 @@ import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
 import { cn } from "../../lib/utils";
 
+export type DashboardNavigationKey = "assets" | "admin";
+
 interface DashboardShellProps {
+  activeNavigationKey: DashboardNavigationKey;
   title: string;
   children: React.ReactNode;
+  onNavigate: (navigationKey: DashboardNavigationKey) => void;
 }
 
 const navigationItems = [
   { icon: LayoutDashboard, label: "대시보드" },
-  { icon: FolderOpen, label: "자산 라이브러리" },
+  { icon: FolderOpen, key: "assets" as const, label: "자산 라이브러리" },
   { icon: Sparkles, label: "프롬프트 허브" },
   { icon: WandSparkles, label: "AI 시나리오" },
   { icon: ImagePlus, label: "AI 이미지 생성" },
   { icon: BookOpen, label: "도서 관리" },
   { icon: Clapperboard, label: "화면설계서" },
-  { icon: ShieldCheck, label: "관리자 설정", active: true }
+  { icon: ShieldCheck, key: "admin" as const, label: "관리자 설정" }
 ];
 
-export function DashboardShell({ title, children }: DashboardShellProps): React.JSX.Element {
+export function DashboardShell({
+  activeNavigationKey,
+  title,
+  children,
+  onNavigate
+}: DashboardShellProps): React.JSX.Element {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="grid min-h-screen lg:grid-cols-[240px_1fr]">
@@ -53,9 +62,15 @@ export function DashboardShell({ title, children }: DashboardShellProps): React.
                 <button
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                    item.active && "bg-muted text-foreground shadow-sm"
+                    item.key === activeNavigationKey && "bg-muted text-foreground shadow-sm",
+                    !item.key && "cursor-default opacity-60"
                   )}
                   key={item.label}
+                  onClick={() => {
+                    if (item.key) {
+                      onNavigate(item.key);
+                    }
+                  }}
                   type="button"
                 >
                   <Icon className="h-4 w-4" />
@@ -67,9 +82,9 @@ export function DashboardShell({ title, children }: DashboardShellProps): React.
 
           <div className="border-t border-sidebar-border px-4 py-5">
             <div className="rounded-2xl border border-sidebar-border bg-background/80 p-4">
-              <p className="text-sm font-medium">관리자 워크스페이스</p>
+              <p className="text-sm font-medium">ACTS 워크스페이스</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                현재 화면은 Figma 구조를 참고한 관리자 설정 골격입니다.
+                현재는 자산 업로드와 관리자 설정만 실제 동작 범위에 포함됩니다.
               </p>
               <Badge className="mt-3" variant="secondary">
                 MVP shell
@@ -126,11 +141,17 @@ export function DashboardShell({ title, children }: DashboardShellProps): React.
 
                   return (
                     <button
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm",
-                        item.active && "bg-primary text-primary-foreground"
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm",
+                        item.key === activeNavigationKey && "bg-primary text-primary-foreground",
+                        !item.key && "opacity-60"
                       )}
                       key={item.label}
+                      onClick={() => {
+                        if (item.key) {
+                          onNavigate(item.key);
+                        }
+                      }}
                       type="button"
                     >
                       <Icon className="h-4 w-4" />

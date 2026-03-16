@@ -26,6 +26,7 @@ class SecurityConfig(
                 authorize("/api/auth/me", permitAll)
                 authorize("/api/auth/login/google", permitAll)
                 authorize("/api/auth/admin/**", hasRole("ADMIN"))
+                authorize("/api/assets/**", authenticated)
                 authorize("/api/auth/logout", authenticated)
                 authorize(anyRequest, permitAll)
             }

@@ -1,4 +1,6 @@
 import type {
+  AssetSummaryView,
+  AssetUploadInput,
   AuditLogView,
   AppHealthView,
   AuthSessionView,
@@ -10,6 +12,8 @@ import type {
 } from "./dashboard-types";
 
 export interface DashboardApi {
+  listAssets(): Promise<AssetSummaryView[]>;
+  uploadAsset(input: AssetUploadInput): Promise<AssetSummaryView>;
   health(): Promise<AppHealthView>;
   getSession(): Promise<AuthSessionView>;
   listOrganizations(): Promise<OrganizationOptionView[]>;
@@ -33,6 +37,33 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
   }
 
   return {
+    async listAssets() {
+      return readJson<AssetSummaryView[]>("/api/assets");
+    },
+    async uploadAsset(input) {
+      const formData = new FormData();
+      formData.append("file", input.file);
+      if (input.title) {
+        formData.append("title", input.title);
+      }
+      if (input.description) {
+        formData.append("description", input.description);
+      }
+      if (input.sourceDetail) {
+        formData.append("sourceDetail", input.sourceDetail);
+      }
+      input.tags.forEach((tag) => formData.append("tags", tag));
+
+      const response = await fetchFn("/api/assets/uploads", {
+        method: "POST",
+        body: formData
+      });
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}.`);
+      }
+
+      return (await response.json()) as AssetSummaryView;
+    },
     async health() {
       return readJson<AppHealthView>("/api/health");
     },

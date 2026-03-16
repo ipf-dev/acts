@@ -23,3 +23,11 @@ acts:
     frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
     admin-emails:
       - minsungkim@iportfolio.co.kr
+  storage:
+    bucket: ${ACTS_STORAGE_BUCKET:acts-assets}
+    endpoint: ${ACTS_STORAGE_ENDPOINT:http://localhost:4566}
+    region: ${ACTS_STORAGE_REGION:ap-northeast-2}
+    access-key: ${ACTS_STORAGE_ACCESS_KEY:test}
+    secret-key: ${ACTS_STORAGE_SECRET_KEY:test}
+    path-style-access-enabled: ${ACTS_STORAGE_PATH_STYLE_ACCESS_ENABLED:true}
+    auto-create-bucket: ${ACTS_STORAGE_AUTO_CREATE_BUCKET:true}

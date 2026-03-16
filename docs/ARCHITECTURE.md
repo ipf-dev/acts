@@ -45,8 +45,9 @@ Expected first-slice backend capabilities:
 - company-wide viewer allowlist with immediate permission recalculation
 - audit logging for login success plus admin org and permission changes
 - asset metadata in PostgreSQL with binary files stored in object storage
-- direct upload session orchestration and post-upload verification
-- asset catalog with tags, origin metadata, duplicate detection, and version history
+- LocalStack S3-backed multipart upload endpoint for the first asset slice
+- asset catalog tables for `assets`, `asset_files`, `asset_tags`, and `asset_events`
+- filename/type-based tag suggestion, image metadata extraction, and creator/org stamping
 - generation request orchestration
 - IP guide retrieval for AI workflows
 - revision and activity history recording
@@ -66,7 +67,7 @@ Expected first-slice frontend surfaces:
 - user-facing auth failure notification after login redirects
 - searchable admin user table with per-user organization assignment
 - admin allowlist management and audit log views
-- asset hub pages with tag and creator filters
+- asset library page with upload modal, tag chips, search, and basic filters
 - generation request forms and result views
 - searchable asset detail flows
 - guide-aware creation UI
