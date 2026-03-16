@@ -44,6 +44,8 @@ Expected first-slice backend capabilities:
 - user org assignment lookup with admin override support
 - company-wide viewer allowlist with immediate permission recalculation
 - audit logging for login success plus admin org and permission changes
+- asset metadata in PostgreSQL with binary files stored in object storage
+- direct upload session orchestration and post-upload verification
 - asset catalog and metadata management
 - generation request orchestration
 - IP guide retrieval for AI workflows
