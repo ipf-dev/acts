@@ -5,6 +5,8 @@ data class AuthUserProfile(
     val displayName: String,
     val departmentId: Long?,
     val departmentName: String?,
+    val teamId: Long?,
+    val teamName: String?,
     val positionTitle: String?,
     val mappingMode: UserMappingMode,
     val role: UserRole,

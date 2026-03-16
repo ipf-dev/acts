@@ -24,6 +24,9 @@ class UserAccountEntity(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")
     var department: DepartmentEntity? = null,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    var team: TeamEntity? = null,
     @Column(name = "position_title")
     var positionTitle: String? = null,
     @Enumerated(EnumType.STRING)

@@ -11,11 +11,35 @@ export interface DepartmentOptionView {
   name: string;
 }
 
+export interface TeamOptionView {
+  id: number;
+  name: string;
+  departmentId: number;
+}
+
+export interface ViewerAllowlistEntryView {
+  email: string;
+  effectiveCompanyWideViewer: boolean;
+  createdAt: string;
+}
+
+export interface AuditLogView {
+  id: number;
+  actorEmail: string;
+  actionType: string;
+  targetEmail: string;
+  beforeState: string | null;
+  afterState: string | null;
+  createdAt: string;
+}
+
 export interface AuthUserView {
   email: string;
   displayName: string;
   departmentId: number | null;
   departmentName: string | null;
+  teamId: number | null;
+  teamName: string | null;
   positionTitle: string | null;
   mappingMode: UserMappingMode;
   role: UserRole;
@@ -32,5 +56,10 @@ export interface AuthSessionView {
 
 export interface ManualAssignmentInput {
   departmentId: number;
+  teamId: number;
   positionTitle: string;
+}
+
+export interface ViewerAllowlistInput {
+  email: string;
 }

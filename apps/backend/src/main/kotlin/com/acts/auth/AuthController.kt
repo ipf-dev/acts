@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.security.oauth2.core.oidc.user.OidcUser
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -80,25 +81,69 @@ class AuthController(
     @GetMapping("/admin/departments")
     fun listDepartments(): List<DepartmentOptionResponse> = userDirectoryService.listDepartments()
 
-    @PutMapping("/admin/users/{email}/assignment")
-    fun updateManualAssignment(
-        @PathVariable email: String,
-        @RequestBody request: ManualAssignmentRequest,
-    ): ResponseEntity<AuthUserProfile> {
-        if (request.departmentId <= 0L) {
+    @GetMapping("/admin/teams")
+    fun listTeams(): List<TeamOptionResponse> = userDirectoryService.listTeams()
+
+    @GetMapping("/admin/viewer-allowlist")
+    fun listViewerAllowlist(): List<ViewerAllowlistEntryResponse> = userDirectoryService.listViewerAllowlist()
+
+    @PostMapping("/admin/viewer-allowlist")
+    fun addViewerAllowlist(
+        @RequestBody request: ViewerAllowlistRequest,
+        authentication: Authentication?,
+    ): ResponseEntity<List<ViewerAllowlistEntryResponse>> {
+        if (request.email.isBlank()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
         }
 
         return try {
             ResponseEntity.ok(
-                userDirectoryService.saveManualAssignment(
-                email = email,
-                    departmentId = request.departmentId,
-                    positionTitle = request.positionTitle,
+                userDirectoryService.addViewerAllowlist(
+                    email = request.email.trim(),
+                    actorEmail = currentActorEmail(authentication),
                 ),
             )
         } catch (_: IllegalArgumentException) {
             ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
         }
     }
+
+    @DeleteMapping("/admin/viewer-allowlist/{email}")
+    fun removeViewerAllowlist(
+        @PathVariable email: String,
+        authentication: Authentication?,
+    ): List<ViewerAllowlistEntryResponse> = userDirectoryService.removeViewerAllowlist(
+        email = email,
+        actorEmail = currentActorEmail(authentication),
+    )
+
+    @GetMapping("/admin/audit-logs")
+    fun listAuditLogs(): List<AuditLogResponse> = userDirectoryService.listAuditLogs()
+
+    @PutMapping("/admin/users/{email}/assignment")
+    fun updateManualAssignment(
+        @PathVariable email: String,
+        @RequestBody request: ManualAssignmentRequest,
+        authentication: Authentication?,
+    ): ResponseEntity<AuthUserProfile> {
+        if (request.departmentId <= 0L || request.teamId <= 0L) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
+
+        return try {
+            ResponseEntity.ok(
+                userDirectoryService.saveManualAssignment(
+                    email = email,
+                    departmentId = request.departmentId,
+                    teamId = request.teamId,
+                    positionTitle = request.positionTitle,
+                    actorEmail = currentActorEmail(authentication),
+                ),
+            )
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
+    }
+
+    private fun currentActorEmail(authentication: Authentication?): String = authentication?.name?.lowercase() ?: "system"
 }

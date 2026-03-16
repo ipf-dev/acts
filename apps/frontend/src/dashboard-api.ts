@@ -1,16 +1,25 @@
 import type {
+  AuditLogView,
   AppHealthView,
   AuthSessionView,
   DepartmentOptionView,
   AuthUserView,
-  ManualAssignmentInput
+  ManualAssignmentInput,
+  TeamOptionView,
+  ViewerAllowlistEntryView,
+  ViewerAllowlistInput
 } from "./dashboard-types";
 
 export interface DashboardApi {
   health(): Promise<AppHealthView>;
   getSession(): Promise<AuthSessionView>;
   listDepartments(): Promise<DepartmentOptionView[]>;
+  listTeams(): Promise<TeamOptionView[]>;
   listUsers(): Promise<AuthUserView[]>;
+  listViewerAllowlist(): Promise<ViewerAllowlistEntryView[]>;
+  addViewerAllowlist(input: ViewerAllowlistInput): Promise<ViewerAllowlistEntryView[]>;
+  removeViewerAllowlist(email: string): Promise<ViewerAllowlistEntryView[]>;
+  listAuditLogs(): Promise<AuditLogView[]>;
   logout(): Promise<void>;
   saveManualAssignment(email: string, input: ManualAssignmentInput): Promise<AuthUserView>;
 }
@@ -35,8 +44,34 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     async listDepartments() {
       return readJson<DepartmentOptionView[]>("/api/auth/admin/departments");
     },
+    async listTeams() {
+      return readJson<TeamOptionView[]>("/api/auth/admin/teams");
+    },
     async listUsers() {
       return readJson<AuthUserView[]>("/api/auth/admin/users");
+    },
+    async listViewerAllowlist() {
+      return readJson<ViewerAllowlistEntryView[]>("/api/auth/admin/viewer-allowlist");
+    },
+    async addViewerAllowlist(input) {
+      return readJson<ViewerAllowlistEntryView[]>("/api/auth/admin/viewer-allowlist", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+    },
+    async removeViewerAllowlist(email) {
+      return readJson<ViewerAllowlistEntryView[]>(
+        `/api/auth/admin/viewer-allowlist/${encodeURIComponent(email)}`,
+        {
+          method: "DELETE"
+        }
+      );
+    },
+    async listAuditLogs() {
+      return readJson<AuditLogView[]>("/api/auth/admin/audit-logs");
     },
     async logout() {
       const response = await fetchFn("/api/auth/logout", {

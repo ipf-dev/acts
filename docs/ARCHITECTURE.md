@@ -40,8 +40,10 @@ Expected first-slice backend capabilities:
 
 - domain-restricted Google SSO and session identity lookup
 - auth success event logging at the SSO boundary
-- PostgreSQL-backed user directory and department catalog
+- PostgreSQL-backed user directory plus department/team catalog
 - user org assignment lookup with admin override support
+- company-wide viewer allowlist with immediate permission recalculation
+- audit logging for admin org and permission changes
 - asset catalog and metadata management
 - generation request orchestration
 - IP guide retrieval for AI workflows
@@ -60,7 +62,8 @@ Expected first-slice frontend surfaces:
 
 - login entry, session status, and admin override screens
 - user-facing auth failure notification after login redirects
-- searchable admin user table with per-user department assignment
+- searchable admin user table with per-user department and team assignment
+- admin allowlist management and audit log views
 - asset hub pages
 - generation request forms and result views
 - searchable asset detail flows

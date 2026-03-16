@@ -18,13 +18,17 @@ import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
 import { isBlank } from "../../lib/utils";
 import type {
   AppHealthView,
+  AuditLogView,
   AuthSessionView,
   AuthUserView,
-  DepartmentOptionView
+  DepartmentOptionView,
+  TeamOptionView,
+  ViewerAllowlistEntryView
 } from "../../dashboard-types";
 
 interface DashboardHomePageProps {
   adminUsers: AuthUserView[];
+  auditLogs: AuditLogView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   departments: DepartmentOptionView[];
@@ -32,18 +36,41 @@ interface DashboardHomePageProps {
   healthErrorMessage: string | null;
   isLoading: boolean;
   isSavingAssignment: boolean;
+  isSavingAllowlist: boolean;
+  onAddViewerAllowlist: (email: string) => Promise<void>;
   onLogout: () => Promise<void>;
-  onSaveManualAssignment: (email: string, departmentId: number, positionTitle: string) => Promise<void>;
+  onRemoveViewerAllowlist: (email: string) => Promise<void>;
+  onSaveManualAssignment: (
+    email: string,
+    departmentId: number,
+    teamId: number,
+    positionTitle: string
+  ) => Promise<void>;
   session: AuthSessionView;
+  teams: TeamOptionView[];
+  viewerAllowlist: ViewerAllowlistEntryView[];
 }
 
 interface UserAssignmentDraft {
   departmentId: string;
   positionTitle: string;
+  teamId: string;
 }
+
+const auditTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  dateStyle: "short",
+  timeStyle: "short"
+});
+
+const auditActionLabelMap: Record<string, string> = {
+  USER_ASSIGNMENT_UPDATED: "사용자 부서/팀 변경",
+  VIEWER_ALLOWLIST_ADDED: "전사 열람자 추가",
+  VIEWER_ALLOWLIST_REMOVED: "전사 열람자 제거"
+};
 
 export function DashboardHomePage({
   adminUsers,
+  auditLogs,
   authErrorMessage,
   authSuccessMessage,
   departments,
@@ -51,10 +78,16 @@ export function DashboardHomePage({
   healthErrorMessage,
   isLoading,
   isSavingAssignment,
+  isSavingAllowlist,
+  onAddViewerAllowlist,
   onLogout,
+  onRemoveViewerAllowlist,
   onSaveManualAssignment,
-  session
+  session,
+  teams,
+  viewerAllowlist
 }: DashboardHomePageProps): React.JSX.Element {
+  const [allowlistEmail, setAllowlistEmail] = useState("");
   const [draftsByEmail, setDraftsByEmail] = useState<Record<string, UserAssignmentDraft>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const healthLabel = isLoading ? "Checking" : health?.ok ? "Connected" : "Unavailable";
@@ -64,36 +97,37 @@ export function DashboardHomePage({
       ? healthErrorMessage
       : `Connected to ${health?.service}.`;
   const currentUser = session.user;
-  const defaultTab = "users";
 
   const permissionRules = [
     {
-      description: "Google Workspace 계정 인증 후에도 ACTS 내부 역할에 따라 접근 범위를 구분합니다.",
-      title: "일반 사용자",
-      tone: "bg-zinc-100 text-zinc-700"
-    },
-    {
-      description: "현재 구현 범위에서는 수동 팀/부서 지정과 운영자용 사용자 확인이 핵심입니다.",
-      title: "Admin",
-      tone: "bg-rose-100 text-rose-700"
-    },
-    {
-      description: "로그인 자체는 @iportfolio.co.kr 도메인으로만 허용됩니다.",
+      description: "Google SSO는 @iportfolio.co.kr 도메인으로 제한하고, 로그인 성공은 시스템 로그에 남깁니다.",
       title: "로그인 정책",
       tone: "bg-sky-100 text-sky-700"
     },
     {
-      description: "자동 부서 추론은 제거했고, 미지정 사용자는 관리자 판단으로 연결합니다.",
+      description: "최초 로그인 사용자는 미지정 상태로 저장하고, 팀/부서는 관리자 화면에서 수동으로 지정합니다.",
       title: "수동 지정",
       tone: "bg-violet-100 text-violet-700"
+    },
+    {
+      description: "전사 열람자는 이메일 allowlist로 관리하며 수정 즉시 권한을 다시 계산합니다.",
+      title: "전사 열람자",
+      tone: "bg-emerald-100 text-emerald-700"
+    },
+    {
+      description: "사용자 지정과 allowlist 변경은 전후 값과 변경자를 감사 로그에 남깁니다.",
+      title: "감사 로그",
+      tone: "bg-rose-100 text-rose-700"
     }
   ];
 
   const signedInSummary = [
     { label: "이름", value: currentUser?.displayName ?? "미로그인" },
     { label: "역할", value: currentUser?.role ?? "게스트" },
+    { label: "팀", value: currentUser?.teamName ?? "지정 전" },
     { label: "부서", value: currentUser?.departmentName ?? "지정 전" },
-    { label: "직급", value: currentUser?.positionTitle ?? "미지정" }
+    { label: "직급", value: currentUser?.positionTitle ?? "미지정" },
+    { label: "전사 열람", value: currentUser?.companyWideViewer ? "허용" : "미허용" }
   ];
 
   const visibleUsers = adminUsers.filter((user) => {
@@ -111,13 +145,27 @@ export function DashboardHomePage({
   function getDraft(user: AuthUserView): UserAssignmentDraft {
     return draftsByEmail[user.email] ?? {
       departmentId: user.departmentId?.toString() ?? "",
-      positionTitle: user.positionTitle ?? ""
+      positionTitle: user.positionTitle ?? "",
+      teamId: user.teamId?.toString() ?? ""
     };
+  }
+
+  function getTeamsForDepartment(departmentId: string): TeamOptionView[] {
+    if (isBlank(departmentId)) {
+      return [];
+    }
+
+    return teams.filter((team) => team.departmentId === Number(departmentId));
   }
 
   function updateDraft(email: string, partialDraft: Partial<UserAssignmentDraft>): void {
     setDraftsByEmail((currentDrafts) => {
-      const previousDraft = currentDrafts[email] ?? { departmentId: "", positionTitle: "" };
+      const previousDraft = currentDrafts[email] ?? {
+        departmentId: "",
+        positionTitle: "",
+        teamId: ""
+      };
+
       return {
         ...currentDrafts,
         [email]: {
@@ -131,16 +179,32 @@ export function DashboardHomePage({
   async function handleAssignmentSave(user: AuthUserView): Promise<void> {
     const draft = getDraft(user);
 
-    if (isBlank(draft.departmentId)) {
+    if (isBlank(draft.departmentId) || isBlank(draft.teamId)) {
       return;
     }
 
-    await onSaveManualAssignment(user.email, Number(draft.departmentId), draft.positionTitle);
+    await onSaveManualAssignment(
+      user.email,
+      Number(draft.departmentId),
+      Number(draft.teamId),
+      draft.positionTitle
+    );
     setDraftsByEmail((currentDrafts) => {
       const nextDrafts = { ...currentDrafts };
       delete nextDrafts[user.email];
       return nextDrafts;
     });
+  }
+
+  async function handleViewerAllowlistSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+
+    if (isBlank(allowlistEmail)) {
+      return;
+    }
+
+    await onAddViewerAllowlist(allowlistEmail.trim());
+    setAllowlistEmail("");
   }
 
   return (
@@ -153,8 +217,8 @@ export function DashboardHomePage({
           <div className="space-y-1">
             <h1 className="text-3xl font-semibold tracking-tight">관리자 설정</h1>
             <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              이미지에서 가져온 정보 구조를 기준으로, 지금 구현된 Google SSO와
-              수동 사용자 지정 플로우만 담은 운영 화면입니다.
+              자동 매핑은 제외하고, 현재는 PostgreSQL 기반 사용자 디렉터리와 전사 열람자 allowlist를
+              운영하는 화면입니다.
             </p>
           </div>
         </div>
@@ -167,28 +231,40 @@ export function DashboardHomePage({
             <div className="space-y-1">
               <p className="text-sm font-medium">Figma skeleton only</p>
               <p className="text-sm text-muted-foreground">
-                기능은 auth/admin MVP에 맞게 축소했고, 레이아웃 뼈대만 참조했습니다.
+                기능은 auth/admin 범위에 맞춰 축소했고, 정보 구조와 운영 UI 톤만 반영했습니다.
               </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs className="space-y-6" defaultValue={defaultTab}>
+      <Tabs className="space-y-6" defaultValue="users">
         <TabsList className="h-auto flex-wrap justify-start gap-2 rounded-2xl bg-transparent p-0">
-          <TabsTrigger className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="users">
+          <TabsTrigger
+            className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            value="users"
+          >
             <Users className="mr-2 h-4 w-4" />
             사용자 관리
           </TabsTrigger>
-          <TabsTrigger className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="allowlist">
+          <TabsTrigger
+            className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            value="allowlist"
+          >
             <Shield className="mr-2 h-4 w-4" />
             권한/Allowlist
           </TabsTrigger>
-          <TabsTrigger className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="policy">
+          <TabsTrigger
+            className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            value="policy"
+          >
             <LockKeyhole className="mr-2 h-4 w-4" />
             정책 설정
           </TabsTrigger>
-          <TabsTrigger className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" value="audit">
+          <TabsTrigger
+            className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            value="audit"
+          >
             <Clock3 className="mr-2 h-4 w-4" />
             감사 로그
           </TabsTrigger>
@@ -200,7 +276,7 @@ export function DashboardHomePage({
               <CardHeader>
                 <CardTitle>현재 로그인 상태</CardTitle>
                 <CardDescription>
-                  Google SSO 세션과 내부 사용자 할당 상태를 한곳에서 확인합니다.
+                  Google SSO 세션과 현재 사용자에 계산된 조직/권한 상태를 확인합니다.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -214,7 +290,7 @@ export function DashboardHomePage({
                   </Badge>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {signedInSummary.map((item) => (
                     <div className="rounded-2xl border border-border bg-muted/40 p-4" key={item.label}>
                       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -263,7 +339,8 @@ export function DashboardHomePage({
                 <div>
                   <CardTitle>사용자 관리</CardTitle>
                   <CardDescription>
-                    PostgreSQL에 저장된 사용자와 부서 수동 지정 상태를 관리합니다. 자동 매핑은 이후 단계에서 붙입니다.
+                    최초 로그인 사용자는 미지정 상태로 저장되며, 관리자가 팀/부서를 수동 지정하면 즉시
+                    권한을 다시 계산합니다.
                   </CardDescription>
                 </div>
 
@@ -278,7 +355,7 @@ export function DashboardHomePage({
                     />
                   </div>
                   <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                    권한 모델은 아직 확정 전이라 현재는 부서와 직급 수동 지정만 저장합니다.
+                    자동 매핑은 아직 꺼두고, 관리자 지정과 감사 로그만 먼저 구현했습니다.
                   </div>
                 </div>
               </CardHeader>
@@ -292,6 +369,7 @@ export function DashboardHomePage({
                             <th className="px-4 py-3 font-medium">사용자</th>
                             <th className="px-4 py-3 font-medium">이메일</th>
                             <th className="px-4 py-3 font-medium">부서</th>
+                            <th className="px-4 py-3 font-medium">팀</th>
                             <th className="px-4 py-3 font-medium">직급</th>
                             <th className="px-4 py-3 font-medium">역할</th>
                             <th className="px-4 py-3 font-medium">전사 열람자</th>
@@ -302,7 +380,11 @@ export function DashboardHomePage({
                           {visibleUsers.length > 0 ? (
                             visibleUsers.map((user) => {
                               const draft = getDraft(user);
-                              const canSaveAssignment = !isSavingAssignment && !isBlank(draft.departmentId);
+                              const availableTeams = getTeamsForDepartment(draft.departmentId);
+                              const canSaveAssignment =
+                                !isSavingAssignment &&
+                                !isBlank(draft.departmentId) &&
+                                !isBlank(draft.teamId);
 
                               return (
                                 <tr className="align-top" key={user.email}>
@@ -320,10 +402,13 @@ export function DashboardHomePage({
                                     </div>
                                   </td>
                                   <td className="px-4 py-4 text-muted-foreground">{user.email}</td>
-                                  <td className="min-w-48 px-4 py-4">
+                                  <td className="min-w-44 px-4 py-4">
                                     <Select
                                       onChange={(event) =>
-                                        updateDraft(user.email, { departmentId: event.target.value })
+                                        updateDraft(user.email, {
+                                          departmentId: event.target.value,
+                                          teamId: ""
+                                        })
                                       }
                                       value={draft.departmentId}
                                     >
@@ -335,7 +420,23 @@ export function DashboardHomePage({
                                       ))}
                                     </Select>
                                   </td>
-                                  <td className="min-w-40 px-4 py-4">
+                                  <td className="min-w-44 px-4 py-4">
+                                    <Select
+                                      disabled={isBlank(draft.departmentId)}
+                                      onChange={(event) =>
+                                        updateDraft(user.email, { teamId: event.target.value })
+                                      }
+                                      value={draft.teamId}
+                                    >
+                                      <option value="">팀을 선택하세요</option>
+                                      {availableTeams.map((team) => (
+                                        <option key={team.id} value={team.id}>
+                                          {team.name}
+                                        </option>
+                                      ))}
+                                    </Select>
+                                  </td>
+                                  <td className="min-w-36 px-4 py-4">
                                     <Input
                                       onChange={(event) =>
                                         updateDraft(user.email, { positionTitle: event.target.value })
@@ -350,14 +451,9 @@ export function DashboardHomePage({
                                     </Badge>
                                   </td>
                                   <td className="px-4 py-4">
-                                    <label className="inline-flex cursor-not-allowed items-center">
-                                      <input
-                                        checked={user.companyWideViewer}
-                                        className="h-5 w-9 cursor-not-allowed rounded-full accent-primary"
-                                        disabled
-                                        type="checkbox"
-                                      />
-                                    </label>
+                                    <Badge variant={user.companyWideViewer ? "success" : "outline"}>
+                                      {user.companyWideViewer ? "허용" : "미허용"}
+                                    </Badge>
                                   </td>
                                   <td className="px-4 py-4">
                                     <Button
@@ -375,7 +471,7 @@ export function DashboardHomePage({
                             })
                           ) : (
                             <tr>
-                              <td className="px-4 py-8 text-center text-muted-foreground" colSpan={7}>
+                              <td className="px-4 py-8 text-center text-muted-foreground" colSpan={8}>
                                 검색 조건에 맞는 사용자가 없습니다. 먼저 사용자가 로그인하면 여기에 나타납니다.
                               </td>
                             </tr>
@@ -386,7 +482,7 @@ export function DashboardHomePage({
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                    관리자 권한이 있는 계정으로 로그인하면 여기서 사용자별 부서와 직급을 저장할 수 있습니다.
+                    관리자 권한이 있는 계정으로 로그인하면 여기서 사용자별 팀/부서와 직급을 저장할 수 있습니다.
                   </div>
                 )}
               </CardContent>
@@ -395,18 +491,72 @@ export function DashboardHomePage({
         </TabsContent>
 
         <TabsContent value="allowlist">
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
             <Card>
               <CardHeader>
-                <CardTitle>권한/Allowlist</CardTitle>
+                <CardTitle>전사 열람자 Allowlist</CardTitle>
                 <CardDescription>
-                  부서 자동 매핑 규칙과 상세 권한 모델은 아직 확정 전입니다. 현재는 사용자 관리 탭에서 수동 부서 지정을 먼저 운영합니다.
+                  대표이사/부사장, 본부장, 팀장 등 전사 열람자를 이메일 allowlist로 관리합니다.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
-                <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                  권한 테이블과 자동 매핑 규칙은 다음 단계에서 확정합니다. 현재는 PostgreSQL에 저장되는 부서 수동 지정과 사용자 디렉터리만 운영합니다.
-                </div>
+                {session.authenticated && currentUser?.role === "ADMIN" ? (
+                  <>
+                    <form
+                      className="grid gap-3 md:grid-cols-[1fr_auto]"
+                      onSubmit={(event) => void handleViewerAllowlistSubmit(event)}
+                    >
+                      <Input
+                        onChange={(event) => setAllowlistEmail(event.target.value)}
+                        placeholder="이메일 주소 (예: leader@iportfolio.co.kr)"
+                        type="email"
+                        value={allowlistEmail}
+                      />
+                      <Button disabled={isSavingAllowlist || isBlank(allowlistEmail)} type="submit">
+                        {isSavingAllowlist ? "추가 중..." : "추가"}
+                      </Button>
+                    </form>
+
+                    <div className="space-y-3">
+                      {viewerAllowlist.length > 0 ? (
+                        viewerAllowlist.map((entry) => (
+                          <div
+                            className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/20 p-4 md:flex-row md:items-center md:justify-between"
+                            key={entry.email}
+                          >
+                            <div>
+                              <p className="font-medium">{entry.email}</p>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                등록일 {auditTimeFormatter.format(new Date(entry.createdAt))}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Badge variant={entry.effectiveCompanyWideViewer ? "success" : "outline"}>
+                                {entry.effectiveCompanyWideViewer ? "전사 열람 허용" : "미허용"}
+                              </Badge>
+                              <Button
+                                disabled={isSavingAllowlist}
+                                onClick={() => void onRemoveViewerAllowlist(entry.email)}
+                                type="button"
+                                variant="destructive"
+                              >
+                                제거
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                          아직 등록된 전사 열람자 allowlist가 없습니다.
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                    관리자 권한이 있는 계정으로 로그인하면 여기서 allowlist를 수정할 수 있습니다.
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -414,7 +564,7 @@ export function DashboardHomePage({
               <CardHeader>
                 <CardTitle>권한 규칙 요약</CardTitle>
                 <CardDescription>
-                  Figma의 정책 카드 구조만 가져오고, 현재 구현된 규칙만 요약했습니다.
+                  현재 구현된 조직/권한 규칙만 요약합니다.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -434,12 +584,12 @@ export function DashboardHomePage({
             <CardHeader>
               <CardTitle>정책 설정</CardTitle>
               <CardDescription>
-                정책 편집 화면은 아직 구현하지 않았습니다. 현재는 도메인 제한 Google SSO와 관리자 수동 지정만 운영합니다.
+                자동 매핑 규칙과 상세 권한 체계는 아직 미정입니다. 현재는 수동 지정, allowlist, 감사 로그까지 구현했습니다.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                정책 세부 편집은 MVP 다음 단계에서 다룹니다.
+                자동 매핑 원천 데이터와 세부 권한 모델이 확정되면 이 탭에 정책 편집 화면을 붙일 예정입니다.
               </div>
             </CardContent>
           </Card>
@@ -450,13 +600,56 @@ export function DashboardHomePage({
             <CardHeader>
               <CardTitle>감사 로그</CardTitle>
               <CardDescription>
-                감사 로그 화면은 Figma에는 있었지만, 현재 개발 플로우에서는 범위에 넣지 않았습니다.
+                사용자 조직 변경과 전사 열람자 allowlist 변경의 전후 값과 변경자를 기록합니다.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                로그인과 관리자 지정 이력은 이후 persistence 단계에서 함께 추가할 예정입니다.
-              </div>
+              {auditLogs.length > 0 ? (
+                <div className="overflow-hidden rounded-2xl border border-border">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-border text-sm">
+                      <thead className="bg-muted/40 text-left text-muted-foreground">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">시각</th>
+                          <th className="px-4 py-3 font-medium">액션</th>
+                          <th className="px-4 py-3 font-medium">대상</th>
+                          <th className="px-4 py-3 font-medium">변경자</th>
+                          <th className="px-4 py-3 font-medium">이전 값</th>
+                          <th className="px-4 py-3 font-medium">이후 값</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border bg-card">
+                        {auditLogs.map((log) => (
+                          <tr className="align-top" key={log.id}>
+                            <td className="px-4 py-4 text-muted-foreground">
+                              {auditTimeFormatter.format(new Date(log.createdAt))}
+                            </td>
+                            <td className="px-4 py-4 font-medium">
+                              {auditActionLabelMap[log.actionType] ?? log.actionType}
+                            </td>
+                            <td className="px-4 py-4 text-muted-foreground">{log.targetEmail}</td>
+                            <td className="px-4 py-4 text-muted-foreground">{log.actorEmail}</td>
+                            <td className="max-w-sm px-4 py-4">
+                              <code className="whitespace-pre-wrap break-all text-xs text-muted-foreground">
+                                {log.beforeState ?? "-"}
+                              </code>
+                            </td>
+                            <td className="max-w-sm px-4 py-4">
+                              <code className="whitespace-pre-wrap break-all text-xs text-muted-foreground">
+                                {log.afterState ?? "-"}
+                              </code>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
+                  아직 기록된 감사 로그가 없습니다.
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
