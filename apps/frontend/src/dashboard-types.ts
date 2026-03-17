@@ -96,3 +96,35 @@ export interface AssetUploadInput {
   sourceDetail?: string;
   tags: string[];
 }
+
+export interface AssetUpdateInput {
+  title: string;
+  description?: string;
+  tags: string[];
+}
+
+export interface AssetFileView {
+  bucketName: string;
+  objectKey: string;
+  originalFileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  checksumSha256: string;
+  versionNumber: number;
+  createdByEmail: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface AssetEventView {
+  eventType: "CREATED" | "METADATA_UPDATED";
+  actorEmail: string;
+  actorName: string | null;
+  detail: string | null;
+  createdAt: string;
+}
+
+export interface AssetDetailView extends AssetSummaryView {
+  currentFile: AssetFileView;
+  events: AssetEventView[];
+}

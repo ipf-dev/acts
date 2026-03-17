@@ -1,9 +1,12 @@
 package com.acts.asset
 
 import org.springframework.stereotype.Component
+import software.amazon.awssdk.core.ResponseBytes
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest
+import software.amazon.awssdk.services.s3.model.GetObjectRequest
+import software.amazon.awssdk.services.s3.model.GetObjectResponse
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
@@ -32,6 +35,25 @@ class S3AssetBinaryStorage(
         return StoredAssetObject(
             bucket = assetStorageProperties.bucket,
             objectKey = objectKey,
+        )
+    }
+
+    override fun load(
+        bucket: String,
+        objectKey: String,
+    ): LoadedAssetObject {
+        ensureBucketExists()
+
+        val responseBytes: ResponseBytes<GetObjectResponse> = s3Client.getObjectAsBytes(
+            GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .build(),
+        )
+
+        return LoadedAssetObject(
+            content = responseBytes.asByteArray(),
+            contentType = responseBytes.response().contentType(),
         )
     }
 

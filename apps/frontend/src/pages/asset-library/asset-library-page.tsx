@@ -17,17 +17,29 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Select } from "../../components/ui/select";
 import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
-import type { AssetSummaryView, AuthSessionView } from "../../dashboard-types";
+import type {
+  AssetDetailView,
+  AssetSummaryView,
+  AssetUpdateInput,
+  AuthSessionView
+} from "../../dashboard-types";
 import { isBlank } from "../../lib/utils";
+import { AssetDetailModal } from "./asset-detail-modal";
 import { AssetUploadModal } from "./asset-upload-modal";
 import type { AssetUploadDraftView } from "./asset-library-page-model";
 
 interface AssetLibraryPageProps {
+  assetDetail: AssetDetailView | null;
   assets: AssetSummaryView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  isAssetDetailLoading: boolean;
   isLoading: boolean;
+  isSavingAssetDetail: boolean;
   isUploading: boolean;
+  onCloseAssetDetail: () => void;
+  onOpenAssetDetail: (assetId: number) => Promise<void>;
+  onSaveAssetDetail: (assetId: number, input: AssetUpdateInput) => Promise<void>;
   onUploadAssets: (drafts: AssetUploadDraftView[]) => Promise<void>;
   session: AuthSessionView;
 }
@@ -39,11 +51,17 @@ const cardDateFormatter = new Intl.DateTimeFormat("ko-KR", {
 });
 
 export function AssetLibraryPage({
+  assetDetail,
   assets,
   authErrorMessage,
   authSuccessMessage,
+  isAssetDetailLoading,
   isLoading,
+  isSavingAssetDetail,
   isUploading,
+  onCloseAssetDetail,
+  onOpenAssetDetail,
+  onSaveAssetDetail,
   onUploadAssets,
   session
 }: AssetLibraryPageProps): React.JSX.Element {
@@ -160,6 +178,12 @@ export function AssetLibraryPage({
   function handleTitleChange(draftId: string, value: string): void {
     setDrafts((currentDrafts) =>
       currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, title: value } : draft))
+    );
+  }
+
+  function handleDescriptionChange(draftId: string, value: string): void {
+    setDrafts((currentDrafts) =>
+      currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, description: value } : draft))
     );
   }
 
@@ -406,6 +430,13 @@ export function AssetLibraryPage({
                       <p>{formatFileSize(asset.fileSizeBytes)}</p>
                     </div>
                   </div>
+
+                  <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
+                    <Button onClick={() => void onOpenAssetDetail(asset.id)} type="button" variant="outline">
+                      상세 보기
+                    </Button>
+                    <Badge variant="secondary">{asset.organizationName ?? "조직 미지정"}</Badge>
+                  </div>
                 </article>
               ))}
             </div>
@@ -431,6 +462,7 @@ export function AssetLibraryPage({
 
       <AssetUploadModal
         drafts={drafts}
+        onDescriptionChange={handleDescriptionChange}
         isOpen={isUploadModalOpen && session.authenticated}
         isUploading={isUploading}
         onAddTag={handleAddTag}
@@ -441,6 +473,14 @@ export function AssetLibraryPage({
         onSubmit={handleUploadSubmit}
         onTagInputChange={handleTagInputChange}
         onTitleChange={handleTitleChange}
+      />
+      <AssetDetailModal
+        asset={assetDetail}
+        isLoading={isAssetDetailLoading}
+        isOpen={Boolean(assetDetail) || isAssetDetailLoading}
+        isSaving={isSavingAssetDetail}
+        onClose={onCloseAssetDetail}
+        onSave={onSaveAssetDetail}
       />
     </section>
   );
@@ -475,6 +515,7 @@ async function createDraftFromFile(file: File): Promise<AssetUploadDraftView> {
     sizeLabel: formatFileSize(file.size),
     suggestedHeight: dimensions?.height ?? null,
     suggestedWidth: dimensions?.width ?? null,
+    description: "",
     tagInput: "",
     tags: createSuggestedTags(file.name, type),
     title: file.name.replace(/\.[^/.]+$/, ""),
@@ -556,7 +597,7 @@ const assetTypeOptions: AssetSummaryView["type"][] = [
 ];
 
 const statusLabelMap: Record<AssetSummaryView["status"], string> = {
-  READY: "등록 완료"
+  READY: "리뷰"
 };
 
 const typeLabelMap: Record<AssetSummaryView["type"], string> = {

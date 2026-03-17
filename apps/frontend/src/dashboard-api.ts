@@ -1,5 +1,7 @@
 import type {
+  AssetDetailView,
   AssetSummaryView,
+  AssetUpdateInput,
   AssetUploadInput,
   AuditLogView,
   AppHealthView,
@@ -12,7 +14,9 @@ import type {
 } from "./dashboard-types";
 
 export interface DashboardApi {
+  getAsset(assetId: number): Promise<AssetDetailView>;
   listAssets(): Promise<AssetSummaryView[]>;
+  updateAsset(assetId: number, input: AssetUpdateInput): Promise<AssetDetailView>;
   uploadAsset(input: AssetUploadInput): Promise<AssetSummaryView>;
   health(): Promise<AppHealthView>;
   getSession(): Promise<AuthSessionView>;
@@ -37,8 +41,20 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
   }
 
   return {
+    async getAsset(assetId) {
+      return readJson<AssetDetailView>(`/api/assets/${assetId}`);
+    },
     async listAssets() {
       return readJson<AssetSummaryView[]>("/api/assets");
+    },
+    async updateAsset(assetId, input) {
+      return readJson<AssetDetailView>(`/api/assets/${assetId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
     },
     async uploadAsset(input) {
       const formData = new FormData();

@@ -1,16 +1,23 @@
 package com.acts.asset
 
+import org.springframework.core.io.ByteArrayResource
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.security.oauth2.core.oidc.user.OidcUser
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
+import java.nio.charset.StandardCharsets
 
 @RestController
 @RequestMapping("/api/assets")
@@ -31,6 +38,62 @@ class AssetController(
             creatorEmail = creatorEmail,
         ),
     )
+
+    @GetMapping("/{assetId}")
+    fun getAsset(
+        @PathVariable assetId: Long,
+    ): ResponseEntity<AssetDetailResponse> = try {
+        ResponseEntity.ok(assetLibraryService.getAsset(assetId))
+    } catch (_: IllegalArgumentException) {
+        ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+    }
+
+    @GetMapping("/{assetId}/download")
+    fun downloadAsset(
+        @PathVariable assetId: Long,
+    ): ResponseEntity<ByteArrayResource> = try {
+        val downloadResult = assetLibraryService.downloadAsset(assetId)
+
+        ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(downloadResult.contentType))
+            .header(
+                HttpHeaders.CONTENT_DISPOSITION,
+                ContentDisposition.attachment()
+                    .filename(downloadResult.fileName, StandardCharsets.UTF_8)
+                    .build()
+                    .toString(),
+            )
+            .contentLength(downloadResult.content.size.toLong())
+            .body(ByteArrayResource(downloadResult.content))
+    } catch (_: IllegalArgumentException) {
+        ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+    }
+
+    @PutMapping("/{assetId}")
+    fun updateAsset(
+        authentication: Authentication?,
+        @PathVariable assetId: Long,
+        @RequestBody request: AssetUpdateRequest,
+    ): ResponseEntity<AssetDetailResponse> {
+        val actorEmail = currentActorEmail(authentication)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+        val actorName = currentActorName(authentication)
+
+        return try {
+            ResponseEntity.ok(
+                assetLibraryService.updateAsset(
+                    assetId = assetId,
+                    title = request.title,
+                    description = request.description,
+                    requestedTags = request.tags,
+                    actorEmail = actorEmail,
+                    actorName = actorName,
+                ),
+            )
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
+    }
 
     @PostMapping(
         "/uploads",

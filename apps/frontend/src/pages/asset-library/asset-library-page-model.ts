@@ -1,6 +1,7 @@
 import type { AssetTypeView } from "../../dashboard-types";
 
 export interface AssetUploadDraftView {
+  description: string;
   id: string;
   file: File;
   formatLabel: string;

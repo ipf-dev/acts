@@ -44,6 +44,12 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = "assets/test/coco.txt",
             ),
         )
+        whenever(assetBinaryStorage.load(any(), any())).thenReturn(
+            LoadedAssetObject(
+                content = "story".toByteArray(),
+                contentType = "text/plain",
+            ),
+        )
     }
 
     @Test
@@ -72,5 +78,66 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThat(uploadedAsset.tags).contains("코코", "축제", "시나리오", "coco", "festival", "story")
         assertThat(listedAssets).hasSize(1)
         assertThat(listedAssets.single().id).isEqualTo(uploadedAsset.id)
+    }
+
+    @Test
+    fun `returns asset detail with history and downloadable file`() {
+        val uploadedAsset = assetLibraryService.uploadAsset(
+            AssetUploadCommand(
+                actorEmail = "coco@iportfolio.co.kr",
+                actorName = "Coco",
+                title = "코코의 첫 모험 시나리오",
+                description = "축제에 가는 이야기 초안",
+                requestedTags = listOf("코코", "축제"),
+                sourceDetail = "외부 등록",
+                fileName = "coco_festival_story.txt",
+                contentType = "text/plain",
+                contentBytes = "story".toByteArray(),
+            ),
+        )
+
+        val assetDetail = assetLibraryService.getAsset(uploadedAsset.id)
+        val downloadResult = assetLibraryService.downloadAsset(uploadedAsset.id)
+
+        assertThat(assetDetail.currentFile.originalFileName).isEqualTo("coco_festival_story.txt")
+        assertThat(assetDetail.events).hasSize(1)
+        assertThat(assetDetail.events.single().eventType).isEqualTo(AssetEventType.CREATED)
+        assertThat(assetDetail.tags).contains("코코", "축제")
+        assertThat(downloadResult.fileName).isEqualTo("coco_festival_story.txt")
+        assertThat(downloadResult.contentType).isEqualTo("text/plain")
+        assertThat(downloadResult.content).containsExactly(*"story".toByteArray())
+    }
+
+    @Test
+    fun `updates asset metadata and records an update history event`() {
+        val uploadedAsset = assetLibraryService.uploadAsset(
+            AssetUploadCommand(
+                actorEmail = "coco@iportfolio.co.kr",
+                actorName = "Coco",
+                title = "코코의 첫 모험 시나리오",
+                description = "초기 설명",
+                requestedTags = listOf("코코", "축제"),
+                sourceDetail = "외부 등록",
+                fileName = "coco_festival_story.txt",
+                contentType = "text/plain",
+                contentBytes = "story".toByteArray(),
+            ),
+        )
+
+        val updatedAsset = assetLibraryService.updateAsset(
+            assetId = uploadedAsset.id,
+            title = "코코와 친구들의 축제",
+            description = "업데이트된 설명",
+            requestedTags = listOf("코코", "친구들", "축제"),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+
+        assertThat(updatedAsset.title).isEqualTo("코코와 친구들의 축제")
+        assertThat(updatedAsset.description).isEqualTo("업데이트된 설명")
+        assertThat(updatedAsset.tags).contains("코코", "친구들", "축제")
+        assertThat(updatedAsset.events).hasSize(2)
+        assertThat(updatedAsset.events.first().eventType).isEqualTo(AssetEventType.METADATA_UPDATED)
+        assertThat(updatedAsset.events.first().detail).contains("제목", "설명", "태그")
     }
 }

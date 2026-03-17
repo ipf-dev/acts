@@ -15,4 +15,8 @@ interface AssetTagRepository : JpaRepository<AssetTagEntity, Long> {
         """,
     )
     fun findAllByAssetIds(@Param("assetIds") assetIds: Collection<Long>): List<AssetTagEntity>
+
+    fun findAllByAsset_IdOrderByIdAsc(assetId: Long): List<AssetTagEntity>
+
+    fun deleteAllByAsset_Id(assetId: Long)
 }

@@ -139,6 +139,120 @@ class AssetLibraryService(
             .filter { summary -> summary.matches(query) }
     }
 
+    @Transactional
+    fun getAsset(assetId: Long): AssetDetailResponse {
+        val asset = assetRepository.findById(assetId)
+            .orElseThrow { IllegalArgumentException("자산을 찾을 수 없습니다.") }
+        val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
+            ?: throw IllegalArgumentException("현재 파일 정보를 찾을 수 없습니다.")
+        val tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId)
+            .map { assetTag -> assetTag.value }
+        val events = assetEventRepository.findAllByAsset_IdOrderByCreatedAtDescIdDesc(assetId)
+            .map { assetEvent ->
+                AssetEventResponse(
+                    eventType = assetEvent.eventType,
+                    actorEmail = assetEvent.actorEmail,
+                    actorName = assetEvent.actorName,
+                    detail = assetEvent.detail,
+                    createdAt = assetEvent.createdAt,
+                )
+            }
+
+        return asset.toDetailResponse(
+            tags = tags,
+            currentFile = currentFile,
+            events = events,
+        )
+    }
+
+    @Transactional
+    fun updateAsset(
+        assetId: Long,
+        title: String,
+        description: String?,
+        requestedTags: List<String>,
+        actorEmail: String,
+        actorName: String?,
+    ): AssetDetailResponse {
+        val asset = assetRepository.findById(assetId)
+            .orElseThrow { IllegalArgumentException("자산을 찾을 수 없습니다.") }
+        val resolvedTitle = title.normalizedOrNull()
+            ?: throw IllegalArgumentException("제목은 비어 있을 수 없습니다.")
+        val resolvedDescription = description.normalizedOrNull()
+        val nextTags = assetTagSuggestionService.buildTags(
+            fileName = asset.originalFileName,
+            title = resolvedTitle,
+            assetType = asset.assetType,
+            requestedTags = requestedTags,
+        )
+        val previousState = AssetMetadataSnapshot(
+            title = asset.title,
+            description = asset.description,
+            tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId).map { assetTag -> assetTag.value },
+        )
+
+        asset.title = resolvedTitle
+        asset.description = resolvedDescription
+        asset.searchText = buildSearchText(
+            title = resolvedTitle,
+            description = resolvedDescription,
+            fileName = asset.originalFileName,
+            ownerName = asset.ownerName,
+            organizationName = asset.organization?.name,
+            tags = nextTags.map { tag -> tag.value },
+        )
+        assetRepository.save(asset)
+
+        assetTagRepository.deleteAllByAsset_Id(assetId)
+        assetTagRepository.flush()
+        assetTagRepository.saveAll(
+            nextTags.map { tagCandidate ->
+                AssetTagEntity(
+                    asset = asset,
+                    value = tagCandidate.value,
+                    normalizedValue = tagCandidate.normalizedValue,
+                    source = tagCandidate.source,
+                )
+            },
+        )
+
+        val nextState = AssetMetadataSnapshot(
+            title = asset.title,
+            description = asset.description,
+            tags = nextTags.map { tag -> tag.value },
+        )
+
+        if (previousState != nextState) {
+            assetEventRepository.save(
+                AssetEventEntity(
+                    asset = asset,
+                    eventType = AssetEventType.METADATA_UPDATED,
+                    actorEmail = actorEmail,
+                    actorName = actorName,
+                    detail = buildMetadataUpdateDetail(previousState, nextState),
+                ),
+            )
+        }
+
+        return getAsset(assetId)
+    }
+
+    @Transactional
+    fun downloadAsset(assetId: Long): AssetDownloadResult {
+        val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
+            ?: throw IllegalArgumentException("다운로드할 파일을 찾을 수 없습니다.")
+        val loadedAssetObject = assetBinaryStorage.load(
+            bucket = currentFile.bucketName,
+            objectKey = currentFile.objectKey,
+        )
+
+        return AssetDownloadResult(
+            content = loadedAssetObject.content,
+            contentType = loadedAssetObject.contentType ?: currentFile.mimeType,
+            fileName = currentFile.originalFileName,
+        )
+    }
+
     private fun AssetSummaryResponse.matches(query: AssetListQuery): Boolean {
         val normalizedSearchTerms = query.search.normalizedSearchTerms()
         if (normalizedSearchTerms.isNotEmpty()) {
@@ -197,6 +311,48 @@ class AssetLibraryService(
         updatedAt = updatedAt,
     )
 
+    private fun AssetEntity.toDetailResponse(
+        tags: List<String>,
+        currentFile: AssetFileEntity,
+        events: List<AssetEventResponse>,
+    ): AssetDetailResponse = AssetDetailResponse(
+        id = requireNotNull(id),
+        title = title,
+        type = assetType,
+        status = assetStatus,
+        description = description,
+        sourceType = sourceType,
+        sourceDetail = sourceDetail,
+        originalFileName = originalFileName,
+        mimeType = mimeType,
+        fileSizeBytes = fileSizeBytes,
+        fileExtension = fileExtension,
+        versionNumber = currentVersionNumber,
+        ownerEmail = ownerEmail,
+        ownerName = ownerName,
+        organizationId = organization?.id,
+        organizationName = organization?.name,
+        widthPx = widthPx,
+        heightPx = heightPx,
+        durationMs = durationMs,
+        tags = tags,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        currentFile = AssetFileResponse(
+            bucketName = currentFile.bucketName,
+            objectKey = currentFile.objectKey,
+            originalFileName = currentFile.originalFileName,
+            mimeType = currentFile.mimeType,
+            fileSizeBytes = currentFile.fileSizeBytes,
+            checksumSha256 = currentFile.checksumSha256,
+            versionNumber = currentFile.versionNumber,
+            createdByEmail = currentFile.createdByEmail,
+            createdByName = currentFile.createdByName,
+            createdAt = currentFile.createdAt,
+        ),
+        events = events,
+    )
+
     private fun createObjectKey(fileName: String): String {
         val timestampPrefix = DateTimeFormatter.ofPattern("yyyy/MM/dd", Locale.US)
             .withZone(ZoneOffset.UTC)
@@ -232,6 +388,29 @@ class AssetLibraryService(
         .digest(contentBytes)
         .joinToString("") { byteValue -> "%02x".format(byteValue) }
 
+    private fun buildMetadataUpdateDetail(
+        previousState: AssetMetadataSnapshot,
+        nextState: AssetMetadataSnapshot,
+    ): String {
+        val changedFields = buildList {
+            if (previousState.title != nextState.title) {
+                add("제목")
+            }
+            if (previousState.description != nextState.description) {
+                add("설명")
+            }
+            if (previousState.tags != nextState.tags) {
+                add("태그")
+            }
+        }
+
+        return if (changedFields.isEmpty()) {
+            "메타데이터가 다시 저장되었습니다."
+        } else {
+            "${changedFields.joinToString(", ")} 정보가 업데이트되었습니다."
+        }
+    }
+
     private fun String?.normalizedOrNull(): String? = this?.trim()?.takeIf { value -> value.isNotEmpty() }
 
     private fun String?.normalizedSearchTerms(): List<String> = this
@@ -241,3 +420,9 @@ class AssetLibraryService(
         ?.filter { searchTerm -> searchTerm.isNotBlank() }
         .orEmpty()
 }
+
+private data class AssetMetadataSnapshot(
+    val title: String,
+    val description: String?,
+    val tags: List<String>,
+)

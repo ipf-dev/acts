@@ -2,4 +2,6 @@ package com.acts.asset
 
 import org.springframework.data.jpa.repository.JpaRepository
 
-interface AssetFileRepository : JpaRepository<AssetFileEntity, Long>
+interface AssetFileRepository : JpaRepository<AssetFileEntity, Long> {
+    fun findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId: Long): AssetFileEntity?
+}

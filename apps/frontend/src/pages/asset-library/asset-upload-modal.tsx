@@ -6,6 +6,7 @@ import type { AssetUploadDraftView } from "./asset-library-page-model";
 
 interface AssetUploadModalProps {
   drafts: AssetUploadDraftView[];
+  onDescriptionChange: (draftId: string, value: string) => void;
   isOpen: boolean;
   isUploading: boolean;
   onAddTag: (draftId: string) => void;
@@ -20,6 +21,7 @@ interface AssetUploadModalProps {
 
 export function AssetUploadModal({
   drafts,
+  onDescriptionChange,
   isOpen,
   isUploading,
   onAddTag,
@@ -117,6 +119,12 @@ export function AssetUploadModal({
                     <Input
                       onChange={(event) => onTitleChange(draft.id, event.target.value)}
                       value={draft.title}
+                    />
+                    <textarea
+                      className="min-h-20 w-full rounded-2xl border border-input bg-white px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                      onChange={(event) => onDescriptionChange(draft.id, event.target.value)}
+                      placeholder="애셋 설명을 입력하세요"
+                      value={draft.description}
                     />
 
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
