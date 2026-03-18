@@ -3,6 +3,7 @@ package com.acts.asset
 import com.acts.auth.OrganizationRepository
 import com.acts.auth.UserDirectoryService
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -139,5 +140,67 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThat(updatedAsset.events).hasSize(2)
         assertThat(updatedAsset.events.first().eventType).isEqualTo(AssetEventType.METADATA_UPDATED)
         assertThat(updatedAsset.events.first().detail).contains("제목", "설명", "태그")
+    }
+
+    @Test
+    fun `soft deletes asset and excludes it from library queries`() {
+        val uploadedAsset = assetLibraryService.uploadAsset(
+            AssetUploadCommand(
+                actorEmail = "coco@iportfolio.co.kr",
+                actorName = "Coco",
+                title = "삭제 테스트 애셋",
+                description = "삭제 설명",
+                requestedTags = listOf("삭제"),
+                sourceDetail = "외부 등록",
+                fileName = "delete_test.txt",
+                contentType = "text/plain",
+                contentBytes = "story".toByteArray(),
+            ),
+        )
+
+        assetLibraryService.deleteAsset(
+            assetId = uploadedAsset.id,
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+
+        val listedAssets = assetLibraryService.listAssets()
+
+        assertThat(listedAssets).noneMatch { asset -> asset.id == uploadedAsset.id }
+        assertThatThrownBy { assetLibraryService.getAsset(uploadedAsset.id) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("자산을 찾을 수 없습니다")
+    }
+
+    @Test
+    fun `rejects delete request from non owner non admin`() {
+        val uploadedAsset = assetLibraryService.uploadAsset(
+            AssetUploadCommand(
+                actorEmail = "coco@iportfolio.co.kr",
+                actorName = "Coco",
+                title = "삭제 권한 테스트 애셋",
+                description = "삭제 설명",
+                requestedTags = listOf("삭제"),
+                sourceDetail = "외부 등록",
+                fileName = "delete_permission_test.txt",
+                contentType = "text/plain",
+                contentBytes = "story".toByteArray(),
+            ),
+        )
+
+        userDirectoryService.syncLogin(
+            email = "tony@iportfolio.co.kr",
+            displayName = "Tony",
+        )
+
+        assertThatThrownBy {
+            assetLibraryService.deleteAsset(
+                assetId = uploadedAsset.id,
+                actorEmail = "tony@iportfolio.co.kr",
+                actorName = "Tony",
+            )
+        }
+            .isInstanceOf(SecurityException::class.java)
+            .hasMessageContaining("삭제 권한이 없습니다")
     }
 }

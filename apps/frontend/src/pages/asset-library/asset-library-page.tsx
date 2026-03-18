@@ -35,9 +35,11 @@ interface AssetLibraryPageProps {
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   isAssetDetailLoading: boolean;
+  isDeleting: boolean;
   isLoading: boolean;
   isUploading: boolean;
   onCloseAssetDetail: () => void;
+  onDeleteAsset: (assetId: number) => Promise<void>;
   onOpenAssetDetail: (assetId: number) => void;
   onOpenAssetPage: (assetId: number) => void;
   onSearchQueryChange: (value: string) => void;
@@ -58,9 +60,11 @@ export function AssetLibraryPage({
   authErrorMessage,
   authSuccessMessage,
   isAssetDetailLoading,
+  isDeleting,
   isLoading,
   isUploading,
   onCloseAssetDetail,
+  onDeleteAsset,
   onOpenAssetDetail,
   onOpenAssetPage,
   onSearchQueryChange,
@@ -577,8 +581,11 @@ export function AssetLibraryPage({
         asset={assetDetail}
         isLoading={isAssetDetailLoading}
         isOpen={Boolean(assetDetail) || isAssetDetailLoading}
+        isDeleting={isDeleting}
         onClose={onCloseAssetDetail}
+        onDelete={onDeleteAsset}
         onOpenDetailPage={onOpenAssetPage}
+        session={session}
       />
     </section>
   );

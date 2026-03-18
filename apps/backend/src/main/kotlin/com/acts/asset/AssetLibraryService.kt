@@ -122,7 +122,7 @@ class AssetLibraryService(
 
     @Transactional
     fun listAssets(query: AssetListQuery = AssetListQuery()): List<AssetSummaryResponse> {
-        val assets = assetRepository.findAllByOrderByCreatedAtDescIdDesc()
+        val assets = assetRepository.findAllByDeletedAtIsNullOrderByCreatedAtDescIdDesc()
         if (assets.isEmpty()) {
             return emptyList()
         }
@@ -141,8 +141,7 @@ class AssetLibraryService(
 
     @Transactional
     fun getAsset(assetId: Long): AssetDetailResponse {
-        val asset = assetRepository.findById(assetId)
-            .orElseThrow { IllegalArgumentException("자산을 찾을 수 없습니다.") }
+        val asset = requireActiveAsset(assetId)
         val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("현재 파일 정보를 찾을 수 없습니다.")
         val tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId)
@@ -174,8 +173,7 @@ class AssetLibraryService(
         actorEmail: String,
         actorName: String?,
     ): AssetDetailResponse {
-        val asset = assetRepository.findById(assetId)
-            .orElseThrow { IllegalArgumentException("자산을 찾을 수 없습니다.") }
+        val asset = requireActiveAsset(assetId)
         val resolvedTitle = title.normalizedOrNull()
             ?: throw IllegalArgumentException("제목은 비어 있을 수 없습니다.")
         val resolvedDescription = description.normalizedOrNull()
@@ -239,6 +237,7 @@ class AssetLibraryService(
 
     @Transactional
     fun downloadAsset(assetId: Long): AssetDownloadResult {
+        requireActiveAsset(assetId)
         val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("다운로드할 파일을 찾을 수 없습니다.")
         val loadedAssetObject = assetBinaryStorage.load(
@@ -250,6 +249,38 @@ class AssetLibraryService(
             content = loadedAssetObject.content,
             contentType = loadedAssetObject.contentType ?: currentFile.mimeType,
             fileName = currentFile.originalFileName,
+        )
+    }
+
+    @Transactional
+    fun deleteAsset(
+        assetId: Long,
+        actorEmail: String,
+        actorName: String?,
+    ) {
+        val actor = userAccountRepository.findById(actorEmail.lowercase())
+            .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
+        val asset = requireActiveAsset(assetId)
+
+        if (actor.role != com.acts.auth.UserRole.ADMIN &&
+            !asset.ownerEmail.equals(actor.email, ignoreCase = true)
+        ) {
+            throw SecurityException("삭제 권한이 없습니다.")
+        }
+
+        asset.deletedAt = Instant.now()
+        asset.deletedByEmail = actor.email
+        asset.deletedByName = actorName ?: actor.displayName
+        assetRepository.save(asset)
+
+        assetEventRepository.save(
+            AssetEventEntity(
+                asset = asset,
+                eventType = AssetEventType.DELETED,
+                actorEmail = actor.email,
+                actorName = actorName ?: actor.displayName,
+                detail = "자산이 삭제되었습니다.",
+            ),
         )
     }
 
@@ -285,6 +316,9 @@ class AssetLibraryService(
 
         return true
     }
+
+    private fun requireActiveAsset(assetId: Long): AssetEntity = assetRepository.findByIdAndDeletedAtIsNull(assetId)
+        ?: throw IllegalArgumentException("자산을 찾을 수 없습니다.")
 
     private fun AssetEntity.toSummaryResponse(tags: List<String>): AssetSummaryResponse = AssetSummaryResponse(
         id = requireNotNull(id),

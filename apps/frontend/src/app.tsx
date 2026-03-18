@@ -104,6 +104,7 @@ export function App(): React.JSX.Element {
           <AssetDetailPageContainer
             assetId={locationState.selectedAssetId}
             onBack={handleCloseAssetDetail}
+            onDeleted={handleCloseAssetDetail}
             onOpenRelatedAsset={handleOpenAssetDetailPage}
           />
         ) : (

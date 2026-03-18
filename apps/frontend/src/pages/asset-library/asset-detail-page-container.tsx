@@ -19,6 +19,7 @@ interface AssetDetailPageState {
   assets: AssetSummaryView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  isDeleting: boolean;
   isLoading: boolean;
   isSaving: boolean;
   session: AuthSessionView;
@@ -27,6 +28,7 @@ interface AssetDetailPageState {
 interface AssetDetailPageContainerProps {
   assetId: number;
   onBack: () => void;
+  onDeleted: () => void;
   onOpenRelatedAsset: (assetId: number) => void;
 }
 
@@ -36,6 +38,7 @@ const initialLocationSearch = window.location.search;
 export function AssetDetailPageContainer({
   assetId,
   onBack,
+  onDeleted,
   onOpenRelatedAsset
 }: AssetDetailPageContainerProps): React.JSX.Element {
   const [state, setState] = useState<AssetDetailPageState>({
@@ -43,6 +46,7 @@ export function AssetDetailPageContainer({
     assets: [],
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+    isDeleting: false,
     isLoading: true,
     isSaving: false,
     session: createAnonymousSession()
@@ -131,6 +135,26 @@ export function AssetDetailPageContainer({
     }
   }
 
+  async function handleDelete(): Promise<void> {
+    setState((currentState) => ({
+      ...currentState,
+      authErrorMessage: null,
+      authSuccessMessage: null,
+      isDeleting: true
+    }));
+
+    try {
+      await dashboardApi.deleteAsset(assetId)
+      onDeleted()
+    } catch (error: unknown) {
+      setState((currentState) => ({
+        ...currentState,
+        authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
+        isDeleting: false
+      }))
+    }
+  }
+
   const relatedAssets = useMemo(() => {
     const currentAsset = state.asset;
 
@@ -157,9 +181,11 @@ export function AssetDetailPageContainer({
       asset={state.asset}
       authErrorMessage={state.authErrorMessage}
       authSuccessMessage={state.authSuccessMessage}
+      isDeleting={state.isDeleting}
       isLoading={state.isLoading}
       isSaving={state.isSaving}
       onBack={onBack}
+      onDelete={handleDelete}
       onOpenRelatedAsset={onOpenRelatedAsset}
       onSave={handleSave}
       relatedAssets={relatedAssets}

@@ -48,7 +48,7 @@ Expected first-slice backend capabilities:
 - LocalStack S3-backed multipart upload endpoint for the first asset slice
 - asset catalog tables for `assets`, `asset_files`, `asset_tags`, and `asset_events`
 - filename/type-based tag suggestion, description capture, image metadata extraction, and creator/org stamping
-- asset detail lookup for both modal and page, metadata update, and backend download endpoint
+- asset detail lookup for both modal and page, metadata update, owner/admin soft delete, and backend download endpoint
 - generation request orchestration
 - IP guide retrieval for AI workflows
 - revision and activity history recording
@@ -70,7 +70,7 @@ Expected first-slice frontend surfaces:
 - searchable admin user table with per-user organization assignment
 - admin allowlist management and audit log views
 - asset library page with upload modal, tag chips, search, and basic filters
-- asset detail modal plus detail page with summary, history, editable metadata, and download action
+- asset detail modal plus detail page with summary, history, editable metadata, download action, and owner/admin delete action
 - generation request forms and result views
 - searchable asset detail flows
 - guide-aware creation UI

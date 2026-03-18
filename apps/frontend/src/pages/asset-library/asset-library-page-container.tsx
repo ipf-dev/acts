@@ -16,6 +16,7 @@ interface AssetLibraryPageState {
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   isAssetDetailLoading: boolean;
+  isDeleting: boolean;
   isLoading: boolean;
   isUploading: boolean;
   session: AuthSessionView;
@@ -41,6 +42,7 @@ export function AssetLibraryPageContainer({
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
     isAssetDetailLoading: false,
+    isDeleting: false,
     isLoading: true,
     isUploading: false,
     session: createAnonymousSession()
@@ -157,6 +159,34 @@ export function AssetLibraryPageContainer({
     }));
   }
 
+  async function handleDeleteAsset(assetId: number): Promise<void> {
+    setState((currentState) => ({
+      ...currentState,
+      authErrorMessage: null,
+      authSuccessMessage: null,
+      isDeleting: true
+    }));
+
+    try {
+      await dashboardApi.deleteAsset(assetId);
+
+      setState((currentState) => ({
+        ...currentState,
+        assetDetail: null,
+        assets: currentState.assets.filter((asset) => asset.id !== assetId),
+        authSuccessMessage: "애셋이 삭제되었습니다.",
+        isAssetDetailLoading: false,
+        isDeleting: false
+      }));
+    } catch (error: unknown) {
+      setState((currentState) => ({
+        ...currentState,
+        authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
+        isDeleting: false
+      }));
+    }
+  }
+
   return (
     <AssetLibraryPage
       assetDetail={state.assetDetail}
@@ -164,9 +194,11 @@ export function AssetLibraryPageContainer({
       authErrorMessage={state.authErrorMessage}
       authSuccessMessage={state.authSuccessMessage}
       isAssetDetailLoading={state.isAssetDetailLoading}
+      isDeleting={state.isDeleting}
       isLoading={state.isLoading}
       isUploading={state.isUploading}
       onCloseAssetDetail={handleCloseAssetDetail}
+      onDeleteAsset={handleDeleteAsset}
       onOpenAssetDetail={handleOpenAssetDetail}
       onOpenAssetPage={onOpenAssetPage}
       onSearchQueryChange={onSearchQueryChange}

@@ -2,12 +2,20 @@ import { useEffect, useState } from "react";
 import {
   ChevronRight,
   Download,
+  MoreHorizontal,
   Save,
+  Trash2,
   X
 } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
@@ -22,7 +30,6 @@ import {
   detailDateFormatter,
   formatFileSize,
   historyLabelMap,
-  statusLabelMap,
   typeLabelMap
 } from "./asset-detail-model";
 import {
@@ -36,9 +43,11 @@ interface AssetDetailPageProps {
   asset: AssetDetailView | null;
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  isDeleting: boolean;
   isLoading: boolean;
   isSaving: boolean;
   onBack: () => void;
+  onDelete: () => Promise<void>;
   onOpenRelatedAsset: (assetId: number) => void;
   onSave: (input: AssetUpdateInput) => Promise<void>;
   relatedAssets: AssetSummaryView[];
@@ -49,9 +58,11 @@ export function AssetDetailPage({
   asset,
   authErrorMessage,
   authSuccessMessage,
+  isDeleting,
   isLoading,
   isSaving,
   onBack,
+  onDelete,
   onOpenRelatedAsset,
   onSave,
   relatedAssets,
@@ -61,6 +72,9 @@ export function AssetDetailPage({
   const [tagInput, setTagInput] = useState("");
   const [tagsDraft, setTagsDraft] = useState<string[]>([]);
   const [titleDraft, setTitleDraft] = useState("");
+  const canDelete =
+    session.user?.role === "ADMIN" ||
+    (asset != null && session.user?.email?.toLowerCase() === asset.ownerEmail.toLowerCase())
 
   useEffect(() => {
     if (!asset) {
@@ -83,6 +97,19 @@ export function AssetDetailPage({
       description: descriptionDraft,
       tags: tagsDraft
     });
+  }
+
+  async function handleDelete(): Promise<void> {
+    if (!asset) {
+      return;
+    }
+
+    const confirmed = window.confirm(`"${asset.title}" 애셋을 삭제하시겠습니까?`);
+    if (!confirmed) {
+      return;
+    }
+
+    await onDelete();
   }
 
   if (!session.authenticated) {
@@ -154,9 +181,7 @@ export function AssetDetailPage({
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-3">
                   <h1 className="text-[34px] font-semibold tracking-tight">{asset.title}</h1>
-                  <Badge className="rounded-full bg-blue-100 text-blue-700" variant="secondary">
-                    {statusLabelMap[asset.status]}
-                  </Badge>
+                  <AssetStatusChip status={asset.status} />
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {typeLabelMap[asset.type]} · v{asset.versionNumber} · {asset.organizationName ?? "조직 미지정"}
@@ -171,6 +196,24 @@ export function AssetDetailPage({
                   다운로드
                 </a>
               </Button>
+              {canDelete ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button className="h-10 w-10 rounded-xl" size="icon" variant="outline">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[160px]">
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => void handleDelete()}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {isDeleting ? "삭제 중" : "삭제"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
             </div>
           </div>
 

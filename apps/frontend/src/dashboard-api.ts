@@ -14,6 +14,7 @@ import type {
 } from "./dashboard-types";
 
 export interface DashboardApi {
+  deleteAsset(assetId: number): Promise<void>;
   getAsset(assetId: number): Promise<AssetDetailView>;
   listAssets(): Promise<AssetSummaryView[]>;
   updateAsset(assetId: number, input: AssetUpdateInput): Promise<AssetDetailView>;
@@ -41,6 +42,15 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
   }
 
   return {
+    async deleteAsset(assetId) {
+      const response = await fetchFn(`/api/assets/${assetId}`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}.`);
+      }
+    },
     async getAsset(assetId) {
       return readJson<AssetDetailView>(`/api/assets/${assetId}`);
     },

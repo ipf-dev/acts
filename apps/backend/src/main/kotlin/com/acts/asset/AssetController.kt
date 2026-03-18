@@ -8,6 +8,7 @@ import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.security.oauth2.core.oidc.user.OidcUser
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -92,6 +93,29 @@ class AssetController(
             )
         } catch (_: IllegalArgumentException) {
             ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
+    }
+
+    @DeleteMapping("/{assetId}")
+    fun deleteAsset(
+        authentication: Authentication?,
+        @PathVariable assetId: Long,
+    ): ResponseEntity<Void> {
+        val actorEmail = currentActorEmail(authentication)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+        val actorName = currentActorName(authentication)
+
+        return try {
+            assetLibraryService.deleteAsset(
+                assetId = assetId,
+                actorEmail = actorEmail,
+                actorName = actorName,
+            )
+            ResponseEntity.noContent().build()
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND).build()
         }
     }
 

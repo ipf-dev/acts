@@ -3,11 +3,12 @@ import {
   Download,
   Eye,
   Sparkles,
+  Trash2,
   X
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogClose, DialogContent } from "../../components/ui/dialog";
-import type { AssetDetailView } from "../../dashboard-types";
+import type { AssetDetailView, AuthSessionView } from "../../dashboard-types";
 import { cn } from "../../lib/utils";
 import {
   detailDateFormatter,
@@ -24,10 +25,13 @@ import {
 
 interface AssetDetailModalProps {
   asset: AssetDetailView | null;
+  isDeleting: boolean;
   isLoading: boolean;
   isOpen: boolean;
   onClose: () => void;
+  onDelete: (assetId: number) => Promise<void>;
   onOpenDetailPage: (assetId: number) => void;
+  session: AuthSessionView;
 }
 
 type AssetDetailTabKey = "summary" | "history" | "metadata";
@@ -40,9 +44,12 @@ const detailTabs: Array<{ key: AssetDetailTabKey; label: string }> = [
 
 export function AssetDetailModal({
   asset,
+  isDeleting,
   isLoading,
   isOpen,
   onClose,
+  onDelete,
+  session,
   onOpenDetailPage
 }: AssetDetailModalProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<AssetDetailTabKey>("summary");
@@ -112,7 +119,13 @@ export function AssetDetailModal({
             {isLoading || !asset ? (
               <AssetInfoState message="상세 정보를 불러오는 중입니다." />
             ) : activeTab === "summary" ? (
-              <AssetSummaryPanel asset={asset} onOpenDetailPage={onOpenDetailPage} />
+              <AssetSummaryPanel
+                asset={asset}
+                isDeleting={isDeleting}
+                onDelete={onDelete}
+                onOpenDetailPage={onOpenDetailPage}
+                session={session}
+              />
             ) : activeTab === "history" ? (
               <AssetHistoryPanel asset={asset} />
             ) : (
@@ -127,11 +140,30 @@ export function AssetDetailModal({
 
 function AssetSummaryPanel({
   asset,
+  isDeleting,
+  onDelete,
+  session,
   onOpenDetailPage
 }: {
   asset: AssetDetailView;
+  isDeleting: boolean;
+  onDelete: (assetId: number) => Promise<void>;
   onOpenDetailPage: (assetId: number) => void;
+  session: AuthSessionView;
 }): React.JSX.Element {
+  const canDelete =
+    session.user?.role === "ADMIN" ||
+    session.user?.email?.toLowerCase() === asset.ownerEmail.toLowerCase();
+
+  async function handleDelete(): Promise<void> {
+    const confirmed = window.confirm(`"${asset.title}" 애셋을 삭제하시겠습니까?`);
+    if (!confirmed) {
+      return;
+    }
+
+    await onDelete(asset.id);
+  }
+
   return (
     <div className="space-y-4">
       <section className="rounded-[18px] border border-[#dfe4f0] bg-[#fcfcfe] px-4 py-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]">
@@ -181,6 +213,18 @@ function AssetSummaryPanel({
             다운로드
           </a>
         </Button>
+        {canDelete ? (
+          <Button
+            className="h-9 rounded-lg px-3 text-[13px] font-medium"
+            disabled={isDeleting}
+            onClick={() => void handleDelete()}
+            type="button"
+            variant="outline"
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+            <span className="text-destructive">{isDeleting ? "삭제 중" : "삭제"}</span>
+          </Button>
+        ) : null}
       </div>
     </div>
   );

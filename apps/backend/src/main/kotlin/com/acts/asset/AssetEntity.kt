@@ -66,6 +66,12 @@ class AssetEntity(
     var createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant = Instant.now(),
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null,
+    @Column(name = "deleted_by_email")
+    var deletedByEmail: String? = null,
+    @Column(name = "deleted_by_name")
+    var deletedByName: String? = null,
 ) {
     @PrePersist
     fun prePersist() {
