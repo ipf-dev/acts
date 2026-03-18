@@ -8,13 +8,14 @@ import {
   Film,
   Save,
   Sparkles,
-  Trash2,
   X
 } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Textarea } from "../../components/ui/textarea";
 import type { AssetDetailView, AssetUpdateInput } from "../../dashboard-types";
 
 interface AssetDetailModalProps {
@@ -54,10 +55,6 @@ export function AssetDetailModal({
     setTagInput("");
   }, [asset]);
 
-  if (!isOpen) {
-    return null;
-  }
-
   async function handleSave(): Promise<void> {
     if (!asset) {
       return;
@@ -71,29 +68,21 @@ export function AssetDetailModal({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 px-4 py-8 backdrop-blur-sm">
-      <div className="w-full max-w-[390px] overflow-hidden rounded-[26px] border border-border bg-white shadow-[0_32px_120px_rgba(17,24,39,0.24)]">
-        <div className="flex items-start justify-between gap-4 px-5 py-5">
-          <div className="flex min-w-0 items-start gap-3">
+    <Dialog onOpenChange={(open) => (!open ? onClose() : undefined)} open={isOpen}>
+      <DialogContent className="max-w-[390px] overflow-hidden p-0">
+        <DialogHeader className="gap-0 px-5 py-5 text-left">
+          <div className="flex min-w-0 items-start gap-3 pr-10">
             <div className="mt-0.5 flex h-10 w-10 flex-none items-center justify-center rounded-2xl bg-[#f1ebff] text-[#6d4ae2]">
               {asset ? <AssetTypeIcon assetType={asset.type} /> : <Sparkles className="h-5 w-5" />}
             </div>
             <div className="min-w-0">
-              <h2 className="line-clamp-2 text-lg font-semibold">{asset?.title ?? "애셋 상세"}</h2>
+              <DialogTitle className="line-clamp-2">{asset?.title ?? "애셋 상세"}</DialogTitle>
               <p className="mt-1 text-sm text-muted-foreground">
                 {asset ? `${typeLabelMap[asset.type]} · 버전 ${asset.versionNumber}` : "불러오는 중"}
               </p>
             </div>
           </div>
-
-          <button
-            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={onClose}
-            type="button"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        </DialogHeader>
 
         <div className="px-5">
           <Tabs defaultValue="summary">
@@ -205,8 +194,8 @@ export function AssetDetailModal({
                     </div>
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-muted-foreground">설명</p>
-                      <textarea
-                        className="min-h-24 w-full rounded-2xl border border-input bg-white px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                      <Textarea
+                        className="min-h-24 rounded-2xl bg-white"
                         onChange={(event) => setDescriptionDraft(event.target.value)}
                         placeholder="애셋 설명을 입력하세요"
                         value={descriptionDraft}
@@ -287,26 +276,17 @@ export function AssetDetailModal({
             <Save className="h-4 w-4" />
             {isSaving ? "저장 중" : "변경 저장"}
           </Button>
-          {asset ? (
+          {asset && !isLoading ? (
             <Button asChild className="flex-1" type="button">
               <a href={`/api/assets/${asset.id}/download`}>
                 <Download className="h-4 w-4" />
                 다운로드
               </a>
             </Button>
-          ) : (
-            <Button className="flex-1" disabled type="button">
-              <Download className="h-4 w-4" />
-              다운로드
-            </Button>
-          )}
-          <Button className="flex-1" disabled type="button" variant="outline">
-            <Trash2 className="h-4 w-4 text-destructive" />
-            삭제
-          </Button>
+          ) : null}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

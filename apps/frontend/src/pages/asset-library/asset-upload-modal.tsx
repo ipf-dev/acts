@@ -1,7 +1,15 @@
 import { ImageIcon, Plus, Upload, X } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
 import type { AssetUploadDraftView } from "./asset-library-page-model";
 
 interface AssetUploadModalProps {
@@ -33,10 +41,6 @@ export function AssetUploadModal({
   onTagInputChange,
   onTitleChange
 }: AssetUploadModalProps): React.JSX.Element | null {
-  if (!isOpen) {
-    return null;
-  }
-
   async function handleFileSelection(event: React.ChangeEvent<HTMLInputElement>): Promise<void> {
     const nextFiles = Array.from(event.target.files ?? []);
     if (nextFiles.length === 0) {
@@ -58,23 +62,14 @@ export function AssetUploadModal({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 px-4 py-8 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-[28px] border border-border bg-white shadow-[0_32px_120px_rgba(17,24,39,0.2)]">
-        <div className="flex items-start justify-between border-b border-border px-6 py-5">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">애셋 업로드</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              파일을 드래그하거나 선택하여 업로드하세요. 자동 분류 및 태깅이 적용됩니다.
-            </p>
-          </div>
-          <button
-            className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            onClick={onClose}
-            type="button"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <Dialog onOpenChange={(open) => (!open ? onClose() : undefined)} open={isOpen}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 py-5 text-left">
+          <DialogTitle className="text-xl tracking-tight">애셋 업로드</DialogTitle>
+          <DialogDescription className="mt-1">
+            파일을 드래그하거나 선택하여 업로드하세요. 자동 분류 및 태깅이 적용됩니다.
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="max-h-[calc(90vh-170px)] space-y-4 overflow-y-auto px-6 py-5">
           <label
@@ -120,8 +115,8 @@ export function AssetUploadModal({
                       onChange={(event) => onTitleChange(draft.id, event.target.value)}
                       value={draft.title}
                     />
-                    <textarea
-                      className="min-h-20 w-full rounded-2xl border border-input bg-white px-3 py-2 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring"
+                    <Textarea
+                      className="min-h-20 rounded-2xl bg-white"
                       onChange={(event) => onDescriptionChange(draft.id, event.target.value)}
                       placeholder="애셋 설명을 입력하세요"
                       value={draft.description}
@@ -201,8 +196,8 @@ export function AssetUploadModal({
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

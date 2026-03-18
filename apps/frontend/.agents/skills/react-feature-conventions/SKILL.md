@@ -12,13 +12,15 @@ description: Create or refactor frontend feature files in this repo using the pa
 3. Put route-level files in `src/pages`.
 4. Put HTTP boundaries in `src/dashboard-api`.
 5. Put reusable primitives in `src/components/ui`.
-6. Keep page shells and containers orchestration-heavy and page components presentational.
+6. Prefer `shadcn/ui` components and patterns for shared UI before inventing custom primitives.
+7. Keep page shells and containers orchestration-heavy and page components presentational.
 
 ## Placement Rules
 
 - `src/pages/**`: route entrypoints, page containers, page shells, page-local state, and page-local mappers.
 - `src/dashboard-api/**`: fetch calls, request/response parsing, transport DTOs, and API-specific adapters.
 - `src/components/ui/**`: reusable primitives with prop-driven behavior and no product-specific data fetching.
+- `src/components/ui/**`: prefer `shadcn/ui`-style components backed by `components.json` and the `@/` alias setup.
 - `src/lib/**`: shared hooks and helpers that are not tied to a single page.
 - `src` root: only app composition files already allowed by `docs/FRONTEND_FILE_SUFFIX_RULES.md`.
 
@@ -31,6 +33,7 @@ description: Create or refactor frontend feature files in this repo using the pa
 - Keep raw `useEffect` code at the boundary. If the Effect talks to the network, browser APIs, or subscriptions and the logic is reusable, move it into a custom hook under `src/lib`.
 - Keep network calls and response mapping out of TSX files unless a route file is only orchestrating existing API helpers.
 - Prefer `startTransition`, `useDeferredValue`, and `useEffectEvent` when the interaction actually needs them. Do not add `useMemo` or `useCallback` by default unless the surrounding code already depends on them.
+- When a shared control already exists in `shadcn/ui`, add or adapt that component instead of creating a parallel custom primitive.
 
 ## Verification
 

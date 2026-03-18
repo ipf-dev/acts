@@ -59,7 +59,7 @@ Default directory direction:
 
 - `src/pages/**` for route-level screens and page containers
 - `src/dashboard-api/**` for HTTP and parsing boundaries
-- `src/components/ui/**` for reusable primitives
+- `src/components/ui/**` for `shadcn/ui`-based reusable primitives
 - `src/lib/**` for shared helpers and hooks
 
 Expected first-slice frontend surfaces:

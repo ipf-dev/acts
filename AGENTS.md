@@ -15,6 +15,7 @@ Problem definition -> small, safe change -> change review -> refactor.
 
 - `apps/backend` is feature-oriented and controller-light.
 - `apps/frontend` separates pages, API access, shared UI, and utilities.
+- `apps/frontend/src/components/ui` prefers `shadcn/ui` primitives before custom shared widgets.
 - `infra` stores only local or shared environment bootstrap assets.
 - `docs` is the source of truth for product and operating context.
 
