@@ -2,10 +2,8 @@ import { useState } from "react";
 import {
   AlertTriangle,
   Clock3,
-  LockKeyhole,
   Search,
   Shield,
-  Sparkles,
   Users
 } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
@@ -217,19 +215,6 @@ export function DashboardHomePage({
           </div>
         </div>
 
-        <Card className="max-w-sm border-primary/10 bg-primary/5">
-          <CardContent className="flex items-start gap-3 p-5">
-            <div className="mt-0.5 rounded-xl bg-primary/10 p-2 text-primary">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Figma skeleton only</p>
-              <p className="text-sm text-muted-foreground">
-                기능은 auth/admin 범위에 맞춰 축소했고, 정보 구조와 운영 UI 톤만 반영했습니다.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <Tabs className="space-y-6" defaultValue="users">
@@ -247,13 +232,6 @@ export function DashboardHomePage({
           >
             <Shield className="mr-2 h-4 w-4" />
             권한/Allowlist
-          </TabsTrigger>
-          <TabsTrigger
-            className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            value="policy"
-          >
-            <LockKeyhole className="mr-2 h-4 w-4" />
-            정책 설정
           </TabsTrigger>
           <TabsTrigger
             className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -546,22 +524,6 @@ export function DashboardHomePage({
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="policy">
-          <Card>
-            <CardHeader>
-              <CardTitle>정책 설정</CardTitle>
-              <CardDescription>
-                자동 매핑 규칙과 상세 권한 체계는 아직 미정입니다. 현재는 조직 수동 지정, allowlist, 감사 로그까지 구현했습니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6 text-sm text-muted-foreground">
-                자동 매핑 원천 데이터와 세부 권한 모델이 확정되면 이 탭에 정책 편집 화면을 붙일 예정입니다.
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="audit">

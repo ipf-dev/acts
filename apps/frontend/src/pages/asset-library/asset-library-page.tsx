@@ -1,7 +1,6 @@
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import {
   Clock3,
-  Download,
   FileAudio2,
   FileImage,
   FileText,
@@ -244,10 +243,6 @@ export function AssetLibraryPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button disabled variant="outline">
-            <Download className="h-4 w-4" />
-            내보내기
-          </Button>
           <Button onClick={() => setIsUploadModalOpen(true)}>
             <Sparkles className="h-4 w-4" />
             애셋 업로드
@@ -308,7 +303,7 @@ export function AssetLibraryPage({
 
                 <Select onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
                   <option value="ALL">전체 상태</option>
-                  <option value="READY">등록 완료</option>
+                  <option value="READY">리뷰</option>
                 </Select>
 
                 <Select
