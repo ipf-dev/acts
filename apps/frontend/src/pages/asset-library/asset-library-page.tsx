@@ -23,12 +23,7 @@ import {
   SelectValue
 } from "../../components/ui/select";
 import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
-import type {
-  AssetDetailView,
-  AssetSummaryView,
-  AssetUpdateInput,
-  AuthSessionView
-} from "../../dashboard-types";
+import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../dashboard-types";
 import { isBlank } from "../../lib/utils";
 import { AssetDetailModal } from "./asset-detail-modal";
 import { AssetUploadModal } from "./asset-upload-modal";
@@ -41,11 +36,10 @@ interface AssetLibraryPageProps {
   authSuccessMessage: string | null;
   isAssetDetailLoading: boolean;
   isLoading: boolean;
-  isSavingAssetDetail: boolean;
   isUploading: boolean;
   onCloseAssetDetail: () => void;
-  onOpenAssetDetail: (assetId: number) => Promise<void>;
-  onSaveAssetDetail: (assetId: number, input: AssetUpdateInput) => Promise<void>;
+  onOpenAssetDetail: (assetId: number) => void;
+  onOpenAssetPage: (assetId: number) => void;
   onSearchQueryChange: (value: string) => void;
   onUploadAssets: (drafts: AssetUploadDraftView[]) => Promise<void>;
   searchQuery: string;
@@ -65,11 +59,10 @@ export function AssetLibraryPage({
   authSuccessMessage,
   isAssetDetailLoading,
   isLoading,
-  isSavingAssetDetail,
   isUploading,
   onCloseAssetDetail,
   onOpenAssetDetail,
-  onSaveAssetDetail,
+  onOpenAssetPage,
   onSearchQueryChange,
   onUploadAssets,
   searchQuery,
@@ -413,7 +406,7 @@ export function AssetLibraryPage({
                   >
                     <button
                       className="block w-full text-left"
-                      onClick={() => void onOpenAssetDetail(asset.id)}
+                      onClick={() => onOpenAssetDetail(asset.id)}
                       type="button"
                     >
                       <div className="flex items-start gap-3">
@@ -531,7 +524,7 @@ export function AssetLibraryPage({
                             <td className="px-4 py-4">
                               <Button
                                 className="h-8 rounded-xl px-3 text-xs"
-                                onClick={() => void onOpenAssetDetail(asset.id)}
+                                onClick={() => onOpenAssetDetail(asset.id)}
                                 type="button"
                                 variant="outline"
                               >
@@ -584,9 +577,8 @@ export function AssetLibraryPage({
         asset={assetDetail}
         isLoading={isAssetDetailLoading}
         isOpen={Boolean(assetDetail) || isAssetDetailLoading}
-        isSaving={isSavingAssetDetail}
         onClose={onCloseAssetDetail}
-        onSave={onSaveAssetDetail}
+        onOpenDetailPage={onOpenAssetPage}
       />
     </section>
   );

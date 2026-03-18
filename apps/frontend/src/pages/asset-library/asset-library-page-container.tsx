@@ -6,12 +6,7 @@ import {
   getLoginFailureMessage,
   getLoginSuccessMessage
 } from "../../dashboard-auth";
-import type {
-  AssetDetailView,
-  AssetSummaryView,
-  AssetUpdateInput,
-  AuthSessionView
-} from "../../dashboard-types";
+import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../dashboard-types";
 import { AssetLibraryPage } from "./asset-library-page";
 import type { AssetUploadDraftView } from "./asset-library-page-model";
 
@@ -22,7 +17,6 @@ interface AssetLibraryPageState {
   authSuccessMessage: string | null;
   isAssetDetailLoading: boolean;
   isLoading: boolean;
-  isSavingAssetDetail: boolean;
   isUploading: boolean;
   session: AuthSessionView;
 }
@@ -31,11 +25,13 @@ const dashboardApi = createDashboardApi();
 const initialLocationSearch = window.location.search;
 
 interface AssetLibraryPageContainerProps {
+  onOpenAssetPage: (assetId: number) => void;
   onSearchQueryChange: (value: string) => void;
   searchQuery: string;
 }
 
 export function AssetLibraryPageContainer({
+  onOpenAssetPage,
   onSearchQueryChange,
   searchQuery
 }: AssetLibraryPageContainerProps): React.JSX.Element {
@@ -46,7 +42,6 @@ export function AssetLibraryPageContainer({
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
     isAssetDetailLoading: false,
     isLoading: true,
-    isSavingAssetDetail: false,
     isUploading: false,
     session: createAnonymousSession()
   });
@@ -129,39 +124,6 @@ export function AssetLibraryPageContainer({
     }
   }
 
-  async function handleSaveAssetDetail(
-    assetId: number,
-    input: AssetUpdateInput
-  ): Promise<void> {
-    setState((currentState) => ({
-      ...currentState,
-      authErrorMessage: null,
-      authSuccessMessage: null,
-      isSavingAssetDetail: true
-    }));
-
-    try {
-      const [assetDetail, assets] = await Promise.all([
-        dashboardApi.updateAsset(assetId, input),
-        dashboardApi.listAssets()
-      ]);
-
-      setState((currentState) => ({
-        ...currentState,
-        assetDetail,
-        assets,
-        authSuccessMessage: "애셋 정보가 업데이트되었습니다.",
-        isSavingAssetDetail: false
-      }));
-    } catch (error: unknown) {
-      setState((currentState) => ({
-        ...currentState,
-        authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
-        isSavingAssetDetail: false
-      }));
-    }
-  }
-
   async function handleOpenAssetDetail(assetId: number): Promise<void> {
     setState((currentState) => ({
       ...currentState,
@@ -203,11 +165,10 @@ export function AssetLibraryPageContainer({
       authSuccessMessage={state.authSuccessMessage}
       isAssetDetailLoading={state.isAssetDetailLoading}
       isLoading={state.isLoading}
-      isSavingAssetDetail={state.isSavingAssetDetail}
       isUploading={state.isUploading}
       onCloseAssetDetail={handleCloseAssetDetail}
       onOpenAssetDetail={handleOpenAssetDetail}
-      onSaveAssetDetail={handleSaveAssetDetail}
+      onOpenAssetPage={onOpenAssetPage}
       onSearchQueryChange={onSearchQueryChange}
       onUploadAssets={handleUploadAssets}
       searchQuery={searchQuery}
