@@ -66,6 +66,7 @@ Expected first-slice frontend surfaces:
 
 - login entry, session status, and admin override screens
 - user-facing auth failure notification after login redirects
+- Figma Make 기준의 shell 레이아웃, 현재 사용자 프로필 메뉴, 자산 검색 헤더
 - searchable admin user table with per-user organization assignment
 - admin allowlist management and audit log views
 - asset library page with upload modal, tag chips, search, and basic filters

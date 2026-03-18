@@ -5,15 +5,21 @@ import { type DashboardNavigationKey, DashboardShell } from "./pages/dashboard/d
 
 export function App(): React.JSX.Element {
   const [activeNavigationKey, setActiveNavigationKey] = useState<DashboardNavigationKey>("assets");
+  const [assetSearchQuery, setAssetSearchQuery] = useState("");
 
   return (
     <DashboardShell
       activeNavigationKey={activeNavigationKey}
+      assetSearchQuery={assetSearchQuery}
       onNavigate={setActiveNavigationKey}
+      onSearchAssetLibrary={setAssetSearchQuery}
       title="acts"
     >
       {activeNavigationKey === "assets" ? (
-        <AssetLibraryPageContainer />
+        <AssetLibraryPageContainer
+          onSearchQueryChange={setAssetSearchQuery}
+          searchQuery={assetSearchQuery}
+        />
       ) : (
         <DashboardHomePageContainer />
       )}

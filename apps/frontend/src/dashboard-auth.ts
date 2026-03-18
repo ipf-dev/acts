@@ -20,14 +20,7 @@ export function createAnonymousSession(): AuthSessionView {
 }
 
 export function getLoginSuccessMessage(search: string): string | null {
-  const params = new URLSearchParams(search);
-  const code = params.get("login");
-
-  if (code !== "success") {
-    return null;
-  }
-
-  return "Google SSO 로그인이 완료되었습니다.";
+  return null;
 }
 
 export function getLoginFailureMessage(search: string): string | null {

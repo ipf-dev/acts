@@ -30,7 +30,15 @@ interface AssetLibraryPageState {
 const dashboardApi = createDashboardApi();
 const initialLocationSearch = window.location.search;
 
-export function AssetLibraryPageContainer(): React.JSX.Element {
+interface AssetLibraryPageContainerProps {
+  onSearchQueryChange: (value: string) => void;
+  searchQuery: string;
+}
+
+export function AssetLibraryPageContainer({
+  onSearchQueryChange,
+  searchQuery
+}: AssetLibraryPageContainerProps): React.JSX.Element {
   const [state, setState] = useState<AssetLibraryPageState>({
     assetDetail: null,
     assets: [],
@@ -200,7 +208,9 @@ export function AssetLibraryPageContainer(): React.JSX.Element {
       onCloseAssetDetail={handleCloseAssetDetail}
       onOpenAssetDetail={handleOpenAssetDetail}
       onSaveAssetDetail={handleSaveAssetDetail}
+      onSearchQueryChange={onSearchQueryChange}
       onUploadAssets={handleUploadAssets}
+      searchQuery={searchQuery}
       session={state.session}
     />
   );

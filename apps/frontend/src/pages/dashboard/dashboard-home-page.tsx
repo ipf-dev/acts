@@ -10,7 +10,13 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
-import { Select } from "../../components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
 import { isBlank } from "../../lib/utils";
@@ -203,38 +209,32 @@ export function DashboardHomePage({
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2">
-          <Badge className="rounded-full px-3 py-1" variant="secondary">
-            관리자 설정
-          </Badge>
-          <div className="space-y-1">
-            <h1 className="text-3xl font-semibold tracking-tight">관리자 설정</h1>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              조직 디렉터리, 전사 열람자 allowlist, 감사 로그를 운영하는 화면입니다.
-            </p>
-          </div>
+        <div className="space-y-1">
+          <h1 className="text-[32px] font-semibold tracking-tight">관리자 설정</h1>
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+            사용자 관리, 권한 설정, 정책 관리 및 감사 로그를 확인하세요.
+          </p>
         </div>
-
       </div>
 
       <Tabs className="space-y-6" defaultValue="users">
-        <TabsList className="h-auto flex-wrap justify-start gap-2 rounded-2xl bg-transparent p-0">
+        <TabsList className="h-auto flex-wrap justify-start gap-1 rounded-full bg-muted p-1">
           <TabsTrigger
-            className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             value="users"
           >
             <Users className="mr-2 h-4 w-4" />
             사용자 관리
           </TabsTrigger>
           <TabsTrigger
-            className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             value="allowlist"
           >
             <Shield className="mr-2 h-4 w-4" />
             권한/Allowlist
           </TabsTrigger>
           <TabsTrigger
-            className="rounded-full border border-border bg-card px-4 py-2 shadow-sm data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
             value="audit"
           >
             <Clock3 className="mr-2 h-4 w-4" />
@@ -244,7 +244,7 @@ export function DashboardHomePage({
 
         <TabsContent value="users">
           <div className="space-y-6">
-            <Card>
+            <Card className="rounded-[24px] border-border shadow-none">
               <CardHeader>
                 <CardTitle>현재 로그인 상태</CardTitle>
                 <CardDescription>
@@ -264,7 +264,7 @@ export function DashboardHomePage({
 
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {signedInSummary.map((item) => (
-                    <div className="rounded-2xl border border-border bg-muted/40 p-4" key={item.label}>
+                    <div className="rounded-2xl border border-border bg-muted/50 p-4" key={item.label}>
                       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
                         {item.label}
                       </p>
@@ -306,7 +306,7 @@ export function DashboardHomePage({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-[24px] border-border shadow-none">
               <CardHeader className="space-y-4">
                 <div>
                   <CardTitle>사용자 관리</CardTitle>
@@ -320,23 +320,23 @@ export function DashboardHomePage({
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      className="pl-10"
+                      className="h-11 rounded-xl border-0 bg-muted pl-10 shadow-none"
                       onChange={(event) => setSearchQuery(event.target.value)}
                       placeholder="이름 또는 이메일로 검색..."
                       value={searchQuery}
                     />
                   </div>
-                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                    조직 구조는 단일 `organizations` 테이블로 단순화했습니다.
+                  <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                    조직은 단일 `organizations` 테이블 기준으로 운영합니다.
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 {session.authenticated && currentUser?.role === "ADMIN" ? (
-                  <div className="overflow-hidden rounded-2xl border border-border">
+                  <div className="overflow-hidden rounded-[20px] border border-border">
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-border text-sm">
-                        <thead className="bg-muted/40 text-left text-muted-foreground">
+                        <thead className="bg-muted/70 text-left text-muted-foreground">
                           <tr>
                             <th className="px-4 py-3 font-medium">사용자</th>
                             <th className="px-4 py-3 font-medium">이메일</th>
@@ -372,17 +372,24 @@ export function DashboardHomePage({
                                   <td className="px-4 py-4 text-muted-foreground">{user.email}</td>
                                   <td className="min-w-48 px-4 py-4">
                                     <Select
-                                      onChange={(event) =>
-                                        updateDraft(user.email, { organizationId: event.target.value })
+                                      onValueChange={(value) =>
+                                        updateDraft(user.email, { organizationId: value })
                                       }
                                       value={draft.organizationId}
                                     >
-                                      <option value="">조직을 선택하세요</option>
-                                      {organizations.map((organization) => (
-                                        <option key={organization.id} value={organization.id}>
-                                          {organization.name}
-                                        </option>
-                                      ))}
+                                      <SelectTrigger className="h-10 rounded-xl">
+                                        <SelectValue placeholder="조직을 선택하세요" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {organizations.map((organization) => (
+                                          <SelectItem
+                                            key={organization.id}
+                                            value={organization.id.toString()}
+                                          >
+                                            {organization.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
                                     </Select>
                                   </td>
                                   <td className="min-w-36 px-4 py-4">
@@ -406,6 +413,7 @@ export function DashboardHomePage({
                                   </td>
                                   <td className="px-4 py-4">
                                     <Button
+                                      className="h-9 rounded-xl px-3"
                                       disabled={!canSaveAssignment}
                                       onClick={() => void handleAssignmentSave(user)}
                                       size="sm"
@@ -441,7 +449,7 @@ export function DashboardHomePage({
 
         <TabsContent value="allowlist">
           <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-            <Card>
+            <Card className="rounded-[24px] border-border shadow-none">
               <CardHeader>
                 <CardTitle>전사 열람자 Allowlist</CardTitle>
                 <CardDescription>
@@ -456,12 +464,17 @@ export function DashboardHomePage({
                       onSubmit={(event) => void handleViewerAllowlistSubmit(event)}
                     >
                       <Input
+                        className="h-11 rounded-xl border-0 bg-muted shadow-none"
                         onChange={(event) => setAllowlistEmail(event.target.value)}
                         placeholder="이메일 주소 (예: leader@iportfolio.co.kr)"
                         type="email"
                         value={allowlistEmail}
                       />
-                      <Button disabled={isSavingAllowlist || isBlank(allowlistEmail)} type="submit">
+                      <Button
+                        className="h-11 rounded-xl px-4"
+                        disabled={isSavingAllowlist || isBlank(allowlistEmail)}
+                        type="submit"
+                      >
                         {isSavingAllowlist ? "추가 중..." : "추가"}
                       </Button>
                     </form>
@@ -470,7 +483,7 @@ export function DashboardHomePage({
                       {viewerAllowlist.length > 0 ? (
                         viewerAllowlist.map((entry) => (
                           <div
-                            className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/20 p-4 md:flex-row md:items-center md:justify-between"
+                            className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/30 p-4 md:flex-row md:items-center md:justify-between"
                             key={entry.email}
                           >
                             <div>
@@ -509,7 +522,7 @@ export function DashboardHomePage({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-[24px] border-border shadow-none">
               <CardHeader>
                 <CardTitle>권한 규칙 요약</CardTitle>
                 <CardDescription>현재 구현된 조직/권한 규칙만 요약합니다.</CardDescription>
@@ -527,7 +540,7 @@ export function DashboardHomePage({
         </TabsContent>
 
         <TabsContent value="audit">
-          <Card>
+          <Card className="rounded-[24px] border-border shadow-none">
             <CardHeader className="space-y-4">
               <div>
                 <CardTitle>감사 로그</CardTitle>
@@ -537,10 +550,15 @@ export function DashboardHomePage({
               </div>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="w-full max-w-xs">
-                  <Select onChange={(event) => setAuditFilter(event.target.value)} value={auditFilter}>
-                    <option value="ALL">전체 로그</option>
-                    <option value="AUTH">로그인</option>
-                    <option value="PERMISSION">권한 변경</option>
+                  <Select onValueChange={setAuditFilter} value={auditFilter}>
+                    <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
+                      <SelectValue placeholder="전체 로그" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">전체 로그</SelectItem>
+                      <SelectItem value="AUTH">로그인</SelectItem>
+                      <SelectItem value="PERMISSION">권한 변경</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
                 <p className="text-sm text-muted-foreground">{visibleAuditLogs.length}건의 로그</p>
@@ -548,10 +566,10 @@ export function DashboardHomePage({
             </CardHeader>
             <CardContent>
               {visibleAuditLogs.length > 0 ? (
-                <div className="overflow-hidden rounded-2xl border border-border">
+                <div className="overflow-hidden rounded-[20px] border border-border">
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-border text-sm">
-                      <thead className="bg-muted/40 text-left text-muted-foreground">
+                      <thead className="bg-muted/70 text-left text-muted-foreground">
                         <tr>
                           <th className="px-4 py-3 font-medium">유형</th>
                           <th className="px-4 py-3 font-medium">액션</th>
