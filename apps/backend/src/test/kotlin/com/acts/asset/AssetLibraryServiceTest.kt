@@ -1,7 +1,5 @@
 package com.acts.asset
 
-import com.acts.auth.AdminAuditLogAction
-import com.acts.auth.AdminAuditLogRepository
 import com.acts.auth.OrganizationRepository
 import com.acts.auth.UserDirectoryService
 import org.assertj.core.api.Assertions.assertThat
@@ -19,7 +17,6 @@ import java.text.Normalizer
 @SpringBootTest
 @Transactional
 class AssetLibraryServiceTest @Autowired constructor(
-    private val adminAuditLogRepository: AdminAuditLogRepository,
     private val assetLibraryService: AssetLibraryService,
     private val organizationRepository: OrganizationRepository,
     private val userDirectoryService: UserDirectoryService,
@@ -209,7 +206,6 @@ class AssetLibraryServiceTest @Autowired constructor(
             title = "코코와 친구들의 축제",
             description = "업데이트된 설명",
             requestedTags = listOf("코코", "친구들", "축제"),
-            organizationId = null,
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
         )
@@ -284,7 +280,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     }
 
     @Test
-    fun `filters assets by organization for regular users and exposes all assets to company wide viewers`() {
+    fun `shows all assets to every authenticated user`() {
         val marketingAsset = uploadAsset(
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
@@ -301,13 +297,12 @@ class AssetLibraryServiceTest @Autowired constructor(
         val contentUserVisibleAssets = assetLibraryService.listAssets(actorEmail = "tony@iportfolio.co.kr")
         val companyWideVisibleAssets = assetLibraryService.listAssets(actorEmail = "leader@iportfolio.co.kr")
 
-        assertThat(contentUserVisibleAssets).extracting("id").contains(contentAsset.id)
-        assertThat(contentUserVisibleAssets).extracting("id").doesNotContain(marketingAsset.id)
+        assertThat(contentUserVisibleAssets).extracting("id").contains(marketingAsset.id, contentAsset.id)
         assertThat(companyWideVisibleAssets).extracting("id").contains(marketingAsset.id, contentAsset.id)
     }
 
     @Test
-    fun `denies detail and download outside organization and records an audit log`() {
+    fun `allows detail and download across organizations`() {
         val uploadedAsset = uploadAsset(
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
@@ -315,58 +310,17 @@ class AssetLibraryServiceTest @Autowired constructor(
             fileName = "marketing-detail.txt",
         )
 
-        assertThatThrownBy {
-            assetLibraryService.getAsset(
-                assetId = uploadedAsset.id,
-                actorEmail = "tony@iportfolio.co.kr",
-            )
-        }
-            .isInstanceOf(SecurityException::class.java)
-            .hasMessageContaining("열람 권한")
-
-        assertThatThrownBy {
-            assetLibraryService.downloadAsset(
-                assetId = uploadedAsset.id,
-                actorEmail = "tony@iportfolio.co.kr",
-            )
-        }
-            .isInstanceOf(SecurityException::class.java)
-            .hasMessageContaining("열람 권한")
-
-        val latestAuditLog = adminAuditLogRepository.findTop50ByOrderByCreatedAtDescIdDesc().first()
-        assertThat(latestAuditLog.actionType).isEqualTo(AdminAuditLogAction.ASSET_ACCESS_DENIED)
-        assertThat(latestAuditLog.actorEmail).isEqualTo("tony@iportfolio.co.kr")
-        assertThat(latestAuditLog.targetName).isEqualTo("마케팅 전용 애셋")
-    }
-
-    @Test
-    fun `updates access organization and records an audit log`() {
-        val strategyOrganization = organizationRepository.findAllByOrderByNameAsc()
-            .first { organization -> organization.name == "AI전략사업팀" }
-        val uploadedAsset = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
-            actorName = "Coco",
-            title = "조직 범위 변경 애셋",
-            fileName = "scope-update.txt",
-        )
-
-        val updatedAsset = assetLibraryService.updateAsset(
+        val assetDetail = assetLibraryService.getAsset(
             assetId = uploadedAsset.id,
-            title = uploadedAsset.title,
-            description = uploadedAsset.description,
-            requestedTags = uploadedAsset.tags,
-            organizationId = requireNotNull(strategyOrganization.id),
-            actorEmail = "coco@iportfolio.co.kr",
-            actorName = "Coco",
+            actorEmail = "tony@iportfolio.co.kr",
+        )
+        val downloadResult = assetLibraryService.downloadAsset(
+            assetId = uploadedAsset.id,
+            actorEmail = "tony@iportfolio.co.kr",
         )
 
-        val latestAuditLog = adminAuditLogRepository.findTop50ByOrderByCreatedAtDescIdDesc()
-            .first { auditLog -> auditLog.actionType == AdminAuditLogAction.ASSET_ACCESS_SCOPE_UPDATED }
-
-        assertThat(updatedAsset.organizationName).isEqualTo("AI전략사업팀")
-        assertThat(updatedAsset.events.first().detail).contains("열람 조직")
-        assertThat(latestAuditLog.beforeState).contains("\"organizationName\":\"마케팅팀\"")
-        assertThat(latestAuditLog.afterState).contains("\"organizationName\":\"AI전략사업팀\"")
+        assertThat(assetDetail.id).isEqualTo(uploadedAsset.id)
+        assertThat(downloadResult.fileName).isEqualTo("marketing-detail.txt")
     }
 
     @Test

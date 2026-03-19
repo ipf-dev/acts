@@ -132,7 +132,6 @@ export interface AssetUpdateInput {
   title: string;
   description?: string;
   tags: string[];
-  organizationId?: number | null;
 }
 
 export interface AssetFileView {

@@ -49,8 +49,8 @@ Expected first-slice backend capabilities:
 - asset catalog tables for `assets`, `asset_files`, `asset_tags`, and `asset_events`
 - filename/type-based tag suggestion, description capture, image metadata extraction, and creator/org stamping
 - centralized asset authorization for list/detail/download/update/delete/export
-- org-scoped asset visibility with company-wide viewer override and owner/Admin management rules
-- asset detail lookup for both modal and page, metadata update, access-organization update, owner/admin soft delete, backend download endpoint, and ZIP export endpoint
+- shared asset visibility for all authenticated users, with owner/Admin management rules and company-wide export privileges
+- asset detail lookup for both modal and page, metadata update, owner/admin soft delete, backend download endpoint, and ZIP export endpoint
 - asset retention policy storage plus trash restore lifecycle endpoints
 - generation request orchestration
 - IP guide retrieval for AI workflows
@@ -74,7 +74,7 @@ Expected first-slice frontend surfaces:
 - admin allowlist management and audit log views
 - admin policy tab for retention settings and deleted asset restore status/actions
 - asset library page with upload modal, tag chips, search, org/creator filters, and company-wide viewer export action
-- asset detail modal plus detail page with summary, history, editable metadata, access organization controls, download action, and owner/admin delete action
+- asset detail modal plus detail page with summary, history, editable metadata, download action, and owner/admin delete action
 - generation request forms and result views
 - searchable asset detail flows
 - guide-aware creation UI

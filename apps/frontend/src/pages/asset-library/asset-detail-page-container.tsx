@@ -10,8 +10,7 @@ import type {
   AssetDetailView,
   AssetSummaryView,
   AssetUpdateInput,
-  AuthSessionView,
-  OrganizationOptionView
+  AuthSessionView
 } from "../../dashboard-types";
 import { getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
 import { AssetDetailPage } from "./asset-detail-page";
@@ -25,7 +24,6 @@ interface AssetDetailPageState {
   isDownloading: boolean;
   isLoading: boolean;
   isSaving: boolean;
-  organizations: OrganizationOptionView[];
   session: AuthSessionView;
 }
 
@@ -54,7 +52,6 @@ export function AssetDetailPageContainer({
     isDownloading: false,
     isLoading: true,
     isSaving: false,
-    organizations: [],
     session: createAnonymousSession()
   });
 
@@ -72,13 +69,12 @@ export function AssetDetailPageContainer({
 
       try {
         const session = await dashboardApi.getSession();
-        const [asset, assets, organizations] = session.authenticated
+        const [asset, assets] = session.authenticated
           ? await Promise.all([
               dashboardApi.getAsset(assetId),
-              dashboardApi.listAssets(),
-              dashboardApi.listOrganizations()
+              dashboardApi.listAssets()
             ])
-          : [null, [], []];
+          : [null, []];
 
         if (!isActive) {
           return;
@@ -91,7 +87,6 @@ export function AssetDetailPageContainer({
           authErrorMessage: getLoginFailureMessage(initialLocationSearch),
           authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
           isLoading: false,
-          organizations,
           session
         }));
       } catch (error: unknown) {
@@ -242,7 +237,6 @@ export function AssetDetailPageContainer({
       onDownload={handleDownload}
       onOpenRelatedAsset={onOpenRelatedAsset}
       onSave={handleSave}
-      organizations={state.organizations}
       relatedAssets={relatedAssets}
       session={state.session}
     />

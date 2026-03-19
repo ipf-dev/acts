@@ -17,21 +17,13 @@ import {
   DropdownMenuTrigger
 } from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
 import type {
   AssetDetailView,
   AssetSummaryView,
   AssetUpdateInput,
-  AuthSessionView,
-  OrganizationOptionView
+  AuthSessionView
 } from "../../dashboard-types";
 import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
 import {
@@ -60,7 +52,6 @@ interface AssetDetailPageProps {
   onDownload: () => Promise<void>;
   onOpenRelatedAsset: (assetId: number) => void;
   onSave: (input: AssetUpdateInput) => Promise<void>;
-  organizations: OrganizationOptionView[];
   relatedAssets: AssetSummaryView[];
   session: AuthSessionView;
 }
@@ -78,12 +69,10 @@ export function AssetDetailPage({
   onDownload,
   onOpenRelatedAsset,
   onSave,
-  organizations,
   relatedAssets,
   session
 }: AssetDetailPageProps): React.JSX.Element {
   const [descriptionDraft, setDescriptionDraft] = useState("");
-  const [organizationIdDraft, setOrganizationIdDraft] = useState<string>("");
   const [tagInput, setTagInput] = useState("");
   const [tagsDraft, setTagsDraft] = useState<string[]>([]);
   const [titleDraft, setTitleDraft] = useState("");
@@ -99,7 +88,6 @@ export function AssetDetailPage({
     setTitleDraft(asset.title);
     setDescriptionDraft(asset.description ?? "");
     setTagsDraft(asset.tags);
-    setOrganizationIdDraft(asset.organizationId != null ? String(asset.organizationId) : "");
     setTagInput("");
   }, [asset]);
 
@@ -111,7 +99,6 @@ export function AssetDetailPage({
     await onSave({
       title: titleDraft,
       description: descriptionDraft,
-      organizationId: organizationIdDraft ? Number(organizationIdDraft) : null,
       tags: tagsDraft
     });
   }
@@ -334,7 +321,7 @@ export function AssetDetailPage({
                           <div>
                             <p className="text-sm font-medium">권한 및 메타데이터</p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              소유자와 Admin은 제목, 설명, 태그, 접근 조직을 수정할 수 있습니다.
+                              소유자와 Admin은 제목, 설명, 태그를 수정할 수 있습니다.
                             </p>
                           </div>
                           <Badge variant={canEdit ? "success" : "outline"}>
@@ -345,8 +332,8 @@ export function AssetDetailPage({
                         <div className="grid gap-4 sm:grid-cols-2">
                           <AssetDataField label="소유자" value={asset.ownerName} />
                           <AssetDataField
-                            label="전체 열람 예외"
-                            value="전사 열람자 및 Admin은 조직 제한 없이 열람/다운로드 가능"
+                            label="조회 범위"
+                            value="모든 로그인 사용자가 목록, 상세, 다운로드에 접근할 수 있습니다."
                             valueClassName="text-[13px] font-normal leading-5 text-muted-foreground"
                           />
                         </div>
@@ -370,22 +357,6 @@ export function AssetDetailPage({
                                 placeholder="애셋 설명을 입력하세요"
                                 value={descriptionDraft}
                               />
-                            </div>
-
-                            <div className="space-y-2">
-                              <p className="text-xs font-medium text-muted-foreground">접근 조직</p>
-                              <Select onValueChange={setOrganizationIdDraft} value={organizationIdDraft}>
-                                <SelectTrigger className="h-11 rounded-xl border-border bg-background">
-                                  <SelectValue placeholder="열람 조직을 선택하세요" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {organizations.map((organization) => (
-                                    <SelectItem key={organization.id} value={String(organization.id)}>
-                                      {organization.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
                             </div>
 
                             <div className="space-y-2">
@@ -451,7 +422,7 @@ export function AssetDetailPage({
                             <div className="flex justify-end">
                               <Button
                                 className="h-10 rounded-xl px-4"
-                                disabled={isSaving || !organizationIdDraft}
+                                disabled={isSaving || titleDraft.trim().length === 0}
                                 onClick={() => void handleSave()}
                                 type="button"
                               >
@@ -462,7 +433,7 @@ export function AssetDetailPage({
                           </>
                         ) : (
                           <section className="grid gap-4 sm:grid-cols-2">
-                            <AssetDataField label="접근 조직" value={asset.organizationName ?? "조직 미지정"} />
+                            <AssetDataField label="제작 조직" value={asset.organizationName ?? "조직 미지정"} />
                             <AssetDataField label="삭제 권한" value={asset.canDelete ? "허용" : "불가"} />
                             <AssetDataField label="편집 권한" value={asset.canEdit ? "허용" : "불가"} />
                             <AssetDataField

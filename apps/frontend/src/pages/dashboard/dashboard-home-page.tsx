@@ -149,12 +149,12 @@ export function DashboardHomePage({
       tone: "bg-emerald-100 text-emerald-700"
     },
     {
-      description: "자산은 기본적으로 조직 범위로 열람을 제한하고, 전사 열람자는 예외로 전체 열람과 내보내기가 가능합니다.",
+      description: "모든 로그인 사용자는 모든 자산을 열람하고 다운로드할 수 있으며, 전사 열람자는 추가로 전체 내보내기가 가능합니다.",
       title: "자산 접근",
       tone: "bg-amber-100 text-amber-700"
     },
     {
-      description: "조직 지정, allowlist, 자산 열람 조직 변경, 접근 차단 이력은 모두 감사 로그에 남깁니다.",
+      description: "조직 지정, allowlist, 정책 변경, 자산 편집/삭제/내보내기 차단 이력은 모두 감사 로그에 남깁니다.",
       title: "감사 로그",
       tone: "bg-rose-100 text-rose-700"
     }

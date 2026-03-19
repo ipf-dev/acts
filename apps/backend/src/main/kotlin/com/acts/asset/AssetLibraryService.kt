@@ -1,7 +1,6 @@
 package com.acts.asset
 
 import com.acts.auth.AdminAuditLogService
-import com.acts.auth.OrganizationRepository
 import com.acts.auth.UserAccountRepository
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
@@ -28,7 +27,6 @@ class AssetLibraryService(
     private val assetTagRepository: AssetTagRepository,
     private val assetTagSuggestionService: AssetTagSuggestionService,
     private val assetTypeClassifier: AssetTypeClassifier,
-    private val organizationRepository: OrganizationRepository,
     private val userAccountRepository: UserAccountRepository,
 ) {
     @Transactional
@@ -201,7 +199,6 @@ class AssetLibraryService(
         title: String,
         description: String?,
         requestedTags: List<String>,
-        organizationId: Long?,
         actorEmail: String,
         actorName: String?,
     ): AssetDetailResponse {
@@ -221,15 +218,7 @@ class AssetLibraryService(
             title = asset.title,
             description = asset.description,
             tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId).map { assetTag -> assetTag.value },
-            organizationId = asset.organization?.id,
-            organizationName = asset.organization?.name,
         )
-        val previousAccessScope = AssetAccessScopeAuditSnapshot.from(asset)
-
-        if (organizationId != null && organizationId != asset.organization?.id) {
-            asset.organization = organizationRepository.findById(organizationId)
-                .orElseThrow { IllegalArgumentException("Organization does not exist.") }
-        }
 
         asset.title = resolvedTitle
         asset.description = resolvedDescription
@@ -260,8 +249,6 @@ class AssetLibraryService(
             title = savedAsset.title,
             description = savedAsset.description,
             tags = nextTags.map { tag -> tag.value },
-            organizationId = savedAsset.organization?.id,
-            organizationName = savedAsset.organization?.name,
         )
 
         if (previousState != nextState) {
@@ -273,17 +260,6 @@ class AssetLibraryService(
                     actorName = actorName ?: actor.displayName,
                     detail = buildMetadataUpdateDetail(previousState, nextState),
                 ),
-            )
-        }
-
-        val nextAccessScope = AssetAccessScopeAuditSnapshot.from(savedAsset)
-        if (previousAccessScope != nextAccessScope) {
-            adminAuditLogService.recordAssetAccessScopeUpdated(
-                actorEmail = actor.email,
-                actorName = actorName ?: actor.displayName,
-                asset = savedAsset,
-                beforeState = previousAccessScope,
-                afterState = nextAccessScope,
             )
         }
 
@@ -559,9 +535,6 @@ class AssetLibraryService(
             if (previousState.tags != nextState.tags) {
                 add("태그")
             }
-            if (previousState.organizationId != nextState.organizationId) {
-                add("열람 조직")
-            }
         }
 
         return if (changedFields.isEmpty()) {
@@ -606,6 +579,4 @@ private data class AssetMetadataSnapshot(
     val title: String,
     val description: String?,
     val tags: List<String>,
-    val organizationId: Long?,
-    val organizationName: String?,
 )

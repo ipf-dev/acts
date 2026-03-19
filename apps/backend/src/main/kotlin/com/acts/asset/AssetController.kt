@@ -139,7 +139,6 @@ class AssetController(
                     title = request.title,
                     description = request.description,
                     requestedTags = request.tags,
-                    organizationId = request.organizationId,
                     actorEmail = actorEmail,
                     actorName = actorName,
                 ),

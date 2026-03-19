@@ -12,7 +12,7 @@ class AssetAuthorizationService(
     fun filterVisibleAssets(
         actor: UserAccountEntity,
         assets: List<AssetEntity>,
-    ): List<AssetEntity> = assets.filter { asset -> canView(actor, asset) }
+    ): List<AssetEntity> = assets
 
     fun permissionsFor(
         actor: UserAccountEntity,
@@ -20,7 +20,7 @@ class AssetAuthorizationService(
     ): AssetPermissionSnapshot = AssetPermissionSnapshot(
         canEdit = canEdit(actor, asset),
         canDelete = canDelete(actor, asset),
-        canDownload = canView(actor, asset),
+        canDownload = true,
     )
 
     fun requireViewAccess(
@@ -28,17 +28,7 @@ class AssetAuthorizationService(
         asset: AssetEntity,
         action: AssetAccessAction,
     ) {
-        if (canView(actor, asset)) {
-            return
-        }
-
-        adminAuditLogService.recordAssetAccessDenied(
-            actorEmail = actor.email,
-            actorName = actor.displayName,
-            asset = asset,
-            attemptedAction = action,
-        )
-        throw SecurityException("자산 열람 권한이 없습니다.")
+        return
     }
 
     fun requireEditAccess(actor: UserAccountEntity, asset: AssetEntity) {
@@ -78,21 +68,6 @@ class AssetAuthorizationService(
     }
 
     fun canExportAll(actor: UserAccountEntity): Boolean = actor.role == UserRole.ADMIN || actor.companyWideViewer
-
-    private fun canView(actor: UserAccountEntity, asset: AssetEntity): Boolean {
-        if (actor.role == UserRole.ADMIN || actor.companyWideViewer) {
-            return true
-        }
-
-        if (asset.ownerEmail.equals(actor.email, ignoreCase = true)) {
-            return true
-        }
-
-        val actorOrganizationId = actor.organization?.id
-        val assetOrganizationId = asset.organization?.id
-
-        return actorOrganizationId != null && actorOrganizationId == assetOrganizationId
-    }
 
     private fun canEdit(actor: UserAccountEntity, asset: AssetEntity): Boolean =
         actor.role == UserRole.ADMIN || asset.ownerEmail.equals(actor.email, ignoreCase = true)
