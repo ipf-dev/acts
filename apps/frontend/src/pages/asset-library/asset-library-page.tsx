@@ -115,9 +115,7 @@ export function AssetLibraryPage({
         .filter((organizationName): organizationName is string => Boolean(organizationName))
     )
   ).sort((left, right) => left.localeCompare(right, "ko-KR"));
-  const normalizedTerms = deferredSearchQuery
-    .trim()
-    .toLowerCase()
+  const normalizedTerms = normalizeSearchValue(deferredSearchQuery)
     .split(/\s+/)
     .filter(Boolean);
   const visibleAssets = assets.filter((asset) => {
@@ -129,8 +127,8 @@ export function AssetLibraryPage({
       asset.organizationName ?? "",
       ...asset.tags
     ]
-      .join(" ")
-      .toLowerCase();
+      .map(normalizeSearchValue)
+      .join(" ");
 
     if (normalizedTerms.some((term) => !searchable.includes(term))) {
       return false;
@@ -635,6 +633,7 @@ async function createDraftFromFile(file: File): Promise<AssetUploadDraftView> {
   const type = inferAssetType(file);
   const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
   const dimensions = previewUrl ? await readImageSize(previewUrl) : null;
+  const normalizedFileName = normalizeDisplayValue(file.name);
 
   return {
     id: crypto.randomUUID(),
@@ -646,14 +645,14 @@ async function createDraftFromFile(file: File): Promise<AssetUploadDraftView> {
     suggestedWidth: dimensions?.width ?? null,
     description: "",
     tagInput: "",
-    tags: createSuggestedTags(file.name, type),
-    title: file.name.replace(/\.[^/.]+$/, ""),
+    tags: createSuggestedTags(normalizedFileName, type),
+    title: normalizeDisplayValue(normalizedFileName.replace(/\.[^/.]+$/, "")),
     type
   };
 }
 
 function createSuggestedTags(fileName: string, type: AssetSummaryView["type"]): string[] {
-  const tokens = fileName
+  const tokens = normalizeDisplayValue(fileName)
     .replace(/\.[^/.]+$/, "")
     .split(/[^0-9A-Za-z가-힣]+/)
     .map((token) => token.trim())
@@ -685,8 +684,16 @@ function inferAssetType(file: File): AssetSummaryView["type"] {
 }
 
 function normalizeTag(value: string): string | null {
-  const normalizedValue = value.trim();
+  const normalizedValue = normalizeDisplayValue(value).trim();
   return isBlank(normalizedValue) ? null : normalizedValue;
+}
+
+function normalizeDisplayValue(value: string): string {
+  return value.normalize("NFC");
+}
+
+function normalizeSearchValue(value: string): string {
+  return normalizeDisplayValue(value).trim().toLowerCase();
 }
 
 function formatFileSize(fileSizeBytes: number): string {

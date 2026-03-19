@@ -175,13 +175,12 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       return readJson<ViewerAllowlistEntryView[]>("/api/auth/admin/viewer-allowlist");
     },
     async addViewerAllowlist(input) {
-      return readJson<ViewerAllowlistEntryView[]>("/api/auth/admin/viewer-allowlist", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(input)
-      });
+      return readJson<ViewerAllowlistEntryView[]>(
+        `/api/auth/admin/viewer-allowlist?email=${encodeURIComponent(input.email)}`,
+        {
+          method: "POST"
+        }
+      );
     },
     async removeViewerAllowlist(email) {
       return readJson<ViewerAllowlistEntryView[]>(

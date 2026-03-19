@@ -7,6 +7,7 @@ import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
+import java.text.Normalizer
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -36,7 +37,7 @@ class AssetLibraryService(
 
         val actor = userAccountRepository.findById(command.actorEmail.lowercase())
             .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
-        val resolvedFileName = command.fileName.trim()
+        val resolvedFileName = normalizeText(command.fileName).trim()
         val resolvedTitle = command.title.normalizedOrNull() ?: resolvedFileName.substringBeforeLast(".", resolvedFileName)
         val resolvedDescription = command.description.normalizedOrNull()
         val contentType = command.contentType.normalizedOrNull() ?: "application/octet-stream"
@@ -397,13 +398,13 @@ class AssetLibraryService(
         val normalizedSearchTerms = query.search.normalizedSearchTerms()
         if (normalizedSearchTerms.isNotEmpty()) {
             val searchable = buildList {
-                add(title.lowercase())
-                description?.lowercase()?.let(::add)
-                add(originalFileName.lowercase())
-                add(ownerName.lowercase())
-                add(ownerEmail.lowercase())
-                organizationName?.lowercase()?.let(::add)
-                addAll(tags.map { tag -> tag.lowercase() })
+                add(title.normalizedSearchValue())
+                description?.normalizedSearchValue()?.let(::add)
+                add(originalFileName.normalizedSearchValue())
+                add(ownerName.normalizedSearchValue())
+                add(ownerEmail.normalizedSearchValue())
+                organizationName?.normalizedSearchValue()?.let(::add)
+                addAll(tags.map { tag -> tag.normalizedSearchValue() })
             }.joinToString(" ")
 
             if (normalizedSearchTerms.any { searchTerm -> !searchable.contains(searchTerm) }) {
@@ -538,7 +539,7 @@ class AssetLibraryService(
         description?.let(::add)
         organizationName?.let(::add)
         addAll(tags)
-    }.joinToString(" ") { value -> value.trim().lowercase() }
+    }.joinToString(" ") { value -> value.normalizedSearchValue() }
 
     private fun calculateSha256(contentBytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
         .digest(contentBytes)
@@ -583,14 +584,22 @@ class AssetLibraryService(
         return "acts-assets-export-$timestamp.zip"
     }
 
-    private fun String?.normalizedOrNull(): String? = this?.trim()?.takeIf { value -> value.isNotEmpty() }
+    private fun String?.normalizedOrNull(): String? = this
+        ?.let(::normalizeText)
+        ?.trim()
+        ?.takeIf { value -> value.isNotEmpty() }
 
     private fun String?.normalizedSearchTerms(): List<String> = this
+        ?.let(::normalizeText)
         ?.trim()
         ?.lowercase()
         ?.split(Regex("\\s+"))
         ?.filter { searchTerm -> searchTerm.isNotBlank() }
         .orEmpty()
+
+    private fun String.normalizedSearchValue(): String = normalizeText(this).trim().lowercase()
+
+    private fun normalizeText(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFC)
 }
 
 private data class AssetMetadataSnapshot(

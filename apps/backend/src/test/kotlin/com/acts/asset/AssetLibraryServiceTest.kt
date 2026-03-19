@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.transaction.annotation.Transactional
+import java.text.Normalizer
 
 @SpringBootTest
 @Transactional
@@ -117,6 +118,37 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThat(uploadedAsset.canDownload).isTrue()
         assertThat(listedAssets).hasSize(1)
         assertThat(listedAssets.single().id).isEqualTo(uploadedAsset.id)
+    }
+
+    @Test
+    fun `matches korean search terms even when uploaded file name is stored in decomposed unicode`() {
+        val decomposedFileName = Normalizer.normalize("폴리17.png", Normalizer.Form.NFD)
+
+        val uploadedAsset = assetLibraryService.uploadAsset(
+            AssetUploadCommand(
+                actorEmail = "coco@iportfolio.co.kr",
+                actorName = "Coco",
+                title = "폴리17",
+                description = "한글 파일명 검색 테스트",
+                requestedTags = emptyList(),
+                sourceDetail = "외부 등록",
+                fileName = decomposedFileName,
+                contentType = "image/png",
+                contentBytes = "image".toByteArray(),
+            ),
+        )
+
+        val partialMatch = assetLibraryService.listAssets(
+            actorEmail = "coco@iportfolio.co.kr",
+            query = AssetListQuery(search = "폴"),
+        )
+        val fullMatch = assetLibraryService.listAssets(
+            actorEmail = "coco@iportfolio.co.kr",
+            query = AssetListQuery(search = "폴리17"),
+        )
+
+        assertThat(partialMatch).extracting("id").contains(uploadedAsset.id)
+        assertThat(fullMatch).extracting("id").contains(uploadedAsset.id)
     }
 
     @Test

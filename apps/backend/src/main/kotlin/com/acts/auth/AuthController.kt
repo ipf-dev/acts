@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -86,17 +87,18 @@ class AuthController(
 
     @PostMapping("/admin/viewer-allowlist")
     fun addViewerAllowlist(
-        @RequestBody request: ViewerAllowlistRequest,
+        @RequestParam email: String,
         authentication: Authentication?,
     ): ResponseEntity<List<ViewerAllowlistEntryResponse>> {
-        if (request.email.isBlank()) {
+        val targetEmail = email.trim()
+        if (targetEmail.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
         }
 
         return try {
             ResponseEntity.ok(
                 userDirectoryService.addViewerAllowlist(
-                    email = request.email.trim(),
+                    email = targetEmail,
                     actorEmail = currentActorEmail(authentication),
                     actorName = currentActorName(authentication),
                 ),
