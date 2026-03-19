@@ -27,6 +27,7 @@ import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
 import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../dashboard-types";
 import { isBlank } from "../../lib/utils";
 import { AssetDetailModal } from "./asset-detail-modal";
+import { AssetPreviewPanel } from "./asset-preview-panel";
 import { AssetUploadModal } from "./asset-upload-modal";
 import type { AssetUploadDraftView } from "./asset-library-page-model";
 
@@ -434,7 +435,15 @@ export function AssetLibraryPage({
                       onClick={() => onOpenAssetDetail(asset.id)}
                       type="button"
                     >
-                      <div className="flex items-start gap-3">
+                      <AssetPreviewPanel
+                        assetId={asset.id}
+                        assetType={asset.type}
+                        cacheKey={asset.updatedAt}
+                        className="aspect-[16/10] w-full"
+                        title={asset.title}
+                      />
+
+                      <div className="mt-4 flex items-start gap-3">
                         <div className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-[#f1ebff] text-[#6d4ae2]">
                           <AssetTypeIcon assetType={asset.type} />
                         </div>
@@ -509,9 +518,13 @@ export function AssetLibraryPage({
                           <tr className="hover:bg-muted/30" key={asset.id}>
                             <td className="px-4 py-4">
                               <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f1ebff] text-[#6d4ae2]">
-                                  <AssetTypeIcon assetType={asset.type} />
-                                </div>
+                                <AssetPreviewPanel
+                                  assetId={asset.id}
+                                  assetType={asset.type}
+                                  cacheKey={asset.updatedAt}
+                                  className="h-12 w-16 flex-none rounded-xl"
+                                  title={asset.title}
+                                />
                                 <div className="min-w-0">
                                   <p className="line-clamp-1 font-medium">{asset.title}</p>
                                   <p className="mt-1 text-xs text-muted-foreground">

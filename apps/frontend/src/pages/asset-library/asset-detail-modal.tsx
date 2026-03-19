@@ -22,6 +22,7 @@ import {
   AssetTagChip,
   AssetTypeIcon
 } from "./asset-detail-section";
+import { AssetPreviewPanel } from "./asset-preview-panel";
 
 interface AssetDetailModalProps {
   asset: AssetDetailView | null;
@@ -170,6 +171,14 @@ function AssetSummaryPanel({
   return (
     <div className="space-y-4">
       <section className="rounded-[18px] border border-[#dfe4f0] bg-[#fcfcfe] px-4 py-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]">
+        <AssetPreviewPanel
+          assetId={asset.id}
+          assetType={asset.type}
+          cacheKey={asset.updatedAt}
+          className="mb-4 aspect-[16/9] w-full rounded-[16px]"
+          title={asset.title}
+        />
+
         <div>
           <p className="text-[12px] text-muted-foreground">설명</p>
           <p className="mt-1 text-[14px] leading-6 text-foreground">{asset.description ?? asset.originalFileName}</p>

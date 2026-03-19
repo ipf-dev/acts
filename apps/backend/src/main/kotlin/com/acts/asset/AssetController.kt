@@ -61,6 +61,8 @@ class AssetController(
         ResponseEntity.ok(assetLibraryService.getAsset(assetId = assetId, actorEmail = actorEmail))
         } catch (_: SecurityException) {
             ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalStateException) {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
         } catch (_: IllegalArgumentException) {
             ResponseEntity.status(HttpStatus.NOT_FOUND).build()
         }
@@ -90,6 +92,30 @@ class AssetController(
                 )
                 .contentLength(downloadResult.content.size.toLong())
                 .body(ByteArrayResource(downloadResult.content))
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        }
+    }
+
+    @GetMapping("/{assetId}/preview")
+    fun previewAsset(
+        @PathVariable assetId: Long,
+        authentication: Authentication?,
+    ): ResponseEntity<ByteArrayResource> {
+        return try {
+            val actorEmail = currentActorEmail(authentication)
+                ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            val previewResult = assetLibraryService.loadPreview(
+                assetId = assetId,
+                actorEmail = actorEmail,
+            )
+
+            ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(previewResult.contentType))
+                .contentLength(previewResult.content.size.toLong())
+                .body(ByteArrayResource(previewResult.content))
         } catch (_: SecurityException) {
             ResponseEntity.status(HttpStatus.FORBIDDEN).build()
         } catch (_: IllegalArgumentException) {

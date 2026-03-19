@@ -9,6 +9,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.model.GetObjectResponse
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
 
@@ -55,6 +56,21 @@ class S3AssetBinaryStorage(
             content = responseBytes.asByteArray(),
             contentType = responseBytes.response().contentType(),
         )
+    }
+
+    override fun loadOrNull(
+        bucket: String,
+        objectKey: String,
+    ): LoadedAssetObject? = try {
+        load(bucket = bucket, objectKey = objectKey)
+    } catch (_: NoSuchKeyException) {
+        null
+    } catch (exception: S3Exception) {
+        if (exception.statusCode() == 404) {
+            null
+        } else {
+            throw exception
+        }
     }
 
     private fun ensureBucketExists() {

@@ -47,3 +47,7 @@ export function triggerFileDownload(file: DownloadedFile): void {
   anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
+
+export function buildAssetPreviewUrl(assetId: number, cacheKey: string): string {
+  return `/api/assets/${assetId}/preview?v=${encodeURIComponent(cacheKey)}`;
+}

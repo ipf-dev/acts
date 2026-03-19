@@ -6,6 +6,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.kotlin.atLeastOnce
+import org.mockito.kotlin.argThat
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.any
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
@@ -23,6 +27,9 @@ class AssetLibraryServiceTest @Autowired constructor(
 ) {
     @MockBean
     private lateinit var assetBinaryStorage: AssetBinaryStorage
+
+    @MockBean
+    private lateinit var assetPreviewGenerator: AssetPreviewGenerator
 
     @BeforeEach
     fun prepareUser() {
@@ -83,6 +90,8 @@ class AssetLibraryServiceTest @Autowired constructor(
                 contentType = "text/plain",
             ),
         )
+        whenever(assetBinaryStorage.loadOrNull(any(), any())).thenReturn(null)
+        whenever(assetPreviewGenerator.generateVideoPreview(any(), any())).thenReturn(null)
     }
 
     @Test
@@ -183,6 +192,81 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThat(downloadResult.fileName).isEqualTo("coco_festival_story.txt")
         assertThat(downloadResult.contentType).isEqualTo("text/plain")
         assertThat(downloadResult.content).containsExactly(*"story".toByteArray())
+    }
+
+    @Test
+    fun `returns image preview from original asset bytes`() {
+        whenever(assetBinaryStorage.load(any(), any())).thenReturn(
+            LoadedAssetObject(
+                content = byteArrayOf(1, 2, 3),
+                contentType = "image/png",
+            ),
+        )
+
+        val uploadedAsset = assetLibraryService.uploadAsset(
+            AssetUploadCommand(
+                actorEmail = "coco@iportfolio.co.kr",
+                actorName = "Coco",
+                title = "이미지 프리뷰 테스트",
+                description = "프리뷰 설명",
+                requestedTags = listOf("이미지"),
+                sourceDetail = "외부 등록",
+                fileName = "preview-image.png",
+                contentType = "image/png",
+                contentBytes = "image".toByteArray(),
+            ),
+        )
+
+        val previewResult = assetLibraryService.loadPreview(
+            assetId = uploadedAsset.id,
+            actorEmail = "tony@iportfolio.co.kr",
+        )
+
+        assertThat(previewResult.contentType).isEqualTo("image/png")
+        assertThat(previewResult.content).containsExactly(1, 2, 3)
+    }
+
+    @Test
+    fun `generates and returns video thumbnail preview`() {
+        whenever(assetPreviewGenerator.generateVideoPreview(eq("preview-video.mp4"), any())).thenReturn(
+            GeneratedAssetPreview(
+                content = byteArrayOf(9, 8, 7),
+                contentType = "image/jpeg",
+            ),
+        )
+        whenever(assetBinaryStorage.load(any(), any())).thenReturn(
+            LoadedAssetObject(
+                content = "video-binary".toByteArray(),
+                contentType = "video/mp4",
+            ),
+        )
+
+        val uploadedAsset = assetLibraryService.uploadAsset(
+            AssetUploadCommand(
+                actorEmail = "coco@iportfolio.co.kr",
+                actorName = "Coco",
+                title = "영상 프리뷰 테스트",
+                description = "썸네일 생성",
+                requestedTags = listOf("영상"),
+                sourceDetail = "외부 등록",
+                fileName = "preview-video.mp4",
+                contentType = "video/mp4",
+                contentBytes = "video-binary".toByteArray(),
+            ),
+        )
+
+        val previewResult = assetLibraryService.loadPreview(
+            assetId = uploadedAsset.id,
+            actorEmail = "tony@iportfolio.co.kr",
+        )
+
+        assertThat(previewResult.contentType).isEqualTo("image/jpeg")
+        assertThat(previewResult.content).containsExactly(9, 8, 7)
+        verify(assetBinaryStorage, atLeastOnce()).store(
+            objectKey = eq("assets/test/coco.txt.preview.jpg"),
+            contentType = eq("image/jpeg"),
+            content = argThat { contentEquals(byteArrayOf(9, 8, 7)) },
+        )
     }
 
     @Test

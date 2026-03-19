@@ -38,6 +38,7 @@ import {
   AssetTagChip,
   AssetTypeIcon
 } from "./asset-detail-section";
+import { AssetPreviewPanel } from "./asset-preview-panel";
 
 interface AssetDetailPageProps {
   asset: AssetDetailView | null;
@@ -242,6 +243,14 @@ export function AssetDetailPage({
                 <TabsContent value="summary">
                   <Card className="rounded-[24px] border-border shadow-none">
                     <CardContent className="space-y-6 p-6">
+                      <AssetPreviewPanel
+                        assetId={asset.id}
+                        assetType={asset.type}
+                        cacheKey={asset.updatedAt}
+                        className="aspect-[16/9] w-full rounded-[20px]"
+                        title={asset.title}
+                      />
+
                       <section className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">설명</p>
                         <p className="text-sm leading-7 text-foreground">

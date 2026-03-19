@@ -23,6 +23,7 @@ class AssetLibraryService(
     private val assetEventRepository: AssetEventRepository,
     private val assetFileRepository: AssetFileRepository,
     private val assetMetadataExtractor: AssetMetadataExtractor,
+    private val assetPreviewGenerator: AssetPreviewGenerator,
     private val assetRepository: AssetRepository,
     private val assetTagRepository: AssetTagRepository,
     private val assetTagSuggestionService: AssetTagSuggestionService,
@@ -102,6 +103,12 @@ class AssetLibraryService(
                 createdByEmail = actor.email,
                 createdByName = actor.displayName,
             ),
+        )
+        storeGeneratedPreviewIfNeeded(
+            assetType = assetType,
+            objectKey = storedAssetObject.objectKey,
+            originalFileName = resolvedFileName,
+            contentBytes = command.contentBytes,
         )
         assetTagRepository.saveAll(
             tags.map { tagCandidate ->
@@ -266,6 +273,36 @@ class AssetLibraryService(
         return getAsset(
             assetId = assetId,
             actorEmail = actor.email,
+        )
+    }
+
+    @Transactional
+    fun loadPreview(
+        assetId: Long,
+        actorEmail: String,
+    ): AssetPreviewResult {
+        val actor = requireActor(actorEmail)
+        val asset = requireActiveAsset(assetId)
+        assetAuthorizationService.requireViewAccess(
+            actor = actor,
+            asset = asset,
+            action = AssetAccessAction.DETAIL_VIEW,
+        )
+        val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
+            ?: throw IllegalArgumentException("프리뷰 대상 파일을 찾을 수 없습니다.")
+
+        val previewObject = when (asset.assetType) {
+            AssetType.IMAGE -> assetBinaryStorage.load(
+                bucket = currentFile.bucketName,
+                objectKey = currentFile.objectKey,
+            )
+            AssetType.VIDEO -> loadOrGenerateVideoPreview(currentFile)
+            else -> null
+        } ?: throw IllegalStateException("프리뷰 생성에 실패했습니다.")
+
+        return AssetPreviewResult(
+            content = previewObject.content,
+            contentType = previewObject.contentType ?: "application/octet-stream",
         )
     }
 
@@ -494,6 +531,8 @@ class AssetLibraryService(
         return "assets/$timestampPrefix/${UUID.randomUUID()}-${sanitizeFileName(fileName)}"
     }
 
+    private fun createPreviewObjectKey(objectKey: String): String = "$objectKey.preview.jpg"
+
     private fun sanitizeFileName(fileName: String): String = fileName
         .trim()
         .replace(Regex("[^\\p{L}\\p{N}._-]+"), "-")
@@ -555,6 +594,59 @@ class AssetLibraryService(
             .withZone(ZoneOffset.UTC)
             .format(Instant.now())
         return "acts-assets-export-$timestamp.zip"
+    }
+
+    private fun storeGeneratedPreviewIfNeeded(
+        assetType: AssetType,
+        objectKey: String,
+        originalFileName: String,
+        contentBytes: ByteArray,
+    ) {
+        if (assetType != AssetType.VIDEO) {
+            return
+        }
+
+        val generatedPreview = assetPreviewGenerator.generateVideoPreview(
+            originalFileName = originalFileName,
+            contentBytes = contentBytes,
+        ) ?: return
+
+        assetBinaryStorage.store(
+            objectKey = createPreviewObjectKey(objectKey),
+            contentType = generatedPreview.contentType,
+            content = generatedPreview.content,
+        )
+    }
+
+    private fun loadOrGenerateVideoPreview(currentFile: AssetFileEntity): LoadedAssetObject? {
+        val previewObjectKey = createPreviewObjectKey(currentFile.objectKey)
+        val cachedPreview = assetBinaryStorage.loadOrNull(
+            bucket = currentFile.bucketName,
+            objectKey = previewObjectKey,
+        )
+        if (cachedPreview != null) {
+            return cachedPreview
+        }
+
+        val originalObject = assetBinaryStorage.load(
+            bucket = currentFile.bucketName,
+            objectKey = currentFile.objectKey,
+        )
+        val generatedPreview = assetPreviewGenerator.generateVideoPreview(
+            originalFileName = currentFile.originalFileName,
+            contentBytes = originalObject.content,
+        ) ?: return null
+
+        assetBinaryStorage.store(
+            objectKey = previewObjectKey,
+            contentType = generatedPreview.contentType,
+            content = generatedPreview.content,
+        )
+
+        return LoadedAssetObject(
+            content = generatedPreview.content,
+            contentType = generatedPreview.contentType,
+        )
     }
 
     private fun String?.normalizedOrNull(): String? = this

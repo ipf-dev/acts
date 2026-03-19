@@ -11,6 +11,11 @@ interface AssetBinaryStorage {
         bucket: String,
         objectKey: String,
     ): LoadedAssetObject
+
+    fun loadOrNull(
+        bucket: String,
+        objectKey: String,
+    ): LoadedAssetObject?
 }
 
 data class StoredAssetObject(

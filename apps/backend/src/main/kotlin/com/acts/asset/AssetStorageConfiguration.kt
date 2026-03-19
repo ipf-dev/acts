@@ -10,7 +10,7 @@ import software.amazon.awssdk.services.s3.S3Client
 import java.net.URI
 
 @Configuration
-@EnableConfigurationProperties(AssetStorageProperties::class)
+@EnableConfigurationProperties(AssetStorageProperties::class, AssetPreviewProperties::class)
 class AssetStorageConfiguration {
     @Bean
     fun s3Client(assetStorageProperties: AssetStorageProperties): S3Client = S3Client.builder()
