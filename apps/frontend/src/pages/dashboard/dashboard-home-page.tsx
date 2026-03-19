@@ -73,6 +73,9 @@ const auditTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
 });
 
 const auditActionLabelMap: Record<string, string> = {
+  ASSET_ACCESS_DENIED: "자산 접근 차단",
+  ASSET_ACCESS_SCOPE_UPDATED: "자산 열람 조직 변경",
+  ASSET_EXPORTED: "자산 내보내기",
   ASSET_RESTORED: "자산 복구",
   ASSET_RETENTION_POLICY_UPDATED: "정책 변경",
   LOGIN_SUCCESS: "로그인 성공",
@@ -146,7 +149,12 @@ export function DashboardHomePage({
       tone: "bg-emerald-100 text-emerald-700"
     },
     {
-      description: "조직 지정과 allowlist 변경은 전후 값과 변경자를 감사 로그에 남깁니다.",
+      description: "자산은 기본적으로 조직 범위로 열람을 제한하고, 전사 열람자는 예외로 전체 열람과 내보내기가 가능합니다.",
+      title: "자산 접근",
+      tone: "bg-amber-100 text-amber-700"
+    },
+    {
+      description: "조직 지정, allowlist, 자산 열람 조직 변경, 접근 차단 이력은 모두 감사 로그에 남깁니다.",
       title: "감사 로그",
       tone: "bg-rose-100 text-rose-700"
     }

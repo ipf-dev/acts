@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useRef, useState } from "react";
 import {
   Clock3,
+  Download,
   FileAudio2,
   FileImage,
   FileText,
@@ -36,10 +37,14 @@ interface AssetLibraryPageProps {
   authSuccessMessage: string | null;
   isAssetDetailLoading: boolean;
   isDeleting: boolean;
+  isDownloading: boolean;
+  isExporting: boolean;
   isLoading: boolean;
   isUploading: boolean;
   onCloseAssetDetail: () => void;
   onDeleteAsset: (assetId: number) => Promise<void>;
+  onDownloadAsset: (assetId: number) => Promise<void>;
+  onExportAssets: () => Promise<void>;
   onOpenAssetDetail: (assetId: number) => void;
   onOpenAssetPage: (assetId: number) => void;
   onSearchQueryChange: (value: string) => void;
@@ -61,10 +66,14 @@ export function AssetLibraryPage({
   authSuccessMessage,
   isAssetDetailLoading,
   isDeleting,
+  isDownloading,
+  isExporting,
   isLoading,
   isUploading,
   onCloseAssetDetail,
   onDeleteAsset,
+  onDownloadAsset,
+  onExportAssets,
   onOpenAssetDetail,
   onOpenAssetPage,
   onSearchQueryChange,
@@ -256,14 +265,28 @@ export function AssetLibraryPage({
         </div>
 
         {session.authenticated ? (
-          <Button
-            className="h-10 rounded-xl bg-primary px-4 text-sm font-medium hover:bg-primary/92"
-            onClick={() => setIsUploadModalOpen(true)}
-            type="button"
-          >
-            <Sparkles className="h-4 w-4" />
-            애셋 업로드
-          </Button>
+          <div className="flex items-center gap-2">
+            {session.user?.companyWideViewer ? (
+              <Button
+                className="h-10 rounded-xl px-4 text-sm font-medium"
+                disabled={isExporting}
+                onClick={() => void onExportAssets()}
+                type="button"
+                variant="outline"
+              >
+                <Download className="h-4 w-4" />
+                {isExporting ? "내보내는 중" : "내보내기"}
+              </Button>
+            ) : null}
+            <Button
+              className="h-10 rounded-xl bg-primary px-4 text-sm font-medium hover:bg-primary/92"
+              onClick={() => setIsUploadModalOpen(true)}
+              type="button"
+            >
+              <Sparkles className="h-4 w-4" />
+              애셋 업로드
+            </Button>
+          </div>
         ) : null}
       </div>
 
@@ -582,10 +605,11 @@ export function AssetLibraryPage({
         isLoading={isAssetDetailLoading}
         isOpen={Boolean(assetDetail) || isAssetDetailLoading}
         isDeleting={isDeleting}
+        isDownloading={isDownloading}
         onClose={onCloseAssetDetail}
         onDelete={onDeleteAsset}
+        onDownload={onDownloadAsset}
         onOpenDetailPage={onOpenAssetPage}
-        session={session}
       />
     </section>
   );

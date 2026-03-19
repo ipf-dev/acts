@@ -7,6 +7,7 @@ import {
   getLoginSuccessMessage
 } from "../../dashboard-auth";
 import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../dashboard-types";
+import { getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
 import { AssetLibraryPage } from "./asset-library-page";
 import type { AssetUploadDraftView } from "./asset-library-page-model";
 
@@ -17,6 +18,8 @@ interface AssetLibraryPageState {
   authSuccessMessage: string | null;
   isAssetDetailLoading: boolean;
   isDeleting: boolean;
+  isDownloading: boolean;
+  isExporting: boolean;
   isLoading: boolean;
   isUploading: boolean;
   session: AuthSessionView;
@@ -43,6 +46,8 @@ export function AssetLibraryPageContainer({
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
     isAssetDetailLoading: false,
     isDeleting: false,
+    isDownloading: false,
+    isExporting: false,
     isLoading: true,
     isUploading: false,
     session: createAnonymousSession()
@@ -120,7 +125,9 @@ export function AssetLibraryPageContainer({
     } catch (error: unknown) {
       setState((currentState) => ({
         ...currentState,
-        authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
+        authErrorMessage: getAssetApiErrorMessage(error, {
+          fallback: "자산 업로드에 실패했습니다."
+        }),
         isUploading: false
       }));
     }
@@ -145,7 +152,11 @@ export function AssetLibraryPageContainer({
     } catch (error: unknown) {
       setState((currentState) => ({
         ...currentState,
-        authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
+        authErrorMessage: getAssetApiErrorMessage(error, {
+          denied: "현재 권한으로는 이 자산을 열 수 없습니다.",
+          fallback: "자산 상세 정보를 불러오지 못했습니다.",
+          notFound: "대상 자산을 찾을 수 없습니다."
+        }),
         isAssetDetailLoading: false
       }));
     }
@@ -181,8 +192,70 @@ export function AssetLibraryPageContainer({
     } catch (error: unknown) {
       setState((currentState) => ({
         ...currentState,
-        authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
+        authErrorMessage: getAssetApiErrorMessage(error, {
+          denied: "삭제 권한이 없습니다.",
+          fallback: "자산 삭제에 실패했습니다.",
+          notFound: "삭제할 자산을 찾을 수 없습니다."
+        }),
         isDeleting: false
+      }));
+    }
+  }
+
+  async function handleDownloadAsset(assetId: number): Promise<void> {
+    setState((currentState) => ({
+      ...currentState,
+      authErrorMessage: null,
+      authSuccessMessage: null,
+      isDownloading: true
+    }));
+
+    try {
+      const file = await dashboardApi.downloadAsset(assetId);
+      triggerFileDownload(file);
+
+      setState((currentState) => ({
+        ...currentState,
+        isDownloading: false
+      }));
+    } catch (error: unknown) {
+      setState((currentState) => ({
+        ...currentState,
+        authErrorMessage: getAssetApiErrorMessage(error, {
+          denied: "현재 권한으로는 이 자산을 다운로드할 수 없습니다.",
+          fallback: "자산 다운로드에 실패했습니다.",
+          notFound: "다운로드할 자산을 찾을 수 없습니다."
+        }),
+        isDownloading: false
+      }));
+    }
+  }
+
+  async function handleExportAssets(): Promise<void> {
+    setState((currentState) => ({
+      ...currentState,
+      authErrorMessage: null,
+      authSuccessMessage: null,
+      isExporting: true
+    }));
+
+    try {
+      const file = await dashboardApi.exportAssets();
+      triggerFileDownload(file);
+
+      setState((currentState) => ({
+        ...currentState,
+        authSuccessMessage: "내보내기 ZIP 다운로드가 시작되었습니다.",
+        isExporting: false
+      }));
+    } catch (error: unknown) {
+      setState((currentState) => ({
+        ...currentState,
+        authErrorMessage: getAssetApiErrorMessage(error, {
+          denied: "전사 열람 권한이 있는 사용자만 전체 자산을 내보낼 수 있습니다.",
+          fallback: "자산 내보내기에 실패했습니다."
+        }),
+        isExporting: false
       }));
     }
   }
@@ -195,10 +268,14 @@ export function AssetLibraryPageContainer({
       authSuccessMessage={state.authSuccessMessage}
       isAssetDetailLoading={state.isAssetDetailLoading}
       isDeleting={state.isDeleting}
+      isDownloading={state.isDownloading}
+      isExporting={state.isExporting}
       isLoading={state.isLoading}
       isUploading={state.isUploading}
       onCloseAssetDetail={handleCloseAssetDetail}
       onDeleteAsset={handleDeleteAsset}
+      onDownloadAsset={handleDownloadAsset}
+      onExportAssets={handleExportAssets}
       onOpenAssetDetail={handleOpenAssetDetail}
       onOpenAssetPage={onOpenAssetPage}
       onSearchQueryChange={onSearchQueryChange}

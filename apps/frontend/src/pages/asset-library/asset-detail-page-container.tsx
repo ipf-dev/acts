@@ -10,8 +10,10 @@ import type {
   AssetDetailView,
   AssetSummaryView,
   AssetUpdateInput,
-  AuthSessionView
+  AuthSessionView,
+  OrganizationOptionView
 } from "../../dashboard-types";
+import { getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
 import { AssetDetailPage } from "./asset-detail-page";
 
 interface AssetDetailPageState {
@@ -20,8 +22,10 @@ interface AssetDetailPageState {
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   isDeleting: boolean;
+  isDownloading: boolean;
   isLoading: boolean;
   isSaving: boolean;
+  organizations: OrganizationOptionView[];
   session: AuthSessionView;
 }
 
@@ -47,8 +51,10 @@ export function AssetDetailPageContainer({
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
     isDeleting: false,
+    isDownloading: false,
     isLoading: true,
     isSaving: false,
+    organizations: [],
     session: createAnonymousSession()
   });
 
@@ -66,9 +72,13 @@ export function AssetDetailPageContainer({
 
       try {
         const session = await dashboardApi.getSession();
-        const [asset, assets] = session.authenticated
-          ? await Promise.all([dashboardApi.getAsset(assetId), dashboardApi.listAssets()])
-          : [null, []];
+        const [asset, assets, organizations] = session.authenticated
+          ? await Promise.all([
+              dashboardApi.getAsset(assetId),
+              dashboardApi.listAssets(),
+              dashboardApi.listOrganizations()
+            ])
+          : [null, [], []];
 
         if (!isActive) {
           return;
@@ -81,6 +91,7 @@ export function AssetDetailPageContainer({
           authErrorMessage: getLoginFailureMessage(initialLocationSearch),
           authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
           isLoading: false,
+          organizations,
           session
         }));
       } catch (error: unknown) {
@@ -91,7 +102,11 @@ export function AssetDetailPageContainer({
         setState((currentState) => ({
           ...currentState,
           asset: null,
-          authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
+          authErrorMessage: getAssetApiErrorMessage(error, {
+            denied: "현재 권한으로는 이 자산에 접근할 수 없습니다.",
+            fallback: "자산 상세 정보를 불러오지 못했습니다.",
+            notFound: "대상 자산을 찾을 수 없습니다."
+          }),
           authSuccessMessage: null,
           isLoading: false
         }));
@@ -129,7 +144,11 @@ export function AssetDetailPageContainer({
     } catch (error: unknown) {
       setState((currentState) => ({
         ...currentState,
-        authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
+        authErrorMessage: getAssetApiErrorMessage(error, {
+          denied: "이 자산을 수정할 권한이 없습니다.",
+          fallback: "자산 정보 저장에 실패했습니다.",
+          notFound: "저장할 자산을 찾을 수 없습니다."
+        }),
         isSaving: false
       }));
     }
@@ -149,9 +168,42 @@ export function AssetDetailPageContainer({
     } catch (error: unknown) {
       setState((currentState) => ({
         ...currentState,
-        authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
+        authErrorMessage: getAssetApiErrorMessage(error, {
+          denied: "삭제 권한이 없습니다.",
+          fallback: "자산 삭제에 실패했습니다.",
+          notFound: "삭제할 자산을 찾을 수 없습니다."
+        }),
         isDeleting: false
       }))
+    }
+  }
+
+  async function handleDownload(): Promise<void> {
+    setState((currentState) => ({
+      ...currentState,
+      authErrorMessage: null,
+      authSuccessMessage: null,
+      isDownloading: true
+    }));
+
+    try {
+      const file = await dashboardApi.downloadAsset(assetId);
+      triggerFileDownload(file);
+
+      setState((currentState) => ({
+        ...currentState,
+        isDownloading: false
+      }));
+    } catch (error: unknown) {
+      setState((currentState) => ({
+        ...currentState,
+        authErrorMessage: getAssetApiErrorMessage(error, {
+          denied: "현재 권한으로는 이 자산을 다운로드할 수 없습니다.",
+          fallback: "자산 다운로드에 실패했습니다.",
+          notFound: "다운로드할 자산을 찾을 수 없습니다."
+        }),
+        isDownloading: false
+      }));
     }
   }
 
@@ -182,12 +234,15 @@ export function AssetDetailPageContainer({
       authErrorMessage={state.authErrorMessage}
       authSuccessMessage={state.authSuccessMessage}
       isDeleting={state.isDeleting}
+      isDownloading={state.isDownloading}
       isLoading={state.isLoading}
       isSaving={state.isSaving}
       onBack={onBack}
       onDelete={handleDelete}
+      onDownload={handleDownload}
       onOpenRelatedAsset={onOpenRelatedAsset}
       onSave={handleSave}
+      organizations={state.organizations}
       relatedAssets={relatedAssets}
       session={state.session}
     />

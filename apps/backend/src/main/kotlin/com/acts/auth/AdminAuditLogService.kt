@@ -1,5 +1,7 @@
 package com.acts.auth
 
+import com.acts.asset.AssetAccessAction
+import com.acts.asset.AssetAccessScopeAuditSnapshot
 import com.acts.asset.AssetEntity
 import com.acts.asset.AssetLifecycleAuditSnapshot
 import com.acts.asset.AssetRetentionPolicyAuditSnapshot
@@ -130,6 +132,70 @@ class AdminAuditLogService(
         )
     }
 
+    fun recordAssetAccessDenied(
+        actorEmail: String,
+        actorName: String?,
+        asset: AssetEntity,
+        attemptedAction: AssetAccessAction,
+    ) {
+        saveAuditLog(
+            category = AuditLogCategory.PERMISSION,
+            outcome = AuditLogOutcome.WARNING,
+            actorEmail = actorEmail,
+            actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.ASSET_ACCESS_DENIED,
+            targetEmail = asset.ownerEmail,
+            targetName = asset.title,
+            detail = "${asset.title} 자산에 대한 ${attemptedAction.toKoreanLabel()} 요청이 차단되었습니다.",
+            beforeState = objectMapper.writeValueAsString(AssetAccessScopeAuditSnapshot.from(asset)),
+            afterState = null,
+        )
+    }
+
+    fun recordAssetAccessScopeUpdated(
+        actorEmail: String,
+        actorName: String?,
+        asset: AssetEntity,
+        beforeState: AssetAccessScopeAuditSnapshot,
+        afterState: AssetAccessScopeAuditSnapshot,
+    ) {
+        if (beforeState == afterState) {
+            return
+        }
+
+        saveAuditLog(
+            category = AuditLogCategory.PERMISSION,
+            outcome = AuditLogOutcome.SUCCESS,
+            actorEmail = actorEmail,
+            actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.ASSET_ACCESS_SCOPE_UPDATED,
+            targetEmail = asset.ownerEmail,
+            targetName = asset.title,
+            detail = "${asset.title} 자산의 열람 조직이 변경되었습니다.",
+            beforeState = objectMapper.writeValueAsString(beforeState),
+            afterState = objectMapper.writeValueAsString(afterState),
+        )
+    }
+
+    fun recordAssetExported(
+        actorEmail: String,
+        actorName: String?,
+        exportedAssetCount: Int,
+    ) {
+        saveAuditLog(
+            category = AuditLogCategory.PERMISSION,
+            outcome = AuditLogOutcome.SUCCESS,
+            actorEmail = actorEmail,
+            actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.ASSET_EXPORTED,
+            targetEmail = actorEmail,
+            targetName = "자산 일괄 내보내기",
+            detail = "${exportedAssetCount}개 자산이 ZIP으로 내보내기 되었습니다.",
+            beforeState = null,
+            afterState = null,
+        )
+    }
+
     fun recordAssetRestored(
         actorEmail: String,
         actorName: String?,
@@ -234,3 +300,10 @@ data class ViewerAllowlistAuditSnapshot(
 )
 
 private fun String?.normalizedAuditName(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
+
+private fun AssetAccessAction.toKoreanLabel(): String = when (this) {
+    AssetAccessAction.DETAIL_VIEW -> "상세 조회"
+    AssetAccessAction.DOWNLOAD -> "다운로드"
+    AssetAccessAction.UPDATE -> "수정"
+    AssetAccessAction.DELETE -> "삭제"
+}

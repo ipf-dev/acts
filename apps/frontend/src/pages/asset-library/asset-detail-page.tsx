@@ -17,13 +17,21 @@ import {
   DropdownMenuTrigger
 } from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
 import type {
   AssetDetailView,
   AssetSummaryView,
   AssetUpdateInput,
-  AuthSessionView
+  AuthSessionView,
+  OrganizationOptionView
 } from "../../dashboard-types";
 import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
 import {
@@ -44,12 +52,15 @@ interface AssetDetailPageProps {
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   isDeleting: boolean;
+  isDownloading: boolean;
   isLoading: boolean;
   isSaving: boolean;
   onBack: () => void;
   onDelete: () => Promise<void>;
+  onDownload: () => Promise<void>;
   onOpenRelatedAsset: (assetId: number) => void;
   onSave: (input: AssetUpdateInput) => Promise<void>;
+  organizations: OrganizationOptionView[];
   relatedAssets: AssetSummaryView[];
   session: AuthSessionView;
 }
@@ -59,22 +70,26 @@ export function AssetDetailPage({
   authErrorMessage,
   authSuccessMessage,
   isDeleting,
+  isDownloading,
   isLoading,
   isSaving,
   onBack,
   onDelete,
+  onDownload,
   onOpenRelatedAsset,
   onSave,
+  organizations,
   relatedAssets,
   session
 }: AssetDetailPageProps): React.JSX.Element {
   const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [organizationIdDraft, setOrganizationIdDraft] = useState<string>("");
   const [tagInput, setTagInput] = useState("");
   const [tagsDraft, setTagsDraft] = useState<string[]>([]);
   const [titleDraft, setTitleDraft] = useState("");
-  const canDelete =
-    session.user?.role === "ADMIN" ||
-    (asset != null && session.user?.email?.toLowerCase() === asset.ownerEmail.toLowerCase())
+  const canDelete = asset?.canDelete ?? false;
+  const canEdit = asset?.canEdit ?? false;
+  const canDownload = asset?.canDownload ?? false;
 
   useEffect(() => {
     if (!asset) {
@@ -84,6 +99,7 @@ export function AssetDetailPage({
     setTitleDraft(asset.title);
     setDescriptionDraft(asset.description ?? "");
     setTagsDraft(asset.tags);
+    setOrganizationIdDraft(asset.organizationId != null ? String(asset.organizationId) : "");
     setTagInput("");
   }, [asset]);
 
@@ -95,6 +111,7 @@ export function AssetDetailPage({
     await onSave({
       title: titleDraft,
       description: descriptionDraft,
+      organizationId: organizationIdDraft ? Number(organizationIdDraft) : null,
       tags: tagsDraft
     });
   }
@@ -190,11 +207,14 @@ export function AssetDetailPage({
             </div>
 
             <div className="flex items-center gap-2">
-              <Button asChild className="h-10 rounded-xl bg-primary px-4 text-sm">
-                <a href={`/api/assets/${asset.id}/download`}>
-                  <Download className="h-4 w-4" />
-                  다운로드
-                </a>
+              <Button
+                className="h-10 rounded-xl bg-primary px-4 text-sm"
+                disabled={!canDownload || isDownloading}
+                onClick={() => void onDownload()}
+                type="button"
+              >
+                <Download className="h-4 w-4" />
+                {isDownloading ? "다운로드 중" : "다운로드"}
               </Button>
               {canDelete ? (
                 <DropdownMenu>
@@ -310,96 +330,147 @@ export function AssetDetailPage({
                       </section>
 
                       <section className="space-y-4 rounded-2xl border border-border bg-muted/30 p-4">
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium text-muted-foreground">제목</p>
-                          <Input
-                            className="h-11 rounded-xl border-border bg-background"
-                            onChange={(event) => setTitleDraft(event.target.value)}
-                            value={titleDraft}
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">권한 및 메타데이터</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              소유자와 Admin은 제목, 설명, 태그, 접근 조직을 수정할 수 있습니다.
+                            </p>
+                          </div>
+                          <Badge variant={canEdit ? "success" : "outline"}>
+                            {canEdit ? "수정 가능" : "읽기 전용"}
+                          </Badge>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <AssetDataField label="소유자" value={asset.ownerName} />
+                          <AssetDataField
+                            label="전체 열람 예외"
+                            value="전사 열람자 및 Admin은 조직 제한 없이 열람/다운로드 가능"
+                            valueClassName="text-[13px] font-normal leading-5 text-muted-foreground"
                           />
                         </div>
 
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium text-muted-foreground">설명</p>
-                          <Textarea
-                            className="min-h-28 rounded-xl border-border bg-background"
-                            onChange={(event) => setDescriptionDraft(event.target.value)}
-                            placeholder="애셋 설명을 입력하세요"
-                            value={descriptionDraft}
-                          />
-                        </div>
+                        {canEdit ? (
+                          <>
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground">제목</p>
+                              <Input
+                                className="h-11 rounded-xl border-border bg-background"
+                                onChange={(event) => setTitleDraft(event.target.value)}
+                                value={titleDraft}
+                              />
+                            </div>
 
-                        <div className="space-y-2">
-                          <p className="text-xs font-medium text-muted-foreground">태그</p>
-                          <div className="flex flex-wrap gap-2">
-                            {tagsDraft.map((tag) => (
-                              <button
-                                className="inline-flex items-center gap-1 rounded-full bg-[#efe7ff] px-3 py-1 text-xs font-medium text-[#6d4ae2]"
-                                key={tag}
-                                onClick={() =>
-                                  setTagsDraft((currentTags) => currentTags.filter((value) => value !== tag))
-                                }
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground">설명</p>
+                              <Textarea
+                                className="min-h-28 rounded-xl border-border bg-background"
+                                onChange={(event) => setDescriptionDraft(event.target.value)}
+                                placeholder="애셋 설명을 입력하세요"
+                                value={descriptionDraft}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground">접근 조직</p>
+                              <Select onValueChange={setOrganizationIdDraft} value={organizationIdDraft}>
+                                <SelectTrigger className="h-11 rounded-xl border-border bg-background">
+                                  <SelectValue placeholder="열람 조직을 선택하세요" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {organizations.map((organization) => (
+                                    <SelectItem key={organization.id} value={String(organization.id)}>
+                                      {organization.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground">태그</p>
+                              <div className="flex flex-wrap gap-2">
+                                {tagsDraft.map((tag) => (
+                                  <button
+                                    className="inline-flex items-center gap-1 rounded-full bg-[#efe7ff] px-3 py-1 text-xs font-medium text-[#6d4ae2]"
+                                    key={tag}
+                                    onClick={() =>
+                                      setTagsDraft((currentTags) => currentTags.filter((value) => value !== tag))
+                                    }
+                                    type="button"
+                                  >
+                                    {tag}
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-none">
+                                <Input
+                                  className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+                                  onChange={(event) => setTagInput(event.target.value)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      const normalizedTag = normalizeTag(tagInput);
+                                      if (!normalizedTag) {
+                                        return;
+                                      }
+                                      setTagsDraft((currentTags) =>
+                                        currentTags.includes(normalizedTag)
+                                          ? currentTags
+                                          : [...currentTags, normalizedTag]
+                                      );
+                                      setTagInput("");
+                                    }
+                                  }}
+                                  placeholder="태그 추가"
+                                  value={tagInput}
+                                />
+                                <button
+                                  className="text-xs font-medium text-primary"
+                                  onClick={() => {
+                                    const normalizedTag = normalizeTag(tagInput);
+                                    if (!normalizedTag) {
+                                      return;
+                                    }
+                                    setTagsDraft((currentTags) =>
+                                      currentTags.includes(normalizedTag)
+                                        ? currentTags
+                                        : [...currentTags, normalizedTag]
+                                    );
+                                    setTagInput("");
+                                  }}
+                                  type="button"
+                                >
+                                  추가
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end">
+                              <Button
+                                className="h-10 rounded-xl px-4"
+                                disabled={isSaving || !organizationIdDraft}
+                                onClick={() => void handleSave()}
                                 type="button"
                               >
-                                {tag}
-                                <X className="h-3 w-3" />
-                              </button>
-                            ))}
-                          </div>
-                          <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-none">
-                            <Input
-                              className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                              onChange={(event) => setTagInput(event.target.value)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  const normalizedTag = normalizeTag(tagInput);
-                                  if (!normalizedTag) {
-                                    return;
-                                  }
-                                  setTagsDraft((currentTags) =>
-                                    currentTags.includes(normalizedTag)
-                                      ? currentTags
-                                      : [...currentTags, normalizedTag]
-                                  );
-                                  setTagInput("");
-                                }
-                              }}
-                              placeholder="태그 추가"
-                              value={tagInput}
+                                <Save className="h-4 w-4" />
+                                {isSaving ? "저장 중" : "변경 저장"}
+                              </Button>
+                            </div>
+                          </>
+                        ) : (
+                          <section className="grid gap-4 sm:grid-cols-2">
+                            <AssetDataField label="접근 조직" value={asset.organizationName ?? "조직 미지정"} />
+                            <AssetDataField label="삭제 권한" value={asset.canDelete ? "허용" : "불가"} />
+                            <AssetDataField label="편집 권한" value={asset.canEdit ? "허용" : "불가"} />
+                            <AssetDataField
+                              label="다운로드 권한"
+                              value={asset.canDownload ? "허용" : "불가"}
                             />
-                            <button
-                              className="text-xs font-medium text-primary"
-                              onClick={() => {
-                                const normalizedTag = normalizeTag(tagInput);
-                                if (!normalizedTag) {
-                                  return;
-                                }
-                                setTagsDraft((currentTags) =>
-                                  currentTags.includes(normalizedTag)
-                                    ? currentTags
-                                    : [...currentTags, normalizedTag]
-                                );
-                                setTagInput("");
-                              }}
-                              type="button"
-                            >
-                              추가
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-end">
-                          <Button
-                            className="h-10 rounded-xl px-4"
-                            disabled={isSaving}
-                            onClick={() => void handleSave()}
-                            type="button"
-                          >
-                            <Save className="h-4 w-4" />
-                            {isSaving ? "저장 중" : "변경 저장"}
-                          </Button>
-                        </div>
+                          </section>
+                        )}
                       </section>
                     </CardContent>
                   </Card>

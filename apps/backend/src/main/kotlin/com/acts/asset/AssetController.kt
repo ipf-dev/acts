@@ -32,43 +32,94 @@ class AssetController(
         @RequestParam(required = false) assetType: AssetType?,
         @RequestParam(required = false) organizationId: Long?,
         @RequestParam(required = false) creatorEmail: String?,
-    ): List<AssetSummaryResponse> = assetLibraryService.listAssets(
-        AssetListQuery(
-            search = search,
-            assetType = assetType,
-            organizationId = organizationId,
-            creatorEmail = creatorEmail,
-        ),
-    )
+        authentication: Authentication?,
+    ): ResponseEntity<List<AssetSummaryResponse>> {
+        val actorEmail = currentActorEmail(authentication)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+
+        return ResponseEntity.ok(
+            assetLibraryService.listAssets(
+                actorEmail = actorEmail,
+                query = AssetListQuery(
+                    search = search,
+                    assetType = assetType,
+                    organizationId = organizationId,
+                    creatorEmail = creatorEmail,
+                ),
+            ),
+        )
+    }
 
     @GetMapping("/{assetId}")
     fun getAsset(
         @PathVariable assetId: Long,
-    ): ResponseEntity<AssetDetailResponse> = try {
-        ResponseEntity.ok(assetLibraryService.getAsset(assetId))
-    } catch (_: IllegalArgumentException) {
-        ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        authentication: Authentication?,
+    ): ResponseEntity<AssetDetailResponse> {
+        return try {
+        val actorEmail = currentActorEmail(authentication)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+        ResponseEntity.ok(assetLibraryService.getAsset(assetId = assetId, actorEmail = actorEmail))
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        }
     }
 
     @GetMapping("/{assetId}/download")
     fun downloadAsset(
         @PathVariable assetId: Long,
-    ): ResponseEntity<ByteArrayResource> = try {
-        val downloadResult = assetLibraryService.downloadAsset(assetId)
-
-        ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType(downloadResult.contentType))
-            .header(
-                HttpHeaders.CONTENT_DISPOSITION,
-                ContentDisposition.attachment()
-                    .filename(downloadResult.fileName, StandardCharsets.UTF_8)
-                    .build()
-                    .toString(),
+        authentication: Authentication?,
+    ): ResponseEntity<ByteArrayResource> {
+        return try {
+            val actorEmail = currentActorEmail(authentication)
+                ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            val downloadResult = assetLibraryService.downloadAsset(
+                assetId = assetId,
+                actorEmail = actorEmail,
             )
-            .contentLength(downloadResult.content.size.toLong())
-            .body(ByteArrayResource(downloadResult.content))
-    } catch (_: IllegalArgumentException) {
-        ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+
+            ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(downloadResult.contentType))
+                .header(
+                    HttpHeaders.CONTENT_DISPOSITION,
+                    ContentDisposition.attachment()
+                        .filename(downloadResult.fileName, StandardCharsets.UTF_8)
+                        .build()
+                        .toString(),
+                )
+                .contentLength(downloadResult.content.size.toLong())
+                .body(ByteArrayResource(downloadResult.content))
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        }
+    }
+
+    @GetMapping("/export")
+    fun exportAssets(authentication: Authentication?): ResponseEntity<ByteArrayResource> {
+        return try {
+            val actorEmail = currentActorEmail(authentication)
+                ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+            val exportResult = assetLibraryService.exportAssets(actorEmail)
+
+            ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(exportResult.contentType))
+                .header(
+                    HttpHeaders.CONTENT_DISPOSITION,
+                    ContentDisposition.attachment()
+                        .filename(exportResult.fileName, StandardCharsets.UTF_8)
+                        .build()
+                        .toString(),
+                )
+                .contentLength(exportResult.content.size.toLong())
+                .body(ByteArrayResource(exportResult.content))
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
     }
 
     @PutMapping("/{assetId}")
@@ -88,10 +139,13 @@ class AssetController(
                     title = request.title,
                     description = request.description,
                     requestedTags = request.tags,
+                    organizationId = request.organizationId,
                     actorEmail = actorEmail,
                     actorName = actorName,
                 ),
             )
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
         } catch (_: IllegalArgumentException) {
             ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
         }

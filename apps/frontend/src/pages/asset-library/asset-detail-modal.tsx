@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogClose, DialogContent } from "../../components/ui/dialog";
-import type { AssetDetailView, AuthSessionView } from "../../dashboard-types";
+import type { AssetDetailView } from "../../dashboard-types";
 import { cn } from "../../lib/utils";
 import {
   detailDateFormatter,
@@ -26,12 +26,13 @@ import {
 interface AssetDetailModalProps {
   asset: AssetDetailView | null;
   isDeleting: boolean;
+  isDownloading: boolean;
   isLoading: boolean;
   isOpen: boolean;
   onClose: () => void;
   onDelete: (assetId: number) => Promise<void>;
+  onDownload: (assetId: number) => Promise<void>;
   onOpenDetailPage: (assetId: number) => void;
-  session: AuthSessionView;
 }
 
 type AssetDetailTabKey = "summary" | "history" | "metadata";
@@ -45,11 +46,12 @@ const detailTabs: Array<{ key: AssetDetailTabKey; label: string }> = [
 export function AssetDetailModal({
   asset,
   isDeleting,
+  isDownloading,
   isLoading,
   isOpen,
   onClose,
   onDelete,
-  session,
+  onDownload,
   onOpenDetailPage
 }: AssetDetailModalProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<AssetDetailTabKey>("summary");
@@ -122,9 +124,10 @@ export function AssetDetailModal({
               <AssetSummaryPanel
                 asset={asset}
                 isDeleting={isDeleting}
+                isDownloading={isDownloading}
                 onDelete={onDelete}
+                onDownload={onDownload}
                 onOpenDetailPage={onOpenDetailPage}
-                session={session}
               />
             ) : activeTab === "history" ? (
               <AssetHistoryPanel asset={asset} />
@@ -141,19 +144,19 @@ export function AssetDetailModal({
 function AssetSummaryPanel({
   asset,
   isDeleting,
+  isDownloading,
   onDelete,
-  session,
+  onDownload,
   onOpenDetailPage
 }: {
   asset: AssetDetailView;
   isDeleting: boolean;
+  isDownloading: boolean;
   onDelete: (assetId: number) => Promise<void>;
+  onDownload: (assetId: number) => Promise<void>;
   onOpenDetailPage: (assetId: number) => void;
-  session: AuthSessionView;
 }): React.JSX.Element {
-  const canDelete =
-    session.user?.role === "ADMIN" ||
-    session.user?.email?.toLowerCase() === asset.ownerEmail.toLowerCase();
+  const canDelete = asset.canDelete;
 
   async function handleDelete(): Promise<void> {
     const confirmed = window.confirm(`"${asset.title}" 애셋을 삭제하시겠습니까?`);
@@ -207,11 +210,14 @@ function AssetSummaryPanel({
           <Eye className="h-4 w-4" />
           상세 보기
         </Button>
-        <Button asChild className="h-9 rounded-lg px-3 text-[13px] font-medium">
-          <a href={`/api/assets/${asset.id}/download`}>
-            <Download className="h-4 w-4" />
-            다운로드
-          </a>
+        <Button
+          className="h-9 rounded-lg px-3 text-[13px] font-medium"
+          disabled={!asset.canDownload || isDownloading}
+          onClick={() => void onDownload(asset.id)}
+          type="button"
+        >
+          <Download className="h-4 w-4" />
+          {isDownloading ? "다운로드 중" : "다운로드"}
         </Button>
         {canDelete ? (
           <Button

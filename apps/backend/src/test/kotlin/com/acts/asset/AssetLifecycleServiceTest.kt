@@ -109,11 +109,15 @@ class AssetLifecycleServiceTest @Autowired constructor(
             actorName = "Coco",
         )
 
-        val restoredAsset = assetLibraryService.getAsset(uploadedAsset.id)
+        val restoredAsset = assetLibraryService.getAsset(
+            assetId = uploadedAsset.id,
+            actorEmail = "coco@iportfolio.co.kr",
+        )
         val auditLog = adminAuditLogRepository.findTop50ByOrderByCreatedAtDescIdDesc()
             .first { log -> log.actionType == AdminAuditLogAction.ASSET_RESTORED }
 
-        assertThat(assetLibraryService.listAssets()).anyMatch { asset -> asset.id == uploadedAsset.id }
+        assertThat(assetLibraryService.listAssets(actorEmail = "coco@iportfolio.co.kr"))
+            .anyMatch { asset -> asset.id == uploadedAsset.id }
         assertThat(restoredAsset.events.first().eventType).isEqualTo(AssetEventType.RESTORED)
         assertThat(auditLog.detail).contains("복구")
     }

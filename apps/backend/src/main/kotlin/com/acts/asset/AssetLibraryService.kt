@@ -1,17 +1,24 @@
 package com.acts.asset
 
+import com.acts.auth.AdminAuditLogService
+import com.acts.auth.OrganizationRepository
 import com.acts.auth.UserAccountRepository
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
+import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 @Service
 class AssetLibraryService(
+    private val adminAuditLogService: AdminAuditLogService,
+    private val assetAuthorizationService: AssetAuthorizationService,
     private val assetBinaryStorage: AssetBinaryStorage,
     private val assetEventRepository: AssetEventRepository,
     private val assetFileRepository: AssetFileRepository,
@@ -20,6 +27,7 @@ class AssetLibraryService(
     private val assetTagRepository: AssetTagRepository,
     private val assetTagSuggestionService: AssetTagSuggestionService,
     private val assetTypeClassifier: AssetTypeClassifier,
+    private val organizationRepository: OrganizationRepository,
     private val userAccountRepository: UserAccountRepository,
 ) {
     @Transactional
@@ -116,13 +124,20 @@ class AssetLibraryService(
             ),
         )
 
-        return listAssets()
+        return listAssets(actor.email)
             .first { assetSummary -> assetSummary.id == savedAssetId }
     }
 
     @Transactional
-    fun listAssets(query: AssetListQuery = AssetListQuery()): List<AssetSummaryResponse> {
-        val assets = assetRepository.findAllByDeletedAtIsNullOrderByCreatedAtDescIdDesc()
+    fun listAssets(
+        actorEmail: String,
+        query: AssetListQuery = AssetListQuery(),
+    ): List<AssetSummaryResponse> {
+        val actor = requireActor(actorEmail)
+        val assets = assetAuthorizationService.filterVisibleAssets(
+            actor = actor,
+            assets = assetRepository.findAllByDeletedAtIsNullOrderByCreatedAtDescIdDesc(),
+        )
         if (assets.isEmpty()) {
             return emptyList()
         }
@@ -135,13 +150,27 @@ class AssetLibraryService(
             )
 
         return assets
-            .map { asset -> asset.toSummaryResponse(tagsByAssetId[asset.id].orEmpty()) }
+            .map { asset ->
+                asset.toSummaryResponse(
+                    tags = tagsByAssetId[asset.id].orEmpty(),
+                    permissions = assetAuthorizationService.permissionsFor(actor, asset),
+                )
+            }
             .filter { summary -> summary.matches(query) }
     }
 
     @Transactional
-    fun getAsset(assetId: Long): AssetDetailResponse {
+    fun getAsset(
+        assetId: Long,
+        actorEmail: String,
+    ): AssetDetailResponse {
+        val actor = requireActor(actorEmail)
         val asset = requireActiveAsset(assetId)
+        assetAuthorizationService.requireViewAccess(
+            actor = actor,
+            asset = asset,
+            action = AssetAccessAction.DETAIL_VIEW,
+        )
         val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("현재 파일 정보를 찾을 수 없습니다.")
         val tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId)
@@ -161,6 +190,7 @@ class AssetLibraryService(
             tags = tags,
             currentFile = currentFile,
             events = events,
+            permissions = assetAuthorizationService.permissionsFor(actor, asset),
         )
     }
 
@@ -170,10 +200,13 @@ class AssetLibraryService(
         title: String,
         description: String?,
         requestedTags: List<String>,
+        organizationId: Long?,
         actorEmail: String,
         actorName: String?,
     ): AssetDetailResponse {
+        val actor = requireActor(actorEmail)
         val asset = requireActiveAsset(assetId)
+        assetAuthorizationService.requireEditAccess(actor, asset)
         val resolvedTitle = title.normalizedOrNull()
             ?: throw IllegalArgumentException("제목은 비어 있을 수 없습니다.")
         val resolvedDescription = description.normalizedOrNull()
@@ -187,7 +220,15 @@ class AssetLibraryService(
             title = asset.title,
             description = asset.description,
             tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId).map { assetTag -> assetTag.value },
+            organizationId = asset.organization?.id,
+            organizationName = asset.organization?.name,
         )
+        val previousAccessScope = AssetAccessScopeAuditSnapshot.from(asset)
+
+        if (organizationId != null && organizationId != asset.organization?.id) {
+            asset.organization = organizationRepository.findById(organizationId)
+                .orElseThrow { IllegalArgumentException("Organization does not exist.") }
+        }
 
         asset.title = resolvedTitle
         asset.description = resolvedDescription
@@ -199,7 +240,7 @@ class AssetLibraryService(
             organizationName = asset.organization?.name,
             tags = nextTags.map { tag -> tag.value },
         )
-        assetRepository.save(asset)
+        val savedAsset = assetRepository.save(asset)
 
         assetTagRepository.deleteAllByAsset_Id(assetId)
         assetTagRepository.flush()
@@ -215,29 +256,54 @@ class AssetLibraryService(
         )
 
         val nextState = AssetMetadataSnapshot(
-            title = asset.title,
-            description = asset.description,
+            title = savedAsset.title,
+            description = savedAsset.description,
             tags = nextTags.map { tag -> tag.value },
+            organizationId = savedAsset.organization?.id,
+            organizationName = savedAsset.organization?.name,
         )
 
         if (previousState != nextState) {
             assetEventRepository.save(
                 AssetEventEntity(
-                    asset = asset,
+                    asset = savedAsset,
                     eventType = AssetEventType.METADATA_UPDATED,
-                    actorEmail = actorEmail,
-                    actorName = actorName,
+                    actorEmail = actor.email,
+                    actorName = actorName ?: actor.displayName,
                     detail = buildMetadataUpdateDetail(previousState, nextState),
                 ),
             )
         }
 
-        return getAsset(assetId)
+        val nextAccessScope = AssetAccessScopeAuditSnapshot.from(savedAsset)
+        if (previousAccessScope != nextAccessScope) {
+            adminAuditLogService.recordAssetAccessScopeUpdated(
+                actorEmail = actor.email,
+                actorName = actorName ?: actor.displayName,
+                asset = savedAsset,
+                beforeState = previousAccessScope,
+                afterState = nextAccessScope,
+            )
+        }
+
+        return getAsset(
+            assetId = assetId,
+            actorEmail = actor.email,
+        )
     }
 
     @Transactional
-    fun downloadAsset(assetId: Long): AssetDownloadResult {
-        requireActiveAsset(assetId)
+    fun downloadAsset(
+        assetId: Long,
+        actorEmail: String,
+    ): AssetDownloadResult {
+        val actor = requireActor(actorEmail)
+        val asset = requireActiveAsset(assetId)
+        assetAuthorizationService.requireViewAccess(
+            actor = actor,
+            asset = asset,
+            action = AssetAccessAction.DOWNLOAD,
+        )
         val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("다운로드할 파일을 찾을 수 없습니다.")
         val loadedAssetObject = assetBinaryStorage.load(
@@ -258,15 +324,9 @@ class AssetLibraryService(
         actorEmail: String,
         actorName: String?,
     ) {
-        val actor = userAccountRepository.findById(actorEmail.lowercase())
-            .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
+        val actor = requireActor(actorEmail)
         val asset = requireActiveAsset(assetId)
-
-        if (actor.role != com.acts.auth.UserRole.ADMIN &&
-            !asset.ownerEmail.equals(actor.email, ignoreCase = true)
-        ) {
-            throw SecurityException("삭제 권한이 없습니다.")
-        }
+        assetAuthorizationService.requireDeleteAccess(actor, asset)
 
         asset.deletedAt = Instant.now()
         asset.deletedByEmail = actor.email
@@ -281,6 +341,55 @@ class AssetLibraryService(
                 actorName = actorName ?: actor.displayName,
                 detail = "자산이 삭제되었습니다.",
             ),
+        )
+    }
+
+    @Transactional
+    fun exportAssets(actorEmail: String): AssetDownloadResult {
+        val actor = requireActor(actorEmail)
+        assetAuthorizationService.requireExportAllAccess(actor)
+
+        val assets = assetAuthorizationService.filterVisibleAssets(
+            actor = actor,
+            assets = assetRepository.findAllByDeletedAtIsNullOrderByCreatedAtDescIdDesc(),
+        )
+        val assetIds = assets.mapNotNull { asset -> asset.id }
+        val currentFilesByAssetId = if (assetIds.isEmpty()) {
+            emptyMap<Long, AssetFileEntity>()
+        } else {
+            assetFileRepository.findAllByAsset_IdInOrderByAsset_IdAscVersionNumberDescIdDesc(assetIds)
+                .groupBy { assetFile -> requireNotNull(assetFile.asset.id) }
+                .mapValues { (_, files) -> files.first() }
+        }
+
+        val zipContent = ByteArrayOutputStream().use { buffer ->
+            ZipOutputStream(buffer).use { zipOutputStream ->
+                assets.forEach { asset ->
+                    val assetId = requireNotNull(asset.id)
+                    val currentFile = currentFilesByAssetId[assetId]
+                        ?: throw IllegalArgumentException("내보낼 파일 정보를 찾을 수 없습니다.")
+                    val loadedAssetObject = assetBinaryStorage.load(
+                        bucket = currentFile.bucketName,
+                        objectKey = currentFile.objectKey,
+                    )
+                    zipOutputStream.putNextEntry(ZipEntry(buildExportEntryName(asset, currentFile.originalFileName)))
+                    zipOutputStream.write(loadedAssetObject.content)
+                    zipOutputStream.closeEntry()
+                }
+            }
+            buffer.toByteArray()
+        }
+
+        adminAuditLogService.recordAssetExported(
+            actorEmail = actor.email,
+            actorName = actor.displayName,
+            exportedAssetCount = assets.size,
+        )
+
+        return AssetDownloadResult(
+            content = zipContent,
+            contentType = "application/zip",
+            fileName = buildExportFileName(),
         )
     }
 
@@ -320,7 +429,13 @@ class AssetLibraryService(
     private fun requireActiveAsset(assetId: Long): AssetEntity = assetRepository.findByIdAndDeletedAtIsNull(assetId)
         ?: throw IllegalArgumentException("자산을 찾을 수 없습니다.")
 
-    private fun AssetEntity.toSummaryResponse(tags: List<String>): AssetSummaryResponse = AssetSummaryResponse(
+    private fun requireActor(actorEmail: String) = userAccountRepository.findById(actorEmail.lowercase())
+        .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
+
+    private fun AssetEntity.toSummaryResponse(
+        tags: List<String>,
+        permissions: AssetPermissionSnapshot,
+    ): AssetSummaryResponse = AssetSummaryResponse(
         id = requireNotNull(id),
         title = title,
         type = assetType,
@@ -341,6 +456,9 @@ class AssetLibraryService(
         heightPx = heightPx,
         durationMs = durationMs,
         tags = tags,
+        canEdit = permissions.canEdit,
+        canDelete = permissions.canDelete,
+        canDownload = permissions.canDownload,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
@@ -349,6 +467,7 @@ class AssetLibraryService(
         tags: List<String>,
         currentFile: AssetFileEntity,
         events: List<AssetEventResponse>,
+        permissions: AssetPermissionSnapshot,
     ): AssetDetailResponse = AssetDetailResponse(
         id = requireNotNull(id),
         title = title,
@@ -370,6 +489,9 @@ class AssetLibraryService(
         heightPx = heightPx,
         durationMs = durationMs,
         tags = tags,
+        canEdit = permissions.canEdit,
+        canDelete = permissions.canDelete,
+        canDownload = permissions.canDownload,
         createdAt = createdAt,
         updatedAt = updatedAt,
         currentFile = AssetFileResponse(
@@ -436,6 +558,9 @@ class AssetLibraryService(
             if (previousState.tags != nextState.tags) {
                 add("태그")
             }
+            if (previousState.organizationId != nextState.organizationId) {
+                add("열람 조직")
+            }
         }
 
         return if (changedFields.isEmpty()) {
@@ -443,6 +568,19 @@ class AssetLibraryService(
         } else {
             "${changedFields.joinToString(", ")} 정보가 업데이트되었습니다."
         }
+    }
+
+    private fun buildExportEntryName(asset: AssetEntity, originalFileName: String): String {
+        val organizationSegment = sanitizeFileName(asset.organization?.name ?: "org-unassigned")
+        val fileNameSegment = sanitizeFileName(originalFileName)
+        return "$organizationSegment/${requireNotNull(asset.id)}-$fileNameSegment"
+    }
+
+    private fun buildExportFileName(): String {
+        val timestamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.US)
+            .withZone(ZoneOffset.UTC)
+            .format(Instant.now())
+        return "acts-assets-export-$timestamp.zip"
     }
 
     private fun String?.normalizedOrNull(): String? = this?.trim()?.takeIf { value -> value.isNotEmpty() }
@@ -459,4 +597,6 @@ private data class AssetMetadataSnapshot(
     val title: String,
     val description: String?,
     val tags: List<String>,
+    val organizationId: Long?,
+    val organizationName: String?,
 )

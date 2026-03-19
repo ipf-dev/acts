@@ -23,6 +23,9 @@ data class AssetSummaryResponse(
     val heightPx: Int?,
     val durationMs: Long?,
     val tags: List<String>,
+    val canEdit: Boolean,
+    val canDelete: Boolean,
+    val canDownload: Boolean,
     val createdAt: Instant,
     val updatedAt: Instant,
 )

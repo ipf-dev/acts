@@ -98,6 +98,9 @@ export interface AssetSummaryView {
   heightPx: number | null;
   durationMs: number | null;
   tags: string[];
+  canEdit: boolean;
+  canDelete: boolean;
+  canDownload: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -129,6 +132,7 @@ export interface AssetUpdateInput {
   title: string;
   description?: string;
   tags: string[];
+  organizationId?: number | null;
 }
 
 export interface AssetFileView {

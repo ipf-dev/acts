@@ -18,6 +18,8 @@ import type {
 
 export interface DashboardApi {
   deleteAsset(assetId: number): Promise<void>;
+  downloadAsset(assetId: number): Promise<DownloadedFile>;
+  exportAssets(): Promise<DownloadedFile>;
   getAsset(assetId: number): Promise<AssetDetailView>;
   getAssetRetentionPolicy(): Promise<AssetRetentionPolicyView>;
   listDeletedAssets(): Promise<DeletedAssetView[]>;
@@ -38,14 +40,44 @@ export interface DashboardApi {
   saveManualAssignment(email: string, input: ManualAssignmentInput): Promise<AuthUserView>;
 }
 
+export interface DownloadedFile {
+  blob: Blob;
+  contentType: string;
+  fileName: string;
+}
+
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message?: string) {
+    super(message ?? `Request failed with status ${status}.`);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi {
   async function readJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
     const response = await fetchFn(input, init);
     if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}.`);
+      throw new ApiError(response.status);
     }
 
     return (await response.json()) as T;
+  }
+
+  async function readFile(input: RequestInfo, init?: RequestInit): Promise<DownloadedFile> {
+    const response = await fetchFn(input, init);
+    if (!response.ok) {
+      throw new ApiError(response.status);
+    }
+
+    const blob = await response.blob();
+    return {
+      blob,
+      contentType: response.headers.get("Content-Type") ?? blob.type,
+      fileName: parseContentDispositionFileName(response.headers.get("Content-Disposition")) ?? "download"
+    };
   }
 
   return {
@@ -55,8 +87,14 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       });
 
       if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}.`);
+        throw new ApiError(response.status);
       }
+    },
+    async downloadAsset(assetId) {
+      return readFile(`/api/assets/${assetId}/download`);
+    },
+    async exportAssets() {
+      return readFile("/api/assets/export");
     },
     async getAsset(assetId) {
       return readJson<AssetDetailView>(`/api/assets/${assetId}`);
@@ -76,7 +114,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       });
 
       if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}.`);
+        throw new ApiError(response.status);
       }
     },
     async updateAsset(assetId, input) {
@@ -116,7 +154,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
         body: formData
       });
       if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}.`);
+        throw new ApiError(response.status);
       }
 
       return (await response.json()) as AssetSummaryView;
@@ -162,7 +200,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       });
 
       if (!response.ok) {
-        throw new Error(`Logout failed with status ${response.status}.`);
+        throw new ApiError(response.status, `Logout failed with status ${response.status}.`);
       }
     },
     async saveManualAssignment(email, input) {
@@ -175,4 +213,22 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       });
     }
   };
+}
+
+function parseContentDispositionFileName(contentDisposition: string | null): string | null {
+  if (!contentDisposition) {
+    return null;
+  }
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const quotedMatch = contentDisposition.match(/filename=\"([^\"]+)\"/i);
+  if (quotedMatch?.[1]) {
+    return quotedMatch[1];
+  }
+
+  return null;
 }
