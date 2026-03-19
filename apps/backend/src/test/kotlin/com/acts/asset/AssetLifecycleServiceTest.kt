@@ -1,0 +1,134 @@
+package com.acts.asset
+
+import com.acts.auth.AdminAuditLogAction
+import com.acts.auth.AdminAuditLogRepository
+import com.acts.auth.OrganizationRepository
+import com.acts.auth.UserDirectoryService
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.mockito.kotlin.any
+import org.mockito.kotlin.whenever
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.transaction.annotation.Transactional
+
+@SpringBootTest
+@Transactional
+class AssetLifecycleServiceTest @Autowired constructor(
+    private val adminAuditLogRepository: AdminAuditLogRepository,
+    private val assetLibraryService: AssetLibraryService,
+    private val assetLifecycleService: AssetLifecycleService,
+    private val organizationRepository: OrganizationRepository,
+    private val userDirectoryService: UserDirectoryService,
+) {
+    @MockBean
+    private lateinit var assetBinaryStorage: AssetBinaryStorage
+
+    @BeforeEach
+    fun prepareUsers() {
+        val organizationId = requireNotNull(
+            organizationRepository.findAllByOrderByNameAsc()
+                .first { organization -> organization.name == "마케팅팀" }
+                .id,
+        )
+
+        userDirectoryService.syncLogin(
+            email = "coco@iportfolio.co.kr",
+            displayName = "Coco",
+        )
+        userDirectoryService.saveManualAssignment(
+            email = "coco@iportfolio.co.kr",
+            organizationId = organizationId,
+            positionTitle = "기획자",
+            actorEmail = "admin@iportfolio.co.kr",
+            actorName = "Admin",
+        )
+
+        userDirectoryService.syncLogin(
+            email = "admin@iportfolio.co.kr",
+            displayName = "Admin",
+        )
+        userDirectoryService.saveManualAssignment(
+            email = "admin@iportfolio.co.kr",
+            organizationId = organizationId,
+            positionTitle = "본부장",
+            actorEmail = "admin@iportfolio.co.kr",
+            actorName = "Admin",
+        )
+
+        whenever(assetBinaryStorage.store(any(), any(), any())).thenReturn(
+            StoredAssetObject(
+                bucket = "acts-assets",
+                objectKey = "assets/test/coco.txt",
+            ),
+        )
+        whenever(assetBinaryStorage.load(any(), any())).thenReturn(
+            LoadedAssetObject(
+                content = "story".toByteArray(),
+                contentType = "text/plain",
+            ),
+        )
+    }
+
+    @Test
+    fun `updates retention policy and records audit log`() {
+        val updatedPolicy = assetLifecycleService.updateRetentionPolicy(
+            request = AssetRetentionPolicyUpdateRequest(
+                trashRetentionDays = 14,
+                restoreEnabled = true,
+            ),
+            actorEmail = "admin@iportfolio.co.kr",
+            actorName = "Admin",
+        )
+
+        val auditLog = adminAuditLogRepository.findTop50ByOrderByCreatedAtDescIdDesc()
+            .first { log -> log.actionType == AdminAuditLogAction.ASSET_RETENTION_POLICY_UPDATED }
+
+        assertThat(updatedPolicy.trashRetentionDays).isEqualTo(14)
+        assertThat(updatedPolicy.updatedByEmail).isEqualTo("admin@iportfolio.co.kr")
+        assertThat(auditLog.detail).contains("휴지통 보관 정책")
+        assertThat(auditLog.beforeState).contains("trashRetentionDays")
+        assertThat(auditLog.afterState).contains("14")
+    }
+
+    @Test
+    fun `restores a deleted asset within the retention window`() {
+        val uploadedAsset = uploadAsset("복구 테스트 애셋")
+
+        assetLibraryService.deleteAsset(
+            assetId = uploadedAsset.id,
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+
+        assetLifecycleService.restoreAsset(
+            assetId = uploadedAsset.id,
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+
+        val restoredAsset = assetLibraryService.getAsset(uploadedAsset.id)
+        val auditLog = adminAuditLogRepository.findTop50ByOrderByCreatedAtDescIdDesc()
+            .first { log -> log.actionType == AdminAuditLogAction.ASSET_RESTORED }
+
+        assertThat(assetLibraryService.listAssets()).anyMatch { asset -> asset.id == uploadedAsset.id }
+        assertThat(restoredAsset.events.first().eventType).isEqualTo(AssetEventType.RESTORED)
+        assertThat(auditLog.detail).contains("복구")
+    }
+
+    private fun uploadAsset(title: String): AssetSummaryResponse = assetLibraryService.uploadAsset(
+        AssetUploadCommand(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = title,
+            description = "설명",
+            requestedTags = listOf("태그"),
+            sourceDetail = "외부 등록",
+            fileName = "${title}.txt",
+            contentType = "text/plain",
+            contentBytes = "story".toByteArray(),
+        ),
+    )
+}

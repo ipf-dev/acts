@@ -1,5 +1,7 @@
 import type {
   AssetDetailView,
+  AssetRetentionPolicyInput,
+  AssetRetentionPolicyView,
   AssetSummaryView,
   AssetUpdateInput,
   AssetUploadInput,
@@ -7,6 +9,7 @@ import type {
   AppHealthView,
   AuthSessionView,
   AuthUserView,
+  DeletedAssetView,
   ManualAssignmentInput,
   OrganizationOptionView,
   ViewerAllowlistEntryView,
@@ -16,8 +19,12 @@ import type {
 export interface DashboardApi {
   deleteAsset(assetId: number): Promise<void>;
   getAsset(assetId: number): Promise<AssetDetailView>;
+  getAssetRetentionPolicy(): Promise<AssetRetentionPolicyView>;
+  listDeletedAssets(): Promise<DeletedAssetView[]>;
   listAssets(): Promise<AssetSummaryView[]>;
+  restoreAsset(assetId: number): Promise<void>;
   updateAsset(assetId: number, input: AssetUpdateInput): Promise<AssetDetailView>;
+  updateAssetRetentionPolicy(input: AssetRetentionPolicyInput): Promise<AssetRetentionPolicyView>;
   uploadAsset(input: AssetUploadInput): Promise<AssetSummaryView>;
   health(): Promise<AppHealthView>;
   getSession(): Promise<AuthSessionView>;
@@ -54,11 +61,35 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     async getAsset(assetId) {
       return readJson<AssetDetailView>(`/api/assets/${assetId}`);
     },
+    async getAssetRetentionPolicy() {
+      return readJson<AssetRetentionPolicyView>("/api/assets/policy");
+    },
+    async listDeletedAssets() {
+      return readJson<DeletedAssetView[]>("/api/assets/deleted");
+    },
     async listAssets() {
       return readJson<AssetSummaryView[]>("/api/assets");
     },
+    async restoreAsset(assetId) {
+      const response = await fetchFn(`/api/assets/${assetId}/restore`, {
+        method: "POST"
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}.`);
+      }
+    },
     async updateAsset(assetId, input) {
       return readJson<AssetDetailView>(`/api/assets/${assetId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+    },
+    async updateAssetRetentionPolicy(input) {
+      return readJson<AssetRetentionPolicyView>("/api/assets/policy", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"

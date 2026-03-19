@@ -1,5 +1,8 @@
 package com.acts.auth
 
+import com.acts.asset.AssetEntity
+import com.acts.asset.AssetLifecycleAuditSnapshot
+import com.acts.asset.AssetRetentionPolicyAuditSnapshot
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 
@@ -98,6 +101,51 @@ class AdminAuditLogService(
             targetEmail = targetEmail,
             targetName = targetName.normalizedAuditName(),
             detail = "${targetName.normalizedAuditName() ?: targetEmail} 전사 열람자 제거",
+            beforeState = objectMapper.writeValueAsString(beforeState),
+            afterState = objectMapper.writeValueAsString(afterState),
+        )
+    }
+
+    fun recordAssetRetentionPolicyUpdated(
+        actorEmail: String,
+        actorName: String?,
+        beforeState: AssetRetentionPolicyAuditSnapshot,
+        afterState: AssetRetentionPolicyAuditSnapshot,
+    ) {
+        if (beforeState == afterState) {
+            return
+        }
+
+        saveAuditLog(
+            category = AuditLogCategory.POLICY,
+            outcome = AuditLogOutcome.SUCCESS,
+            actorEmail = actorEmail,
+            actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.ASSET_RETENTION_POLICY_UPDATED,
+            targetEmail = actorEmail,
+            targetName = "자산 보관 정책",
+            detail = "휴지통 보관 정책이 변경되었습니다.",
+            beforeState = objectMapper.writeValueAsString(beforeState),
+            afterState = objectMapper.writeValueAsString(afterState),
+        )
+    }
+
+    fun recordAssetRestored(
+        actorEmail: String,
+        actorName: String?,
+        asset: AssetEntity,
+        beforeState: AssetLifecycleAuditSnapshot,
+        afterState: AssetLifecycleAuditSnapshot,
+    ) {
+        saveAuditLog(
+            category = AuditLogCategory.POLICY,
+            outcome = AuditLogOutcome.SUCCESS,
+            actorEmail = actorEmail,
+            actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.ASSET_RESTORED,
+            targetEmail = asset.ownerEmail,
+            targetName = asset.title,
+            detail = "${asset.title} 자산이 복구되었습니다.",
             beforeState = objectMapper.writeValueAsString(beforeState),
             afterState = objectMapper.writeValueAsString(afterState),
         )

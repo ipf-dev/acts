@@ -17,6 +17,19 @@ export interface ViewerAllowlistEntryView {
   createdAt: string;
 }
 
+export interface AssetRetentionPolicyView {
+  trashRetentionDays: number;
+  restoreEnabled: boolean;
+  updatedByEmail: string;
+  updatedByName: string | null;
+  updatedAt: string;
+}
+
+export interface AssetRetentionPolicyInput {
+  trashRetentionDays: number;
+  restoreEnabled: boolean;
+}
+
 export interface AuditLogView {
   id: number;
   category: string;
@@ -97,6 +110,21 @@ export interface AssetUploadInput {
   tags: string[];
 }
 
+export interface DeletedAssetView {
+  id: number;
+  title: string;
+  type: AssetTypeView;
+  ownerEmail: string;
+  ownerName: string;
+  organizationName: string | null;
+  originalFileName: string;
+  deletedAt: string;
+  deletedByEmail: string | null;
+  deletedByName: string | null;
+  restoreDeadlineAt: string;
+  canRestore: boolean;
+}
+
 export interface AssetUpdateInput {
   title: string;
   description?: string;
@@ -117,7 +145,7 @@ export interface AssetFileView {
 }
 
 export interface AssetEventView {
-  eventType: "CREATED" | "METADATA_UPDATED";
+  eventType: "CREATED" | "METADATA_UPDATED" | "DELETED" | "RESTORED";
   actorEmail: string;
   actorName: string | null;
   detail: string | null;

@@ -6,7 +6,9 @@ export const detailDateFormatter = new Intl.DateTimeFormat("ko-KR", {
 
 export const historyLabelMap: Record<string, string> = {
   CREATED: "생성",
-  METADATA_UPDATED: "수정"
+  DELETED: "삭제",
+  METADATA_UPDATED: "수정",
+  RESTORED: "복구"
 };
 
 export const statusLabelMap: Record<AssetDetailView["status"], string> = {
@@ -29,4 +31,3 @@ export function formatFileSize(fileSizeBytes: number): string {
 
   return `${(fileSizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
-

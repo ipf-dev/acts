@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Clock3,
+  RotateCcw,
   Search,
+  Settings2,
   Shield,
   Users
 } from "lucide-react";
@@ -21,6 +23,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
 import { isBlank } from "../../lib/utils";
 import type {
+  AssetRetentionPolicyView,
+  DeletedAssetView,
   AppHealthView,
   AuditLogView,
   AuthSessionView,
@@ -31,23 +35,29 @@ import type {
 
 interface DashboardHomePageProps {
   adminUsers: AuthUserView[];
+  assetRetentionPolicy: AssetRetentionPolicyView | null;
   auditLogs: AuditLogView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  deletedAssets: DeletedAssetView[];
   health: AppHealthView | null;
   healthErrorMessage: string | null;
   isLoading: boolean;
+  isSavingPolicy: boolean;
   isSavingAssignment: boolean;
   isSavingAllowlist: boolean;
   onAddViewerAllowlist: (email: string) => Promise<void>;
   onLogout: () => Promise<void>;
   onRemoveViewerAllowlist: (email: string) => Promise<void>;
+  onRestoreDeletedAsset: (assetId: number) => Promise<void>;
+  onSaveAssetRetentionPolicy: (policy: AssetRetentionPolicyView) => Promise<void>;
   onSaveManualAssignment: (
     email: string,
     organizationId: number,
     positionTitle: string
   ) => Promise<void>;
   organizations: OrganizationOptionView[];
+  processingDeletedAssetId: number | null;
   session: AuthSessionView;
   viewerAllowlist: ViewerAllowlistEntryView[];
 }
@@ -63,6 +73,8 @@ const auditTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
 });
 
 const auditActionLabelMap: Record<string, string> = {
+  ASSET_RESTORED: "자산 복구",
+  ASSET_RETENTION_POLICY_UPDATED: "정책 변경",
   LOGIN_SUCCESS: "로그인 성공",
   USER_ASSIGNMENT_UPDATED: "사용자 조직 변경",
   VIEWER_ALLOWLIST_ADDED: "전사 열람자 추가",
@@ -71,30 +83,38 @@ const auditActionLabelMap: Record<string, string> = {
 
 const auditCategoryLabelMap: Record<string, string> = {
   AUTH: "로그인",
-  PERMISSION: "권한"
+  PERMISSION: "권한",
+  POLICY: "정책"
 };
 
 export function DashboardHomePage({
   adminUsers,
+  assetRetentionPolicy,
   auditLogs,
   authErrorMessage,
   authSuccessMessage,
+  deletedAssets,
   health,
   healthErrorMessage,
   isLoading,
+  isSavingPolicy,
   isSavingAssignment,
   isSavingAllowlist,
   onAddViewerAllowlist,
   onLogout,
   onRemoveViewerAllowlist,
+  onRestoreDeletedAsset,
+  onSaveAssetRetentionPolicy,
   onSaveManualAssignment,
   organizations,
+  processingDeletedAssetId,
   session,
   viewerAllowlist
 }: DashboardHomePageProps): React.JSX.Element {
   const [allowlistEmail, setAllowlistEmail] = useState("");
   const [auditFilter, setAuditFilter] = useState("ALL");
   const [draftsByEmail, setDraftsByEmail] = useState<Record<string, UserAssignmentDraft>>({});
+  const [policyDraft, setPolicyDraft] = useState<AssetRetentionPolicyView | null>(assetRetentionPolicy);
   const [searchQuery, setSearchQuery] = useState("");
   const healthLabel = isLoading ? "Checking" : health?.ok ? "Connected" : "Unavailable";
   const healthMessage = isLoading
@@ -103,6 +123,10 @@ export function DashboardHomePage({
       ? healthErrorMessage
       : `Connected to ${health?.service}.`;
   const currentUser = session.user;
+
+  useEffect(() => {
+    setPolicyDraft(assetRetentionPolicy);
+  }, [assetRetentionPolicy]);
 
   const permissionRules = [
     {
@@ -206,6 +230,23 @@ export function DashboardHomePage({
     setAllowlistEmail("");
   }
 
+  async function handlePolicySave(): Promise<void> {
+    if (!policyDraft) {
+      return;
+    }
+
+    await onSaveAssetRetentionPolicy(policyDraft);
+  }
+
+  async function handleRestoreClick(assetId: number): Promise<void> {
+    const confirmed = window.confirm("이 자산을 휴지통에서 복구하시겠습니까?");
+    if (!confirmed) {
+      return;
+    }
+
+    await onRestoreDeletedAsset(assetId);
+  }
+
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -232,6 +273,13 @@ export function DashboardHomePage({
           >
             <Shield className="mr-2 h-4 w-4" />
             권한/Allowlist
+          </TabsTrigger>
+          <TabsTrigger
+            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+            value="policy"
+          >
+            <Settings2 className="mr-2 h-4 w-4" />
+            정책 설정
           </TabsTrigger>
           <TabsTrigger
             className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
@@ -539,13 +587,170 @@ export function DashboardHomePage({
           </div>
         </TabsContent>
 
+        <TabsContent value="policy">
+          <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <Card className="rounded-[24px] border-border shadow-none">
+              <CardHeader>
+                <CardTitle>저장 및 삭제 정책</CardTitle>
+                <CardDescription>
+                  휴지통 보관 기간과 복구 허용 여부를 설정합니다. 정책이 바뀌면 감사 로그에 저장됩니다.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {session.authenticated && currentUser?.role === "ADMIN" && policyDraft ? (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-border bg-muted/30 p-4">
+                        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                          휴지통 보관 기간
+                        </p>
+                        <Input
+                          className="mt-3 h-11 rounded-xl border-border bg-background"
+                          min={1}
+                          onChange={(event) =>
+                            setPolicyDraft((currentPolicy) =>
+                              currentPolicy
+                                ? {
+                                    ...currentPolicy,
+                                    trashRetentionDays: Number(event.target.value || 0)
+                                  }
+                                : currentPolicy
+                            )
+                          }
+                          type="number"
+                          value={policyDraft.trashRetentionDays}
+                        />
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          삭제된 자산은 휴지통에서 최대 {policyDraft.trashRetentionDays}일 동안 복구 가능합니다.
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-border bg-muted/30 p-4">
+                        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">복구 허용</p>
+                        <Select
+                          onValueChange={(value) =>
+                            setPolicyDraft((currentPolicy) =>
+                              currentPolicy
+                                ? {
+                                    ...currentPolicy,
+                                    restoreEnabled: value === "ENABLED"
+                                  }
+                                : currentPolicy
+                            )
+                          }
+                          value={policyDraft.restoreEnabled ? "ENABLED" : "DISABLED"}
+                        >
+                          <SelectTrigger className="mt-3 h-11 rounded-xl border-border bg-background">
+                            <SelectValue placeholder="복구 허용 여부" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ENABLED">복구 허용</SelectItem>
+                            <SelectItem value="DISABLED">복구 비허용</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          휴지통에서 자산을 원래 상태로 되돌릴 수 있는지 결정합니다.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/20 p-4">
+                      <div className="text-sm text-muted-foreground">
+                        마지막 변경:{" "}
+                        {policyDraft.updatedByName ?? policyDraft.updatedByEmail} ·{" "}
+                        {auditTimeFormatter.format(new Date(policyDraft.updatedAt))}
+                      </div>
+                      <Button
+                        className="h-10 rounded-xl px-4"
+                        disabled={isSavingPolicy || policyDraft.trashRetentionDays < 1}
+                        onClick={() => void handlePolicySave()}
+                        type="button"
+                      >
+                        {isSavingPolicy ? "정책 저장 중..." : "정책 저장"}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                    관리자 권한이 있는 계정으로 로그인하면 여기서 보관 기간과 복구 정책을 설정할 수 있습니다.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[24px] border-border shadow-none">
+              <CardHeader>
+                <CardTitle>휴지통</CardTitle>
+                <CardDescription>
+                  소프트 삭제된 자산의 복구 가능 기간을 확인하고, 아직 만료되지 않았다면 복구할 수 있습니다.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {session.authenticated && currentUser?.role === "ADMIN" ? (
+                  deletedAssets.length > 0 ? (
+                    deletedAssets.map((asset) => {
+                      const isProcessing = processingDeletedAssetId === asset.id;
+
+                      return (
+                        <div
+                          className="rounded-2xl border border-border bg-muted/20 p-4"
+                          key={asset.id}
+                        >
+                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-medium">{asset.title}</p>
+                                <Badge variant="outline">{asset.type}</Badge>
+                              </div>
+                              <div className="grid gap-1 text-sm text-muted-foreground">
+                                <p>제작자 {asset.ownerName} · {asset.organizationName ?? "조직 미지정"}</p>
+                                <p>삭제자 {asset.deletedByName ?? asset.deletedByEmail ?? "시스템"}</p>
+                                <p>삭제일 {auditTimeFormatter.format(new Date(asset.deletedAt))}</p>
+                                <p>복구 만료 {auditTimeFormatter.format(new Date(asset.restoreDeadlineAt))}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant={asset.canRestore ? "success" : "warning"}>
+                                {asset.canRestore ? "복구 가능" : "복구 기간 만료"}
+                              </Badge>
+                              <Button
+                                className="h-9 rounded-xl px-3"
+                                disabled={isProcessing || !asset.canRestore}
+                                onClick={() => void handleRestoreClick(asset.id)}
+                                type="button"
+                                variant="outline"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                                복구
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                      현재 휴지통에 보관 중인 자산이 없습니다.
+                    </div>
+                  )
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                    관리자 권한이 있는 계정으로 로그인하면 휴지통 자산의 복구 상태를 확인하고 복구할 수 있습니다.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         <TabsContent value="audit">
           <Card className="rounded-[24px] border-border shadow-none">
             <CardHeader className="space-y-4">
               <div>
                 <CardTitle>감사 로그</CardTitle>
                 <CardDescription>
-                  로그인 성공, 사용자 조직 변경, 전사 열람자 allowlist 변경을 저장하고 조회합니다.
+                  로그인, 사용자 조직 변경, 자산 정책 변경, 복구 이력을 저장하고 조회합니다.
                 </CardDescription>
               </div>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -558,6 +763,7 @@ export function DashboardHomePage({
                       <SelectItem value="ALL">전체 로그</SelectItem>
                       <SelectItem value="AUTH">로그인</SelectItem>
                       <SelectItem value="PERMISSION">권한 변경</SelectItem>
+                      <SelectItem value="POLICY">정책</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
