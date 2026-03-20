@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+
+server:
+  port: ${SERVER_PORT:8088}
+
+acts:
+  auth:
+    backend-base-url: ${BACKEND_BASE_URL}
+    frontend-base-url: ${FRONTEND_BASE_URL}
+  storage:
+    bucket: acts-assets-prod
+  preview:
+    ffmpeg-path: ${ACTS_PREVIEW_FFMPEG_PATH:}
