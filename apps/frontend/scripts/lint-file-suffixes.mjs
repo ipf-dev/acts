@@ -13,10 +13,7 @@ const KEBAB_CASE_FILE_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.(ts|tsx)$/;
 
 const ROOT_ALLOWED_FILES = new Set([
   "src/app.tsx",
-  "src/main.ts",
-  "src/dashboard-api.ts",
-  "src/dashboard-auth.ts",
-  "src/dashboard-types.ts"
+  "src/main.ts"
 ]);
 
 const PAGE_TSX_SUFFIXES = [
@@ -137,22 +134,8 @@ function lintRelativeFilePath(relativePath) {
     return "lib files must use use-* or utils.";
   }
 
-  if (normalizedPath.startsWith("src/dashboard-api/")) {
-    if (extension !== ".ts") {
-      return "dashboard-api files must be TS.";
-    }
-    if (baseName === "http" || baseName === "parsers") {
-      return null;
-    }
-    if (
-      baseName.includes("-api") ||
-      baseName.endsWith("-parsers") ||
-      baseName.endsWith("-shared") ||
-      baseName.endsWith("-upload")
-    ) {
-      return null;
-    }
-    return "dashboard-api files must use -api / -parsers / -shared / -upload.";
+  if (normalizedPath.startsWith("src/api/")) {
+    return extension === ".ts" ? null : "api files must be TS.";
   }
 
   if (ROOT_ALLOWED_FILES.has(normalizedPath)) {
@@ -160,7 +143,7 @@ function lintRelativeFilePath(relativePath) {
   }
 
   if (normalizedPath.startsWith("src/")) {
-    return "Unclassified path. Move it under pages, components, lib, or dashboard-api.";
+    return "Unclassified path. Move it under pages, components, lib, or api.";
   }
 
   return null;

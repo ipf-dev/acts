@@ -1,4 +1,4 @@
-import type { AssetTypeView } from "../../dashboard-types";
+import type { AssetTypeView } from "../../api/types";
 
 export interface AssetUploadDraftView {
   description: string;

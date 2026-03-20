@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import type React from "react";
-import { createDashboardApi } from "../../dashboard-api";
+import { createDashboardApi } from "../../api/client";
 import {
   clearLoginRedirectState,
   getLoginFailureMessage,
   getLoginSuccessMessage
-} from "../../dashboard-auth";
-import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../dashboard-types";
+} from "../../api/auth";
+import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../api/types";
 import { getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
 import { AssetLibraryPage } from "./asset-library-page";
 import type { AssetUploadDraftView } from "./asset-library-page-model";

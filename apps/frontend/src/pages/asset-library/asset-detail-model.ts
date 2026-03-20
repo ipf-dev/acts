@@ -1,4 +1,4 @@
-import type { AssetDetailView, AssetSummaryView } from "../../dashboard-types";
+import type { AssetDetailView, AssetSummaryView } from "../../api/types";
 
 export const detailDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "short"

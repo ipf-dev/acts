@@ -20,8 +20,8 @@ import {
   SelectTrigger,
   SelectValue
 } from "../../components/ui/select";
-import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
-import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../dashboard-types";
+import { GOOGLE_LOGIN_PATH } from "../../api/auth";
+import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../api/types";
 import { cn, isBlank } from "../../lib/utils";
 import { AssetDetailModal } from "./asset-detail-modal";
 import { formatFileSize, typeLabelMap } from "./asset-detail-model";

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogClose, DialogContent } from "../../components/ui/dialog";
-import type { AssetDetailView } from "../../dashboard-types";
+import type { AssetDetailView } from "../../api/types";
 import { cn } from "../../lib/utils";
 import {
   detailDateFormatter,

@@ -25,8 +25,8 @@ import type {
   AssetSummaryView,
   AssetUpdateInput,
   AuthSessionView
-} from "../../dashboard-types";
-import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
+} from "../../api/types";
+import { GOOGLE_LOGIN_PATH } from "../../api/auth";
 import {
   detailDateFormatter,
   formatFileSize,

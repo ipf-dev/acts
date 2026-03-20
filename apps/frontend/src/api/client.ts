@@ -17,7 +17,7 @@ import type {
   UserFeatureAuthorizationView,
   ViewerAllowlistEntryView,
   ViewerAllowlistInput
-} from "./dashboard-types";
+} from "./types";
 
 export interface DashboardApi {
   deleteAsset(assetId: number): Promise<void>;

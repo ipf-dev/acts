@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import type React from "react";
-import { createDashboardApi } from "../../dashboard-api";
+import { createDashboardApi } from "../../api/client";
 import {
   clearLoginRedirectState,
   getLoginFailureMessage,
   getLoginSuccessMessage
-} from "../../dashboard-auth";
+} from "../../api/auth";
 import type {
   AssetDetailView,
   AssetSummaryView,
   AssetUpdateInput,
   AuthSessionView
-} from "../../dashboard-types";
+} from "../../api/types";
 import { getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
 import { AssetDetailPage } from "./asset-detail-page";
 

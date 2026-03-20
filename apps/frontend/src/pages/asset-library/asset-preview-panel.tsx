@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type React from "react";
 import { Film } from "lucide-react";
-import type { AssetSummaryView } from "../../dashboard-types";
+import type { AssetSummaryView } from "../../api/types";
 import { cn } from "../../lib/utils";
 import { buildAssetPreviewUrl } from "./asset-library-utils";
 import { AssetTypeIcon } from "./asset-detail-section";

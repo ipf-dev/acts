@@ -9,8 +9,8 @@ import {
   ShieldCheck,
   Sparkles
 } from "lucide-react";
-import { createDashboardApi } from "../dashboard-api";
-import type { AuthSessionView } from "../dashboard-types";
+import { createDashboardApi } from "../api/client";
+import type { AuthSessionView } from "../api/types";
 import { Badge } from "./ui/badge";
 import {
   DropdownMenu,

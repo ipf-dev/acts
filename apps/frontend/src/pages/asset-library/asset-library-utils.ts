@@ -1,4 +1,4 @@
-import { ApiError, type DownloadedFile } from "../../dashboard-api";
+import { ApiError, type DownloadedFile } from "../../api/client";
 
 interface AssetApiErrorMessages {
   badRequest?: string;

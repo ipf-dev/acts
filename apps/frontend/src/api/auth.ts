@@ -1,4 +1,4 @@
-import type { AuthSessionView } from "./dashboard-types";
+import type { AuthSessionView } from "./types";
 
 export const GOOGLE_LOGIN_PATH = "/api/auth/login/google";
 

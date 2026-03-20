@@ -7,7 +7,7 @@ import {
   Sparkles,
   Tag
 } from "lucide-react";
-import type { AssetDetailView, AssetSummaryView } from "../../dashboard-types";
+import type { AssetDetailView, AssetSummaryView } from "../../api/types";
 import { cn } from "../../lib/utils";
 import { statusLabelMap } from "./asset-detail-model";
 

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import type React from "react";
-import { createDashboardApi } from "../../dashboard-api";
+import { createDashboardApi } from "../../api/client";
 import {
   clearLoginRedirectState,
   getLoginFailureMessage,
   getLoginSuccessMessage
-} from "../../dashboard-auth";
+} from "../../api/auth";
 import type {
   AssetRetentionPolicyView,
   DeletedAssetView,
@@ -17,7 +17,7 @@ import type {
   AppFeatureKeyView,
   UserFeatureAuthorizationView,
   ViewerAllowlistEntryView
-} from "../../dashboard-types";
+} from "../../api/types";
 import { AdminPage } from "./admin-page";
 
 interface AdminPageState {

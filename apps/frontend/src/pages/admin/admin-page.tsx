@@ -22,7 +22,7 @@ import {
   SelectValue
 } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
+import { GOOGLE_LOGIN_PATH } from "../../api/auth";
 import { cn, isBlank } from "../../lib/utils";
 import type {
   AssetRetentionPolicyView,
@@ -36,7 +36,7 @@ import type {
   OrganizationOptionView,
   UserFeatureAuthorizationView,
   ViewerAllowlistEntryView
-} from "../../dashboard-types";
+} from "../../api/types";
 
 interface AdminPageProps {
   adminUsers: AuthUserView[];

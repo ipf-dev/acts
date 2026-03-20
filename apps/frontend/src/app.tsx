@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type React from "react";
-import { createDashboardApi } from "./dashboard-api";
-import { createAnonymousSession } from "./dashboard-auth";
-import type { AuthSessionView } from "./dashboard-types";
+import { createDashboardApi } from "./api/client";
+import { createAnonymousSession } from "./api/auth";
+import type { AuthSessionView } from "./api/types";
 import { AssetDetailPageContainer } from "./pages/asset-library/asset-detail-page-container";
 import { AssetLibraryPageContainer } from "./pages/asset-library/asset-library-page-container";
 import { AdminPageContainer } from "./pages/admin/admin-page-container";
