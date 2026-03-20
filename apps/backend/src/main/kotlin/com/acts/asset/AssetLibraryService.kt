@@ -6,6 +6,7 @@ import com.acts.asset.event.AssetEventType
 import com.acts.asset.preview.AssetPreviewGenerator
 import com.acts.asset.preview.AssetPreviewResult
 import com.acts.asset.storage.AssetBinaryStorage
+import com.acts.asset.storage.AssetStorageProperties
 import com.acts.asset.storage.LoadedAssetObject
 import com.acts.asset.tag.AssetTagEntity
 import com.acts.asset.tag.AssetTagRepository
@@ -15,7 +16,6 @@ import com.acts.auth.user.UserAccountRepository
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 import java.io.ByteArrayOutputStream
-import java.security.MessageDigest
 import java.text.Normalizer
 import java.time.Instant
 import java.time.ZoneOffset
@@ -35,53 +35,45 @@ class AssetLibraryService(
     private val assetMetadataExtractor: AssetMetadataExtractor,
     private val assetPreviewGenerator: AssetPreviewGenerator,
     private val assetRepository: AssetRepository,
+    private val assetStorageProperties: AssetStorageProperties,
     private val assetTagRepository: AssetTagRepository,
     private val assetTagSuggestionService: AssetTagSuggestionService,
     private val assetTypeClassifier: AssetTypeClassifier,
     private val userAccountRepository: UserAccountRepository,
 ) {
     @Transactional
-    fun uploadAsset(command: AssetUploadCommand): AssetSummaryResponse {
-        require(command.contentBytes.isNotEmpty()) { "업로드할 파일이 비어 있습니다." }
-
-        val actor = userAccountRepository.findById(command.actorEmail.lowercase())
-            .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
+    fun initiateUpload(request: AssetUploadIntentRequest, actorEmail: String, actorName: String?): AssetUploadIntentResponse {
+        val actor = requireActor(actorEmail)
         assetAuthorizationService.requireLibraryAccess(actor)
-        val resolvedFileName = normalizeText(command.fileName).trim()
-        val resolvedTitle = command.title.normalizedOrNull() ?: resolvedFileName.substringBeforeLast(".", resolvedFileName)
-        val resolvedDescription = command.description.normalizedOrNull()
-        val contentType = command.contentType.normalizedOrNull() ?: "application/octet-stream"
-        val assetType = assetTypeClassifier.classify(
-            fileName = resolvedFileName,
-            contentType = contentType,
-        )
-        val metadata = assetMetadataExtractor.extract(
-            assetType = assetType,
-            contentBytes = command.contentBytes,
-        )
+
+        val resolvedFileName = normalizeText(request.fileName).trim()
+        val contentType = request.contentType.normalizedOrNull() ?: "application/octet-stream"
+        val resolvedTitle = request.title.normalizedOrNull() ?: resolvedFileName.substringBeforeLast(".", resolvedFileName)
+        val resolvedDescription = request.description.normalizedOrNull()
+        val assetType = assetTypeClassifier.classify(fileName = resolvedFileName, contentType = contentType)
         val tags = assetTagSuggestionService.buildTags(
             fileName = resolvedFileName,
             title = resolvedTitle,
             assetType = assetType,
-            requestedTags = command.requestedTags,
+            requestedTags = request.tags,
         )
         val objectKey = createObjectKey(resolvedFileName)
-        val storedAssetObject = assetBinaryStorage.store(
+        val presignedUrl = assetBinaryStorage.presignUploadUrl(
             objectKey = objectKey,
             contentType = contentType,
-            content = command.contentBytes,
         )
+
         val asset = assetRepository.save(
             AssetEntity(
                 title = resolvedTitle,
                 assetType = assetType,
-                assetStatus = AssetStatus.READY,
+                assetStatus = AssetStatus.UPLOADING,
                 description = resolvedDescription,
                 sourceType = AssetSourceType.EXTERNAL_UPLOAD,
-                sourceDetail = command.sourceDetail.normalizedOrNull(),
+                sourceDetail = request.sourceDetail.normalizedOrNull(),
                 originalFileName = resolvedFileName,
                 mimeType = contentType,
-                fileSizeBytes = command.contentBytes.size.toLong(),
+                fileSizeBytes = request.fileSizeBytes,
                 fileExtension = resolvedFileName.substringAfterLast(".", "").normalizedOrNull(),
                 ownerEmail = actor.email,
                 ownerName = actor.displayName,
@@ -95,32 +87,12 @@ class AssetLibraryService(
                     organizationName = actor.organization?.name,
                     tags = tags.map { tag -> tag.value },
                 ),
-                widthPx = metadata.widthPx,
-                heightPx = metadata.heightPx,
-                durationMs = metadata.durationMs,
+                widthPx = null,
+                heightPx = null,
+                durationMs = null,
             ),
         )
-        val savedAssetId = requireNotNull(asset.id)
-        assetFileRepository.save(
-            AssetFileEntity(
-                asset = asset,
-                versionNumber = 1,
-                bucketName = storedAssetObject.bucket,
-                objectKey = storedAssetObject.objectKey,
-                originalFileName = resolvedFileName,
-                mimeType = contentType,
-                fileSizeBytes = command.contentBytes.size.toLong(),
-                checksumSha256 = calculateSha256(command.contentBytes),
-                createdByEmail = actor.email,
-                createdByName = actor.displayName,
-            ),
-        )
-        storeGeneratedPreviewIfNeeded(
-            assetType = assetType,
-            objectKey = storedAssetObject.objectKey,
-            originalFileName = resolvedFileName,
-            contentBytes = command.contentBytes,
-        )
+
         assetTagRepository.saveAll(
             tags.map { tagCandidate ->
                 AssetTagEntity(
@@ -131,6 +103,59 @@ class AssetLibraryService(
                 )
             },
         )
+
+        assetFileRepository.save(
+            AssetFileEntity(
+                asset = asset,
+                versionNumber = 1,
+                bucketName = assetStorageProperties.bucket,
+                objectKey = objectKey,
+                originalFileName = resolvedFileName,
+                mimeType = contentType,
+                fileSizeBytes = request.fileSizeBytes,
+                checksumSha256 = null,
+                createdByEmail = actor.email,
+                createdByName = actor.displayName,
+            ),
+        )
+
+        return AssetUploadIntentResponse(
+            assetId = requireNotNull(asset.id),
+            presignedUrl = presignedUrl,
+            objectKey = objectKey,
+        )
+    }
+
+    @Transactional
+    fun completeUpload(assetId: Long, request: AssetUploadCompleteRequest, actorEmail: String): AssetSummaryResponse {
+        val actor = requireActor(actorEmail)
+        val asset = assetRepository.findById(assetId)
+            .orElseThrow { IllegalArgumentException("자산을 찾을 수 없습니다.") }
+
+        require(asset.assetStatus == AssetStatus.UPLOADING) { "업로드 진행 중인 자산이 아닙니다." }
+        require(asset.ownerEmail == actor.email) { "자산 소유자만 업로드를 완료할 수 있습니다." }
+
+        val pendingFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
+            ?: throw IllegalArgumentException("업로드 대상 파일 정보를 찾을 수 없습니다.")
+        require(pendingFile.objectKey == request.objectKey) { "업로드 대상 파일이 일치하지 않습니다." }
+
+        asset.assetStatus = AssetStatus.READY
+        asset.fileSizeBytes = request.fileSizeBytes
+        asset.widthPx = request.widthPx
+        asset.heightPx = request.heightPx
+        asset.searchText = buildSearchText(
+            title = asset.title,
+            description = asset.description,
+            fileName = asset.originalFileName,
+            ownerName = actor.displayName,
+            organizationName = asset.organization?.name,
+            tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId).map { it.value },
+        )
+        assetRepository.save(asset)
+
+        pendingFile.fileSizeBytes = request.fileSizeBytes
+        assetFileRepository.save(pendingFile)
+
         assetEventRepository.save(
             AssetEventEntity(
                 asset = asset,
@@ -141,8 +166,7 @@ class AssetLibraryService(
             ),
         )
 
-        return listAssets(actor.email)
-            .first { assetSummary -> assetSummary.id == savedAssetId }
+        return listAssets(actor.email).first { assetSummary -> assetSummary.id == assetId }
     }
 
     @Transactional
@@ -566,10 +590,6 @@ class AssetLibraryService(
         organizationName?.let(::add)
         addAll(tags)
     }.joinToString(" ") { value -> value.normalizedSearchValue() }
-
-    private fun calculateSha256(contentBytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
-        .digest(contentBytes)
-        .joinToString("") { byteValue -> "%02x".format(byteValue) }
 
     private fun buildMetadataUpdateDetail(
         previousState: AssetMetadataSnapshot,

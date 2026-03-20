@@ -23,6 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.transaction.annotation.Transactional
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import java.text.Normalizer
 
 @SpringBootTest
@@ -38,6 +40,12 @@ class AssetLibraryServiceTest @Autowired constructor(
 
     @MockBean
     private lateinit var assetPreviewGenerator: AssetPreviewGenerator
+
+    @MockBean
+    private lateinit var s3Client: S3Client
+
+    @MockBean
+    private lateinit var s3Presigner: S3Presigner
 
     @BeforeEach
     fun prepareUser() {
@@ -86,6 +94,9 @@ class AssetLibraryServiceTest @Autowired constructor(
             actorEmail = "minsungkim@iportfolio.co.kr",
             actorName = "Min Sung Kim",
         )
+        whenever(assetBinaryStorage.presignUploadUrl(any(), any(), any())).thenReturn(
+            "https://s3.example.com/presigned-url",
+        )
         whenever(assetBinaryStorage.store(any(), any(), any())).thenReturn(
             StoredAssetObject(
                 bucket = "acts-assets",
@@ -104,18 +115,26 @@ class AssetLibraryServiceTest @Autowired constructor(
 
     @Test
     fun `stores uploaded asset metadata tags and creator organization`() {
-        val uploadedAsset = assetLibraryService.uploadAsset(
-            AssetUploadCommand(
-                actorEmail = "coco@iportfolio.co.kr",
-                actorName = "Coco",
-                title = "코코의 첫 모험 시나리오",
-                description = "축제에 가는 이야기 초안",
-                requestedTags = listOf("코코", "축제"),
-                sourceDetail = "외부 등록",
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
                 fileName = "coco_festival_story.txt",
                 contentType = "text/plain",
-                contentBytes = "story".toByteArray(),
+                fileSizeBytes = 5L,
+                title = "코코의 첫 모험 시나리오",
+                description = "축제에 가는 이야기 초안",
+                sourceDetail = "외부 등록",
+                tags = listOf("코코", "축제"),
             ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+        val uploadedAsset = assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
         )
 
         val listedAssets = assetLibraryService.listAssets(
@@ -138,18 +157,26 @@ class AssetLibraryServiceTest @Autowired constructor(
     fun `matches korean search terms even when uploaded file name is stored in decomposed unicode`() {
         val decomposedFileName = Normalizer.normalize("폴리17.png", Normalizer.Form.NFD)
 
-        val uploadedAsset = assetLibraryService.uploadAsset(
-            AssetUploadCommand(
-                actorEmail = "coco@iportfolio.co.kr",
-                actorName = "Coco",
-                title = "폴리17",
-                description = "한글 파일명 검색 테스트",
-                requestedTags = emptyList(),
-                sourceDetail = "외부 등록",
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
                 fileName = decomposedFileName,
                 contentType = "image/png",
-                contentBytes = "image".toByteArray(),
+                fileSizeBytes = 5L,
+                title = "폴리17",
+                description = "한글 파일명 검색 테스트",
+                sourceDetail = "외부 등록",
+                tags = emptyList(),
             ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+        val uploadedAsset = assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
         )
 
         val partialMatch = assetLibraryService.listAssets(
@@ -167,18 +194,26 @@ class AssetLibraryServiceTest @Autowired constructor(
 
     @Test
     fun `returns asset detail with history and downloadable file`() {
-        val uploadedAsset = assetLibraryService.uploadAsset(
-            AssetUploadCommand(
-                actorEmail = "coco@iportfolio.co.kr",
-                actorName = "Coco",
-                title = "코코의 첫 모험 시나리오",
-                description = "축제에 가는 이야기 초안",
-                requestedTags = listOf("코코", "축제"),
-                sourceDetail = "외부 등록",
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
                 fileName = "coco_festival_story.txt",
                 contentType = "text/plain",
-                contentBytes = "story".toByteArray(),
+                fileSizeBytes = 5L,
+                title = "코코의 첫 모험 시나리오",
+                description = "축제에 가는 이야기 초안",
+                sourceDetail = "외부 등록",
+                tags = listOf("코코", "축제"),
             ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+        val uploadedAsset = assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
         )
 
         val assetDetail = assetLibraryService.getAsset(
@@ -211,18 +246,26 @@ class AssetLibraryServiceTest @Autowired constructor(
             ),
         )
 
-        val uploadedAsset = assetLibraryService.uploadAsset(
-            AssetUploadCommand(
-                actorEmail = "coco@iportfolio.co.kr",
-                actorName = "Coco",
-                title = "이미지 프리뷰 테스트",
-                description = "프리뷰 설명",
-                requestedTags = listOf("이미지"),
-                sourceDetail = "외부 등록",
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
                 fileName = "preview-image.png",
                 contentType = "image/png",
-                contentBytes = "image".toByteArray(),
+                fileSizeBytes = 5L,
+                title = "이미지 프리뷰 테스트",
+                description = "프리뷰 설명",
+                sourceDetail = "외부 등록",
+                tags = listOf("이미지"),
             ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+        val uploadedAsset = assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
         )
 
         val previewResult = assetLibraryService.loadPreview(
@@ -249,18 +292,26 @@ class AssetLibraryServiceTest @Autowired constructor(
             ),
         )
 
-        val uploadedAsset = assetLibraryService.uploadAsset(
-            AssetUploadCommand(
-                actorEmail = "coco@iportfolio.co.kr",
-                actorName = "Coco",
-                title = "영상 프리뷰 테스트",
-                description = "썸네일 생성",
-                requestedTags = listOf("영상"),
-                sourceDetail = "외부 등록",
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
                 fileName = "preview-video.mp4",
                 contentType = "video/mp4",
-                contentBytes = "video-binary".toByteArray(),
+                fileSizeBytes = 12L,
+                title = "영상 프리뷰 테스트",
+                description = "썸네일 생성",
+                sourceDetail = "외부 등록",
+                tags = listOf("영상"),
             ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+        val uploadedAsset = assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 12L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
         )
 
         val previewResult = assetLibraryService.loadPreview(
@@ -271,7 +322,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThat(previewResult.contentType).isEqualTo("image/jpeg")
         assertThat(previewResult.content).containsExactly(9, 8, 7)
         verify(assetBinaryStorage, atLeastOnce()).store(
-            objectKey = eq("assets/test/coco.txt.preview.jpg"),
+            objectKey = argThat { endsWith(".preview.jpg") },
             contentType = eq("image/jpeg"),
             content = argThat { contentEquals(byteArrayOf(9, 8, 7)) },
         )
@@ -279,18 +330,26 @@ class AssetLibraryServiceTest @Autowired constructor(
 
     @Test
     fun `updates asset metadata and records an update history event`() {
-        val uploadedAsset = assetLibraryService.uploadAsset(
-            AssetUploadCommand(
-                actorEmail = "coco@iportfolio.co.kr",
-                actorName = "Coco",
-                title = "코코의 첫 모험 시나리오",
-                description = "초기 설명",
-                requestedTags = listOf("코코", "축제"),
-                sourceDetail = "외부 등록",
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
                 fileName = "coco_festival_story.txt",
                 contentType = "text/plain",
-                contentBytes = "story".toByteArray(),
+                fileSizeBytes = 5L,
+                title = "코코의 첫 모험 시나리오",
+                description = "초기 설명",
+                sourceDetail = "외부 등록",
+                tags = listOf("코코", "축제"),
             ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+        val uploadedAsset = assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
         )
 
         val updatedAsset = assetLibraryService.updateAsset(
@@ -312,18 +371,11 @@ class AssetLibraryServiceTest @Autowired constructor(
 
     @Test
     fun `soft deletes asset and excludes it from library queries`() {
-        val uploadedAsset = assetLibraryService.uploadAsset(
-            AssetUploadCommand(
-                actorEmail = "coco@iportfolio.co.kr",
-                actorName = "Coco",
-                title = "삭제 테스트 애셋",
-                description = "삭제 설명",
-                requestedTags = listOf("삭제"),
-                sourceDetail = "외부 등록",
-                fileName = "delete_test.txt",
-                contentType = "text/plain",
-                contentBytes = "story".toByteArray(),
-            ),
+        val uploadedAsset = uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "삭제 테스트 애셋",
+            fileName = "delete_test.txt",
         )
 
         assetLibraryService.deleteAsset(
@@ -347,18 +399,11 @@ class AssetLibraryServiceTest @Autowired constructor(
 
     @Test
     fun `rejects delete request from non owner non admin`() {
-        val uploadedAsset = assetLibraryService.uploadAsset(
-            AssetUploadCommand(
-                actorEmail = "coco@iportfolio.co.kr",
-                actorName = "Coco",
-                title = "삭제 권한 테스트 애셋",
-                description = "삭제 설명",
-                requestedTags = listOf("삭제"),
-                sourceDetail = "외부 등록",
-                fileName = "delete_permission_test.txt",
-                contentType = "text/plain",
-                contentBytes = "story".toByteArray(),
-            ),
+        val uploadedAsset = uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "삭제 권한 테스트 애셋",
+            fileName = "delete_permission_test.txt",
         )
         assertThatThrownBy {
             assetLibraryService.deleteAsset(
@@ -472,17 +517,27 @@ class AssetLibraryServiceTest @Autowired constructor(
         actorName: String,
         title: String,
         fileName: String,
-    ): AssetSummaryResponse = assetLibraryService.uploadAsset(
-        AssetUploadCommand(
+    ): AssetSummaryResponse {
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
+                fileName = fileName,
+                contentType = "text/plain",
+                fileSizeBytes = 5L,
+                title = title,
+                description = "설명",
+                sourceDetail = "외부 등록",
+                tags = listOf("태그"),
+            ),
             actorEmail = actorEmail,
             actorName = actorName,
-            title = title,
-            description = "설명",
-            requestedTags = listOf("태그"),
-            sourceDetail = "외부 등록",
-            fileName = fileName,
-            contentType = "text/plain",
-            contentBytes = "story".toByteArray(),
-        ),
-    )
+        )
+        return assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = actorEmail,
+        )
+    }
 }

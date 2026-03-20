@@ -135,6 +135,8 @@ export interface AssetUploadInput {
   description?: string;
   sourceDetail?: string;
   tags: string[];
+  widthPx?: number;
+  heightPx?: number;
 }
 
 export interface DeletedAssetView {

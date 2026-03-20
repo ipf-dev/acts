@@ -33,8 +33,8 @@ class AssetFileEntity(
     var mimeType: String,
     @Column(name = "file_size_bytes", nullable = false)
     var fileSizeBytes: Long,
-    @Column(name = "checksum_sha256", nullable = false)
-    var checksumSha256: String,
+    @Column(name = "checksum_sha256")
+    var checksumSha256: String?,
     @Column(name = "created_by_email", nullable = false)
     var createdByEmail: String,
     @Column(name = "created_by_name", nullable = false)

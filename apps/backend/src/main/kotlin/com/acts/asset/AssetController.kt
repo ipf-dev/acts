@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.multipart.MultipartFile
 import java.nio.charset.StandardCharsets
 
 @RestController
@@ -277,44 +276,53 @@ class AssetController(
         }
     }
 
-    @PostMapping(
-        "/uploads",
-        consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
-    )
-    fun uploadAsset(
+    @PostMapping("/upload-intent", consumes = ["application/json"])
+    fun initiateUpload(
         authentication: Authentication?,
-        @RequestParam("file") file: MultipartFile,
-        @RequestParam(required = false) title: String?,
-        @RequestParam(required = false) description: String?,
-        @RequestParam(required = false) sourceDetail: String?,
-        @RequestParam(required = false) tags: List<String>?,
-    ): ResponseEntity<AssetSummaryResponse> {
-        if (file.isEmpty || file.originalFilename.isNullOrBlank()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
-        }
-
+        @RequestBody request: AssetUploadIntentRequest,
+    ): ResponseEntity<AssetUploadIntentResponse> {
         val actorEmail = currentActorEmail(authentication)
             ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
         val actorName = currentActorName(authentication)
 
         return try {
-            ResponseEntity.status(HttpStatus.CREATED).body(
-                assetLibraryService.uploadAsset(
-                    AssetUploadCommand(
-                        actorEmail = actorEmail,
-                        actorName = actorName,
-                        title = title,
-                        description = description,
-                        requestedTags = tags.orEmpty(),
-                        sourceDetail = sourceDetail,
-                        fileName = requireNotNull(file.originalFilename),
-                        contentType = file.contentType,
-                        contentBytes = file.bytes,
-                    ),
+            ResponseEntity.ok(
+                assetLibraryService.initiateUpload(
+                    request = request,
+                    actorEmail = actorEmail,
+                    actorName = actorName,
                 ),
             )
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
         } catch (_: IllegalArgumentException) {
             ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
+    }
+
+    @PostMapping("/{assetId}/complete", consumes = ["application/json"])
+    fun completeUpload(
+        authentication: Authentication?,
+        @PathVariable assetId: Long,
+        @RequestBody request: AssetUploadCompleteRequest,
+    ): ResponseEntity<AssetSummaryResponse> {
+        val actorEmail = currentActorEmail(authentication)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+
+        return try {
+            ResponseEntity.ok(
+                assetLibraryService.completeUpload(
+                    assetId = assetId,
+                    request = request,
+                    actorEmail = actorEmail,
+                ),
+            )
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalStateException) {
+            ResponseEntity.status(HttpStatus.CONFLICT).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND).build()
         }
     }
 

@@ -4,27 +4,23 @@ import com.acts.asset.preview.AssetPreviewProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
-import java.net.URI
+import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 @Configuration
 @EnableConfigurationProperties(AssetStorageProperties::class, AssetPreviewProperties::class)
 class AssetStorageConfiguration {
     @Bean
-    fun s3Client(assetStorageProperties: AssetStorageProperties): S3Client = S3Client.builder()
-        .endpointOverride(URI.create(assetStorageProperties.endpoint))
-        .credentialsProvider(
-            StaticCredentialsProvider.create(
-                AwsBasicCredentials.create(
-                    assetStorageProperties.accessKey,
-                    assetStorageProperties.secretKey,
-                ),
-            ),
-        )
-        .region(Region.of(assetStorageProperties.region))
-        .forcePathStyle(assetStorageProperties.pathStyleAccessEnabled)
+    fun s3Client(properties: AssetStorageProperties): S3Client = S3Client.builder()
+        .region(Region.of(properties.region))
+        .credentialsProvider(DefaultCredentialsProvider.create())
+        .build()
+
+    @Bean
+    fun s3Presigner(properties: AssetStorageProperties): S3Presigner = S3Presigner.builder()
+        .region(Region.of(properties.region))
+        .credentialsProvider(DefaultCredentialsProvider.create())
         .build()
 }

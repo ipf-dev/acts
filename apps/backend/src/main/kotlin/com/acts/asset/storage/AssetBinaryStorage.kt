@@ -1,6 +1,12 @@
 package com.acts.asset.storage
 
 interface AssetBinaryStorage {
+    fun presignUploadUrl(
+        objectKey: String,
+        contentType: String,
+        expirationMinutes: Long = 15,
+    ): String
+
     fun store(
         objectKey: String,
         contentType: String,

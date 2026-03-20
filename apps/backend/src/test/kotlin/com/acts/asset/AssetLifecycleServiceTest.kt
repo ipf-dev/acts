@@ -18,6 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.transaction.annotation.Transactional
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.presigner.S3Presigner
 
 @SpringBootTest
 @Transactional
@@ -30,6 +32,12 @@ class AssetLifecycleServiceTest @Autowired constructor(
 ) {
     @MockBean
     private lateinit var assetBinaryStorage: AssetBinaryStorage
+
+    @MockBean
+    private lateinit var s3Client: S3Client
+
+    @MockBean
+    private lateinit var s3Presigner: S3Presigner
 
     @BeforeEach
     fun prepareUsers() {
@@ -63,6 +71,9 @@ class AssetLifecycleServiceTest @Autowired constructor(
             actorName = "Admin",
         )
 
+        whenever(assetBinaryStorage.presignUploadUrl(any(), any(), any())).thenReturn(
+            "https://s3.example.com/presigned-url",
+        )
         whenever(assetBinaryStorage.store(any(), any(), any())).thenReturn(
             StoredAssetObject(
                 bucket = "acts-assets",
@@ -127,17 +138,27 @@ class AssetLifecycleServiceTest @Autowired constructor(
         assertThat(auditLog.detail).contains("복구")
     }
 
-    private fun uploadAsset(title: String): AssetSummaryResponse = assetLibraryService.uploadAsset(
-        AssetUploadCommand(
+    private fun uploadAsset(title: String): AssetSummaryResponse {
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
+                fileName = "$title.txt",
+                contentType = "text/plain",
+                fileSizeBytes = 5L,
+                title = title,
+                description = "설명",
+                sourceDetail = "외부 등록",
+                tags = listOf("태그"),
+            ),
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
-            title = title,
-            description = "설명",
-            requestedTags = listOf("태그"),
-            sourceDetail = "외부 등록",
-            fileName = "${title}.txt",
-            contentType = "text/plain",
-            contentBytes = "story".toByteArray(),
-        ),
-    )
+        )
+        return assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+        )
+    }
 }

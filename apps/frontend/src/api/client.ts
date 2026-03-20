@@ -144,28 +144,45 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       });
     },
     async uploadAsset(input) {
-      const formData = new FormData();
-      formData.append("file", input.file);
-      if (input.title) {
-        formData.append("title", input.title);
-      }
-      if (input.description) {
-        formData.append("description", input.description);
-      }
-      if (input.sourceDetail) {
-        formData.append("sourceDetail", input.sourceDetail);
-      }
-      input.tags.forEach((tag) => formData.append("tags", tag));
+      // Step 1: get presigned URL from backend
+      const intentResponse = await readJson<{ assetId: number; presignedUrl: string; objectKey: string }>(
+        "/api/assets/upload-intent",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: input.file.name,
+            contentType: input.file.type || "application/octet-stream",
+            fileSizeBytes: input.file.size,
+            title: input.title,
+            description: input.description,
+            sourceDetail: input.sourceDetail,
+            tags: input.tags,
+          }),
+        }
+      );
 
-      const response = await fetchFn("/api/assets/uploads", {
-        method: "POST",
-        body: formData
+      // Step 2: upload directly to S3
+      const s3Response = await fetch(intentResponse.presignedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": input.file.type || "application/octet-stream" },
+        body: input.file,
       });
-      if (!response.ok) {
-        throw new ApiError(response.status);
+      if (!s3Response.ok) {
+        throw new ApiError(s3Response.status);
       }
 
-      return (await response.json()) as AssetSummaryView;
+      // Step 3: notify backend of completion
+      return readJson<AssetSummaryView>(`/api/assets/${intentResponse.assetId}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          objectKey: intentResponse.objectKey,
+          fileSizeBytes: input.file.size,
+          widthPx: input.widthPx ?? null,
+          heightPx: input.heightPx ?? null,
+        }),
+      });
     },
     async health() {
       return readJson<AppHealthView>("/api/health");

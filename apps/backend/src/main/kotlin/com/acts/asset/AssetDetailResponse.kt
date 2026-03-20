@@ -39,7 +39,7 @@ data class AssetFileResponse(
     val originalFileName: String,
     val mimeType: String,
     val fileSizeBytes: Long,
-    val checksumSha256: String,
+    val checksumSha256: String?,
     val versionNumber: Int,
     val createdByEmail: String,
     val createdByName: String,
