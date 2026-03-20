@@ -1,5 +1,6 @@
 package com.acts.asset
 
+import com.acts.asset.tag.AssetTagSuggestionService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 

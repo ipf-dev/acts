@@ -1,5 +1,7 @@
 package com.acts.auth
 
+import com.acts.auth.user.UserMappingMode
+
 data class AuthUserProfile(
     val email: String,
     val displayName: String,

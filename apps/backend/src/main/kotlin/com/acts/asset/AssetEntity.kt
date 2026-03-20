@@ -1,6 +1,6 @@
 package com.acts.asset
 
-import com.acts.auth.OrganizationEntity
+import com.acts.auth.org.OrganizationEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType

@@ -1,5 +1,6 @@
 package com.acts.asset
 
+import com.acts.asset.event.AssetEventType
 import java.time.Instant
 
 data class AssetDetailResponse(

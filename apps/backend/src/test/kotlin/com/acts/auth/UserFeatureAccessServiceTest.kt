@@ -1,5 +1,9 @@
 package com.acts.auth
 
+import com.acts.auth.feature.AppFeatureKey
+import com.acts.auth.feature.UserFeatureAccessService
+import com.acts.auth.user.UserAccountRepository
+import com.acts.auth.user.UserDirectoryService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired

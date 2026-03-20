@@ -1,5 +1,9 @@
 package com.acts.auth
 
+import com.acts.auth.audit.AdminAuditLogAction
+import com.acts.auth.audit.AdminAuditLogRepository
+import com.acts.auth.audit.AuditLogCategory
+import com.acts.auth.audit.AuditLogOutcome
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent

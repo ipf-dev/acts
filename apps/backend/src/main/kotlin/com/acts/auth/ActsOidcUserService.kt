@@ -1,5 +1,6 @@
 package com.acts.auth
 
+import com.acts.auth.user.UserDirectoryService
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest

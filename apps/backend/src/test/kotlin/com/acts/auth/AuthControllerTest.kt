@@ -1,5 +1,6 @@
 package com.acts.auth
 
+import com.acts.auth.user.UserDirectoryService
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasSize
 import org.junit.jupiter.api.Test

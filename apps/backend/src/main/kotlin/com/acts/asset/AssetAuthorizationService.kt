@@ -1,9 +1,9 @@
 package com.acts.asset
 
-import com.acts.auth.AdminAuditLogService
-import com.acts.auth.AppFeatureKey
-import com.acts.auth.UserAccountEntity
-import com.acts.auth.UserFeatureAccessService
+import com.acts.auth.audit.AdminAuditLogService
+import com.acts.auth.feature.AppFeatureKey
+import com.acts.auth.user.UserAccountEntity
+import com.acts.auth.feature.UserFeatureAccessService
 import com.acts.auth.UserRole
 import org.springframework.stereotype.Service
 
