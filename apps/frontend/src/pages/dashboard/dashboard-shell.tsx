@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type React from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -9,7 +10,6 @@ import {
   Sparkles
 } from "lucide-react";
 import { createDashboardApi } from "../../dashboard-api";
-import { createAnonymousSession } from "../../dashboard-auth";
 import type { AuthSessionView } from "../../dashboard-types";
 import { Badge } from "../../components/ui/badge";
 import {
@@ -31,6 +31,7 @@ interface DashboardShellProps {
   children: React.ReactNode;
   onNavigate: (navigationKey: DashboardNavigationKey) => void;
   onSearchAssetLibrary: (value: string) => void;
+  session: AuthSessionView;
   title: string;
 }
 
@@ -47,38 +48,11 @@ export function DashboardShell({
   children,
   onNavigate,
   onSearchAssetLibrary,
+  session,
   title
 }: DashboardShellProps): React.JSX.Element {
   const [collapsed, setCollapsed] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [session, setSession] = useState<AuthSessionView>(createAnonymousSession());
-
-  useEffect(() => {
-    let isActive = true;
-
-    async function loadSession(): Promise<void> {
-      try {
-        const nextSession = await dashboardApi.getSession();
-        if (!isActive) {
-          return;
-        }
-
-        setSession(nextSession);
-      } catch {
-        if (!isActive) {
-          return;
-        }
-
-        setSession(createAnonymousSession());
-      }
-    }
-
-    void loadSession();
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (activeNavigationKey === "admin" && session.user?.role !== "ADMIN") {

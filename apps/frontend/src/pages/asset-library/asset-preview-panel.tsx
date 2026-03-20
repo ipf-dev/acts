@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type React from "react";
 import { Film } from "lucide-react";
 import type { AssetSummaryView } from "../../dashboard-types";
 import { cn } from "../../lib/utils";

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type React from "react";
 import {
   Download,
   Eye,
@@ -157,8 +158,6 @@ function AssetSummaryPanel({
   onDownload: (assetId: number) => Promise<void>;
   onOpenDetailPage: (assetId: number) => void;
 }): React.JSX.Element {
-  const canDelete = asset.canDelete;
-
   async function handleDelete(): Promise<void> {
     const confirmed = window.confirm(`"${asset.title}" 애셋을 삭제하시겠습니까?`);
     if (!confirmed) {
@@ -228,7 +227,7 @@ function AssetSummaryPanel({
           <Download className="h-4 w-4" />
           {isDownloading ? "다운로드 중" : "다운로드"}
         </Button>
-        {canDelete ? (
+        {asset.canDelete ? (
           <Button
             className="h-9 rounded-lg px-3 text-[13px] font-medium"
             disabled={isDeleting}

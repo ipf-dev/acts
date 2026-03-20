@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type React from "react";
 import {
   AlertTriangle,
   Clock3,
@@ -22,7 +23,7 @@ import {
 } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
-import { isBlank } from "../../lib/utils";
+import { cn, isBlank } from "../../lib/utils";
 import type {
   AssetRetentionPolicyView,
   DeletedAssetView,
@@ -365,7 +366,7 @@ export function DashboardHomePage({
       <div className="space-y-3">
         {features.map((feature) => (
           <div
-            className={`rounded-2xl border border-border p-4 ${toneClassName}`}
+            className={cn("rounded-2xl border border-border p-4", toneClassName)}
             key={feature.key}
           >
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -731,7 +732,7 @@ export function DashboardHomePage({
               </CardHeader>
               <CardContent className="space-y-3">
                 {permissionRules.map((rule) => (
-                  <div className={`rounded-2xl p-4 ${rule.tone}`} key={rule.title}>
+                  <div className={cn("rounded-2xl p-4", rule.tone)} key={rule.title}>
                     <p className="font-medium">{rule.title}</p>
                     <p className="mt-2 text-sm leading-6">{rule.description}</p>
                   </div>

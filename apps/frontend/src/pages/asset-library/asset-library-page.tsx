@@ -1,11 +1,8 @@
 import { useDeferredValue, useEffect, useRef, useState } from "react";
+import type React from "react";
 import {
   Clock3,
   Download,
-  FileAudio2,
-  FileImage,
-  FileText,
-  Film,
   Grid2x2,
   List,
   RotateCcw,
@@ -25,8 +22,10 @@ import {
 } from "../../components/ui/select";
 import { GOOGLE_LOGIN_PATH } from "../../dashboard-auth";
 import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../dashboard-types";
-import { isBlank } from "../../lib/utils";
+import { cn, isBlank } from "../../lib/utils";
 import { AssetDetailModal } from "./asset-detail-modal";
+import { formatFileSize, typeLabelMap } from "./asset-detail-model";
+import { AssetTypeIcon } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
 import { AssetUploadModal } from "./asset-upload-modal";
 import type { AssetUploadDraftView } from "./asset-library-page-model";
@@ -385,18 +384,20 @@ export function AssetLibraryPage({
 
                 <div className="flex items-center overflow-hidden rounded-xl border border-border bg-background">
                   <button
-                    className={`inline-flex h-11 w-11 items-center justify-center ${
+                    className={cn(
+                      "inline-flex h-11 w-11 items-center justify-center",
                       layoutMode === "grid" ? "bg-muted text-foreground" : "text-muted-foreground"
-                    }`}
+                    )}
                     onClick={() => setLayoutMode("grid")}
                     type="button"
                   >
                     <Grid2x2 className="h-4 w-4" />
                   </button>
                   <button
-                    className={`inline-flex h-11 w-11 items-center justify-center ${
+                    className={cn(
+                      "inline-flex h-11 w-11 items-center justify-center",
                       layoutMode === "list" ? "bg-muted text-foreground" : "text-muted-foreground"
-                    }`}
+                    )}
                     onClick={() => setLayoutMode("list")}
                     type="button"
                   >
@@ -613,10 +614,10 @@ export function AssetLibraryPage({
       />
       <AssetDetailModal
         asset={assetDetail}
-        isLoading={isAssetDetailLoading}
-        isOpen={Boolean(assetDetail) || isAssetDetailLoading}
         isDeleting={isDeleting}
         isDownloading={isDownloading}
+        isLoading={isAssetDetailLoading}
+        isOpen={Boolean(assetDetail) || isAssetDetailLoading}
         onClose={onCloseAssetDetail}
         onDelete={onDeleteAsset}
         onDownload={onDownloadAsset}
@@ -624,22 +625,6 @@ export function AssetLibraryPage({
       />
     </section>
   );
-}
-
-function AssetTypeIcon({ assetType }: { assetType: AssetSummaryView["type"] }): React.JSX.Element {
-  switch (assetType) {
-    case "AUDIO":
-      return <FileAudio2 className="h-5 w-5" />;
-    case "IMAGE":
-      return <FileImage className="h-5 w-5" />;
-    case "SCENARIO":
-    case "DOCUMENT":
-      return <FileText className="h-5 w-5" />;
-    case "VIDEO":
-      return <Film className="h-5 w-5" />;
-    default:
-      return <Sparkles className="h-5 w-5" />;
-  }
 }
 
 async function createDraftFromFile(file: File): Promise<AssetUploadDraftView> {
@@ -709,14 +694,6 @@ function normalizeSearchValue(value: string): string {
   return normalizeDisplayValue(value).trim().toLowerCase();
 }
 
-function formatFileSize(fileSizeBytes: number): string {
-  if (fileSizeBytes < 1024 * 1024) {
-    return `${Math.max(1, Math.round(fileSizeBytes / 1024))} KB`;
-  }
-
-  return `${(fileSizeBytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function readImageSize(previewUrl: string): Promise<{ height: number; width: number }> {
   return new Promise((resolve) => {
     const image = new Image();
@@ -747,13 +724,4 @@ const assetTypeOptions: AssetSummaryView["type"][] = [
 
 const statusLabelMap: Record<AssetSummaryView["status"], string> = {
   READY: "리뷰"
-};
-
-const typeLabelMap: Record<AssetSummaryView["type"], string> = {
-  AUDIO: "오디오",
-  DOCUMENT: "문서",
-  IMAGE: "이미지",
-  OTHER: "기타",
-  SCENARIO: "시나리오",
-  VIDEO: "영상"
 };

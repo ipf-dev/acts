@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
+import type React from "react";
 import { createDashboardApi } from "../../dashboard-api";
 import {
   clearLoginRedirectState,
-  createAnonymousSession,
   getLoginFailureMessage,
   getLoginSuccessMessage
 } from "../../dashboard-auth";
@@ -74,7 +74,11 @@ async function loadAdminData(): Promise<{
   };
 }
 
-export function DashboardHomePageContainer(): React.JSX.Element {
+interface DashboardHomePageContainerProps {
+  session: AuthSessionView;
+}
+
+export function DashboardHomePageContainer({ session: initialSession }: DashboardHomePageContainerProps): React.JSX.Element {
   const [state, setState] = useState<DashboardHomePageState>({
     adminUsers: [],
     assetRetentionPolicy: null,
@@ -91,7 +95,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
     isSavingFeatureAccess: false,
     processingDeletedAssetId: null,
     organizations: [],
-    session: createAnonymousSession(),
+    session: initialSession,
     userFeatureAuthorizations: [],
     viewerAllowlist: []
   });
@@ -102,13 +106,10 @@ export function DashboardHomePageContainer(): React.JSX.Element {
 
     async function loadPage(): Promise<void> {
       try {
-        const [healthResult, session] = await Promise.all([
-          dashboardApi.health().catch((error: unknown) => ({
-            errorMessage: error instanceof Error ? error.message : "Unknown error.",
-            health: null
-          })),
-          dashboardApi.getSession()
-        ]);
+        const healthResult = await dashboardApi.health().catch((error: unknown) => ({
+          errorMessage: error instanceof Error ? error.message : "Unknown error.",
+          health: null
+        }));
 
         if (!isActive) {
           return;
@@ -124,7 +125,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         let authErrorMessage = getLoginFailureMessage(initialLocationSearch);
         let authSuccessMessage = getLoginSuccessMessage(initialLocationSearch);
 
-        if (session.authenticated && session.user?.role === "ADMIN") {
+        if (initialSession.authenticated && initialSession.user?.role === "ADMIN") {
           try {
             ({ adminUsers, assetRetentionPolicy, auditLogs, deletedAssets, featureAuthorizations, organizations, viewerAllowlist } = await loadAdminData());
           } catch (error: unknown) {
@@ -149,7 +150,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
           isSavingFeatureAccess: false,
           processingDeletedAssetId: null,
           organizations,
-          session,
+          session: initialSession,
           userFeatureAuthorizations: featureAuthorizations,
           viewerAllowlist
         };
@@ -171,7 +172,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
       }
     }
 
-    void loadPage()
+    void loadPage();
 
     return () => {
       isActive = false;

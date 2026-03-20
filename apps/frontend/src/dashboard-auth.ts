@@ -20,7 +20,7 @@ export function createAnonymousSession(): AuthSessionView {
   };
 }
 
-export function getLoginSuccessMessage(search: string): string | null {
+export function getLoginSuccessMessage(_search: string): string | null {
   return null;
 }
 

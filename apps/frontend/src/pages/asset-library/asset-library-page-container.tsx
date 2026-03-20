@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
+import type React from "react";
 import { createDashboardApi } from "../../dashboard-api";
 import {
   clearLoginRedirectState,
-  createAnonymousSession,
   getLoginFailureMessage,
   getLoginSuccessMessage
 } from "../../dashboard-auth";
@@ -32,12 +32,14 @@ interface AssetLibraryPageContainerProps {
   onOpenAssetPage: (assetId: number) => void;
   onSearchQueryChange: (value: string) => void;
   searchQuery: string;
+  session: AuthSessionView;
 }
 
 export function AssetLibraryPageContainer({
   onOpenAssetPage,
   onSearchQueryChange,
-  searchQuery
+  searchQuery,
+  session: initialSession
 }: AssetLibraryPageContainerProps): React.JSX.Element {
   const [state, setState] = useState<AssetLibraryPageState>({
     assetDetail: null,
@@ -50,7 +52,7 @@ export function AssetLibraryPageContainer({
     isExporting: false,
     isLoading: true,
     isUploading: false,
-    session: createAnonymousSession()
+    session: initialSession
   });
 
   useEffect(() => {
@@ -59,8 +61,7 @@ export function AssetLibraryPageContainer({
 
     async function loadPage(): Promise<void> {
       try {
-        const session = await dashboardApi.getSession();
-        const assets = session.authenticated ? await dashboardApi.listAssets() : [];
+        const assets = initialSession.authenticated ? await dashboardApi.listAssets() : [];
 
         if (!isActive) {
           return;
@@ -72,7 +73,7 @@ export function AssetLibraryPageContainer({
           authErrorMessage: getLoginFailureMessage(initialLocationSearch),
           authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
           isLoading: false,
-          session
+          session: initialSession
         }));
       } catch (error: unknown) {
         if (!isActive) {

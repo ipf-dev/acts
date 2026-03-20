@@ -1,3 +1,4 @@
+import type React from "react";
 import { ImageIcon, Plus, Upload, X } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -10,15 +11,16 @@ import {
 } from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
+import { typeLabelMap } from "./asset-detail-model";
 import type { AssetUploadDraftView } from "./asset-library-page-model";
 
 interface AssetUploadModalProps {
   drafts: AssetUploadDraftView[];
-  onDescriptionChange: (draftId: string, value: string) => void;
   isOpen: boolean;
   isUploading: boolean;
   onAddTag: (draftId: string) => void;
   onClose: () => void;
+  onDescriptionChange: (draftId: string, value: string) => void;
   onFileDrop: (files: File[]) => Promise<void>;
   onRemoveDraft: (draftId: string) => void;
   onRemoveTag: (draftId: string, tag: string) => void;
@@ -29,11 +31,11 @@ interface AssetUploadModalProps {
 
 export function AssetUploadModal({
   drafts,
-  onDescriptionChange,
   isOpen,
   isUploading,
   onAddTag,
   onClose,
+  onDescriptionChange,
   onFileDrop,
   onRemoveDraft,
   onRemoveTag,
@@ -200,12 +202,3 @@ export function AssetUploadModal({
     </Dialog>
   );
 }
-
-const typeLabelMap: Record<string, string> = {
-  AUDIO: "오디오",
-  DOCUMENT: "문서",
-  IMAGE: "이미지",
-  OTHER: "기타",
-  SCENARIO: "시나리오",
-  VIDEO: "영상"
-};

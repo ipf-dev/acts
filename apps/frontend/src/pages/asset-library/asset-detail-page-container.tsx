@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import type React from "react";
 import { createDashboardApi } from "../../dashboard-api";
 import {
   clearLoginRedirectState,
-  createAnonymousSession,
   getLoginFailureMessage,
   getLoginSuccessMessage
 } from "../../dashboard-auth";
@@ -32,6 +32,7 @@ interface AssetDetailPageContainerProps {
   onBack: () => void;
   onDeleted: () => void;
   onOpenRelatedAsset: (assetId: number) => void;
+  session: AuthSessionView;
 }
 
 const dashboardApi = createDashboardApi();
@@ -41,7 +42,8 @@ export function AssetDetailPageContainer({
   assetId,
   onBack,
   onDeleted,
-  onOpenRelatedAsset
+  onOpenRelatedAsset,
+  session: initialSession
 }: AssetDetailPageContainerProps): React.JSX.Element {
   const [state, setState] = useState<AssetDetailPageState>({
     asset: null,
@@ -52,7 +54,7 @@ export function AssetDetailPageContainer({
     isDownloading: false,
     isLoading: true,
     isSaving: false,
-    session: createAnonymousSession()
+    session: initialSession
   });
 
   useEffect(() => {
@@ -68,8 +70,7 @@ export function AssetDetailPageContainer({
       }));
 
       try {
-        const session = await dashboardApi.getSession();
-        const [asset, assets] = session.authenticated
+        const [asset, assets] = initialSession.authenticated
           ? await Promise.all([
               dashboardApi.getAsset(assetId),
               dashboardApi.listAssets()
@@ -87,7 +88,7 @@ export function AssetDetailPageContainer({
           authErrorMessage: getLoginFailureMessage(initialLocationSearch),
           authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
           isLoading: false,
-          session
+          session: initialSession
         }));
       } catch (error: unknown) {
         if (!isActive) {
@@ -158,8 +159,8 @@ export function AssetDetailPageContainer({
     }));
 
     try {
-      await dashboardApi.deleteAsset(assetId)
-      onDeleted()
+      await dashboardApi.deleteAsset(assetId);
+      onDeleted();
     } catch (error: unknown) {
       setState((currentState) => ({
         ...currentState,
@@ -169,7 +170,7 @@ export function AssetDetailPageContainer({
           notFound: "삭제할 자산을 찾을 수 없습니다."
         }),
         isDeleting: false
-      }))
+      }));
     }
   }
 

@@ -1,4 +1,8 @@
 import { useEffect, useState } from "react";
+import type React from "react";
+import { createDashboardApi } from "./dashboard-api";
+import { createAnonymousSession } from "./dashboard-auth";
+import type { AuthSessionView } from "./dashboard-types";
 import { AssetDetailPageContainer } from "./pages/asset-library/asset-detail-page-container";
 import { AssetLibraryPageContainer } from "./pages/asset-library/asset-library-page-container";
 import { DashboardHomePageContainer } from "./pages/dashboard/dashboard-home-page-container";
@@ -11,6 +15,7 @@ interface AppLocationState {
 
 const ASSET_ID_PARAM = "assetId";
 const SECTION_PARAM = "section";
+const dashboardApi = createDashboardApi();
 
 function readAppLocation(location: Location = window.location): AppLocationState {
   const params = new URLSearchParams(location.search);
@@ -55,6 +60,28 @@ function writeAppLocation(nextState: AppLocationState, method: "push" | "replace
 export function App(): React.JSX.Element {
   const [assetSearchQuery, setAssetSearchQuery] = useState("");
   const [locationState, setLocationState] = useState<AppLocationState>(() => readAppLocation());
+  const [session, setSession] = useState<AuthSessionView | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadSession(): Promise<void> {
+      try {
+        const nextSession = await dashboardApi.getSession();
+        if (!isActive) return;
+        setSession(nextSession);
+      } catch {
+        if (!isActive) return;
+        setSession(createAnonymousSession());
+      }
+    }
+
+    void loadSession();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     function syncLocation(): void {
@@ -97,26 +124,31 @@ export function App(): React.JSX.Element {
       assetSearchQuery={assetSearchQuery}
       onNavigate={handleNavigation}
       onSearchAssetLibrary={setAssetSearchQuery}
+      session={session ?? createAnonymousSession()}
       title="acts"
     >
-      {locationState.activeNavigationKey === "assets" ? (
-        locationState.selectedAssetId ? (
-          <AssetDetailPageContainer
-            assetId={locationState.selectedAssetId}
-            onBack={handleCloseAssetDetail}
-            onDeleted={handleCloseAssetDetail}
-            onOpenRelatedAsset={handleOpenAssetDetailPage}
-          />
+      {session !== null ? (
+        locationState.activeNavigationKey === "assets" ? (
+          locationState.selectedAssetId ? (
+            <AssetDetailPageContainer
+              assetId={locationState.selectedAssetId}
+              onBack={handleCloseAssetDetail}
+              onDeleted={handleCloseAssetDetail}
+              onOpenRelatedAsset={handleOpenAssetDetailPage}
+              session={session}
+            />
+          ) : (
+            <AssetLibraryPageContainer
+              onOpenAssetPage={handleOpenAssetDetailPage}
+              onSearchQueryChange={setAssetSearchQuery}
+              searchQuery={assetSearchQuery}
+              session={session}
+            />
+          )
         ) : (
-          <AssetLibraryPageContainer
-            onOpenAssetPage={handleOpenAssetDetailPage}
-            onSearchQueryChange={setAssetSearchQuery}
-            searchQuery={assetSearchQuery}
-          />
+          <DashboardHomePageContainer session={session} />
         )
-      ) : (
-        <DashboardHomePageContainer />
-      )}
+      ) : null}
     </DashboardShell>
   );
 }
