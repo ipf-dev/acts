@@ -38,7 +38,7 @@ import type {
   ViewerAllowlistEntryView
 } from "../../dashboard-types";
 
-interface DashboardHomePageProps {
+interface AdminPageProps {
   adminUsers: AuthUserView[];
   assetRetentionPolicy: AssetRetentionPolicyView | null;
   auditLogs: AuditLogView[];
@@ -103,7 +103,7 @@ const auditCategoryLabelMap: Record<string, string> = {
   POLICY: "정책"
 };
 
-export function DashboardHomePage({
+export function AdminPage({
   adminUsers,
   assetRetentionPolicy,
   auditLogs,
@@ -129,7 +129,7 @@ export function DashboardHomePage({
   session,
   userFeatureAuthorizations,
   viewerAllowlist
-}: DashboardHomePageProps): React.JSX.Element {
+}: AdminPageProps): React.JSX.Element {
   const [allowlistEmail, setAllowlistEmail] = useState("");
   const [auditFilter, setAuditFilter] = useState("ALL");
   const [draftsByEmail, setDraftsByEmail] = useState<Record<string, UserAssignmentDraft>>({});

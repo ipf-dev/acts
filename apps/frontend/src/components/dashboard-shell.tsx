@@ -9,9 +9,9 @@ import {
   ShieldCheck,
   Sparkles
 } from "lucide-react";
-import { createDashboardApi } from "../../dashboard-api";
-import type { AuthSessionView } from "../../dashboard-types";
-import { Badge } from "../../components/ui/badge";
+import { createDashboardApi } from "../dashboard-api";
+import type { AuthSessionView } from "../dashboard-types";
+import { Badge } from "./ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +19,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from "../../components/ui/dropdown-menu";
-import { Input } from "../../components/ui/input";
-import { cn } from "../../lib/utils";
+} from "./ui/dropdown-menu";
+import { Input } from "./ui/input";
+import { cn } from "../lib/utils";
 
 export type DashboardNavigationKey = "assets" | "admin";
 

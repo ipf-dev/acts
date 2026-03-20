@@ -5,8 +5,8 @@ import { createAnonymousSession } from "./dashboard-auth";
 import type { AuthSessionView } from "./dashboard-types";
 import { AssetDetailPageContainer } from "./pages/asset-library/asset-detail-page-container";
 import { AssetLibraryPageContainer } from "./pages/asset-library/asset-library-page-container";
-import { DashboardHomePageContainer } from "./pages/dashboard/dashboard-home-page-container";
-import { type DashboardNavigationKey, DashboardShell } from "./pages/dashboard/dashboard-shell";
+import { AdminPageContainer } from "./pages/admin/admin-page-container";
+import { type DashboardNavigationKey, DashboardShell } from "./components/dashboard-shell";
 
 interface AppLocationState {
   activeNavigationKey: DashboardNavigationKey;
@@ -146,7 +146,7 @@ export function App(): React.JSX.Element {
             />
           )
         ) : (
-          <DashboardHomePageContainer session={session} />
+          <AdminPageContainer session={session} />
         )
       ) : null}
     </DashboardShell>

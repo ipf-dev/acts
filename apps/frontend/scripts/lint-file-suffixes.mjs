@@ -16,8 +16,6 @@ const ROOT_ALLOWED_FILES = new Set([
   "src/main.ts",
   "src/dashboard-api.ts",
   "src/dashboard-auth.ts",
-  "src/dashboard-routes.ts",
-  "src/dashboard-theme.ts",
   "src/dashboard-types.ts"
 ]);
 

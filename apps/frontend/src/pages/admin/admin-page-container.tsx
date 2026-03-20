@@ -18,9 +18,9 @@ import type {
   UserFeatureAuthorizationView,
   ViewerAllowlistEntryView
 } from "../../dashboard-types";
-import { DashboardHomePage } from "./dashboard-home-page";
+import { AdminPage } from "./admin-page";
 
-interface DashboardHomePageState {
+interface AdminPageState {
   adminUsers: AuthUserView[];
   assetRetentionPolicy: AssetRetentionPolicyView | null;
   auditLogs: AuditLogView[];
@@ -74,12 +74,12 @@ async function loadAdminData(): Promise<{
   };
 }
 
-interface DashboardHomePageContainerProps {
+interface AdminPageContainerProps {
   session: AuthSessionView;
 }
 
-export function DashboardHomePageContainer({ session: initialSession }: DashboardHomePageContainerProps): React.JSX.Element {
-  const [state, setState] = useState<DashboardHomePageState>({
+export function AdminPageContainer({ session: initialSession }: AdminPageContainerProps): React.JSX.Element {
+  const [state, setState] = useState<AdminPageState>({
     adminUsers: [],
     assetRetentionPolicy: null,
     auditLogs: [],
@@ -134,7 +134,7 @@ export function DashboardHomePageContainer({ session: initialSession }: Dashboar
           }
         }
 
-        const nextState: DashboardHomePageState = {
+        const nextState: AdminPageState = {
           adminUsers,
           assetRetentionPolicy,
           auditLogs,
@@ -423,7 +423,7 @@ export function DashboardHomePageContainer({ session: initialSession }: Dashboar
   }
 
   return (
-    <DashboardHomePage
+    <AdminPage
       adminUsers={state.adminUsers}
       assetRetentionPolicy={state.assetRetentionPolicy}
       auditLogs={state.auditLogs}
