@@ -5,6 +5,7 @@ import {
   RotateCcw,
   Search,
   Settings2,
+  SlidersHorizontal,
   Shield,
   Users
 } from "lucide-react";
@@ -26,10 +27,13 @@ import type {
   AssetRetentionPolicyView,
   DeletedAssetView,
   AppHealthView,
+  AppFeatureKeyView,
+  AppFeatureView,
   AuditLogView,
   AuthSessionView,
   AuthUserView,
   OrganizationOptionView,
+  UserFeatureAuthorizationView,
   ViewerAllowlistEntryView
 } from "../../dashboard-types";
 
@@ -46,11 +50,13 @@ interface DashboardHomePageProps {
   isSavingPolicy: boolean;
   isSavingAssignment: boolean;
   isSavingAllowlist: boolean;
+  isSavingFeatureAccess: boolean;
   onAddViewerAllowlist: (email: string) => Promise<void>;
   onLogout: () => Promise<void>;
   onRemoveViewerAllowlist: (email: string) => Promise<void>;
   onRestoreDeletedAsset: (assetId: number) => Promise<void>;
   onSaveAssetRetentionPolicy: (policy: AssetRetentionPolicyView) => Promise<void>;
+  onSaveUserFeatureAccess: (email: string, allowedFeatureKeys: AppFeatureKeyView[]) => Promise<void>;
   onSaveManualAssignment: (
     email: string,
     organizationId: number,
@@ -59,12 +65,17 @@ interface DashboardHomePageProps {
   organizations: OrganizationOptionView[];
   processingDeletedAssetId: number | null;
   session: AuthSessionView;
+  userFeatureAuthorizations: UserFeatureAuthorizationView[];
   viewerAllowlist: ViewerAllowlistEntryView[];
 }
 
 interface UserAssignmentDraft {
   organizationId: string;
   positionTitle: string;
+}
+
+interface UserFeatureAccessDraft {
+  allowedFeatureKeys: AppFeatureKeyView[];
 }
 
 const auditTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
@@ -79,6 +90,7 @@ const auditActionLabelMap: Record<string, string> = {
   ASSET_RESTORED: "자산 복구",
   ASSET_RETENTION_POLICY_UPDATED: "정책 변경",
   LOGIN_SUCCESS: "로그인 성공",
+  USER_FEATURE_ACCESS_UPDATED: "기능 권한 변경",
   USER_ASSIGNMENT_UPDATED: "사용자 조직 변경",
   VIEWER_ALLOWLIST_ADDED: "전사 열람자 추가",
   VIEWER_ALLOWLIST_REMOVED: "전사 열람자 제거"
@@ -103,22 +115,27 @@ export function DashboardHomePage({
   isSavingPolicy,
   isSavingAssignment,
   isSavingAllowlist,
+  isSavingFeatureAccess,
   onAddViewerAllowlist,
   onLogout,
   onRemoveViewerAllowlist,
   onRestoreDeletedAsset,
   onSaveAssetRetentionPolicy,
+  onSaveUserFeatureAccess,
   onSaveManualAssignment,
   organizations,
   processingDeletedAssetId,
   session,
+  userFeatureAuthorizations,
   viewerAllowlist
 }: DashboardHomePageProps): React.JSX.Element {
   const [allowlistEmail, setAllowlistEmail] = useState("");
   const [auditFilter, setAuditFilter] = useState("ALL");
   const [draftsByEmail, setDraftsByEmail] = useState<Record<string, UserAssignmentDraft>>({});
+  const [featureDraftsByEmail, setFeatureDraftsByEmail] = useState<Record<string, UserFeatureAccessDraft>>({});
   const [policyDraft, setPolicyDraft] = useState<AssetRetentionPolicyView | null>(assetRetentionPolicy);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedFeatureUserEmail, setSelectedFeatureUserEmail] = useState("");
   const healthLabel = isLoading ? "Checking" : health?.ok ? "Connected" : "Unavailable";
   const healthMessage = isLoading
     ? "Calling the Spring Boot backend."
@@ -130,6 +147,18 @@ export function DashboardHomePage({
   useEffect(() => {
     setPolicyDraft(assetRetentionPolicy);
   }, [assetRetentionPolicy]);
+
+  useEffect(() => {
+    if (userFeatureAuthorizations.length === 0) {
+      setSelectedFeatureUserEmail("");
+      return;
+    }
+
+    const hasSelectedUser = userFeatureAuthorizations.some((user) => user.email === selectedFeatureUserEmail);
+    if (!hasSelectedUser) {
+      setSelectedFeatureUserEmail(userFeatureAuthorizations[0].email);
+    }
+  }, [selectedFeatureUserEmail, userFeatureAuthorizations]);
 
   const permissionRules = [
     {
@@ -147,6 +176,11 @@ export function DashboardHomePage({
       description: "전사 열람자는 이메일 allowlist로 관리하며 수정 즉시 권한을 다시 계산합니다.",
       title: "전사 열람자",
       tone: "bg-emerald-100 text-emerald-700"
+    },
+    {
+      description: "사용자별 기능 권한은 Allow/Deny로 분리해 저장하며, 현재 운영 중인 자산 라이브러리부터 실제 권한에 반영합니다.",
+      title: "기능 권한",
+      tone: "bg-indigo-100 text-indigo-700"
     },
     {
       description: "모든 로그인 사용자는 모든 자산을 열람하고 다운로드할 수 있으며, 전사 열람자는 추가로 전체 내보내기가 가능합니다.",
@@ -187,6 +221,20 @@ export function DashboardHomePage({
 
     return log.category === auditFilter;
   });
+  const selectedFeatureUser =
+    userFeatureAuthorizations.find((user) => user.email === selectedFeatureUserEmail) ?? null;
+  const selectedFeatureDraft = selectedFeatureUser ? getFeatureDraft(selectedFeatureUser) : null;
+  const selectedFeatureCatalog = selectedFeatureUser
+    ? [...selectedFeatureUser.allowedFeatures, ...selectedFeatureUser.deniedFeatures].sort(
+        (left, right) => featureSortOrder(left) - featureSortOrder(right)
+      )
+    : [];
+  const selectedAllowedFeatures = selectedFeatureDraft
+    ? selectedFeatureCatalog.filter((feature) => selectedFeatureDraft.allowedFeatureKeys.includes(feature.key))
+    : [];
+  const selectedDeniedFeatures = selectedFeatureDraft
+    ? selectedFeatureCatalog.filter((feature) => !selectedFeatureDraft.allowedFeatureKeys.includes(feature.key))
+    : [];
 
   function getDraft(user: AuthUserView): UserAssignmentDraft {
     return draftsByEmail[user.email] ?? {
@@ -212,6 +260,38 @@ export function DashboardHomePage({
     });
   }
 
+  function getFeatureDraft(user: UserFeatureAuthorizationView): UserFeatureAccessDraft {
+    return featureDraftsByEmail[user.email] ?? {
+      allowedFeatureKeys: user.allowedFeatures.map((feature) => feature.key)
+    };
+  }
+
+  function updateFeatureDraft(email: string, nextAllowedFeatureKeys: AppFeatureKeyView[]): void {
+    setFeatureDraftsByEmail((currentDrafts) => ({
+      ...currentDrafts,
+      [email]: {
+        allowedFeatureKeys: nextAllowedFeatureKeys
+      }
+    }));
+  }
+
+  function moveFeature(
+    user: UserFeatureAuthorizationView,
+    featureKey: AppFeatureKeyView,
+    shouldAllow: boolean
+  ): void {
+    const draft = getFeatureDraft(user);
+    const nextAllowedFeatureKeys = shouldAllow
+      ? Array.from(new Set([...draft.allowedFeatureKeys, featureKey]))
+      : draft.allowedFeatureKeys.filter((currentFeatureKey) => currentFeatureKey !== featureKey);
+
+    updateFeatureDraft(user.email, nextAllowedFeatureKeys);
+  }
+
+  function featureSortOrder(feature: AppFeatureView): number {
+    return ["ASSET_LIBRARY"].indexOf(feature.key);
+  }
+
   async function handleAssignmentSave(user: AuthUserView): Promise<void> {
     const draft = getDraft(user);
 
@@ -221,6 +301,16 @@ export function DashboardHomePage({
 
     await onSaveManualAssignment(user.email, Number(draft.organizationId), draft.positionTitle);
     setDraftsByEmail((currentDrafts) => {
+      const nextDrafts = { ...currentDrafts };
+      delete nextDrafts[user.email];
+      return nextDrafts;
+    });
+  }
+
+  async function handleFeatureAccessSave(user: UserFeatureAuthorizationView): Promise<void> {
+    const draft = getFeatureDraft(user);
+    await onSaveUserFeatureAccess(user.email, draft.allowedFeatureKeys);
+    setFeatureDraftsByEmail((currentDrafts) => {
       const nextDrafts = { ...currentDrafts };
       delete nextDrafts[user.email];
       return nextDrafts;
@@ -255,6 +345,55 @@ export function DashboardHomePage({
     await onRestoreDeletedAsset(assetId);
   }
 
+  function renderFeatureItems(
+    features: AppFeatureView[],
+    toneClassName: string,
+    emptyMessage: string,
+    actionLabel: string,
+    onClick: (featureKey: AppFeatureKeyView) => void,
+    disabled: boolean
+  ): React.JSX.Element {
+    if (features.length === 0) {
+      return (
+        <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+          {emptyMessage}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        {features.map((feature) => (
+          <div
+            className={`rounded-2xl border border-border p-4 ${toneClassName}`}
+            key={feature.key}
+          >
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{feature.label}</p>
+                  <Badge variant={feature.implemented ? "success" : "outline"}>
+                    {feature.implemented ? "운영 중" : "준비 중"}
+                  </Badge>
+                </div>
+                <p className="text-sm leading-6 text-muted-foreground">{feature.description}</p>
+              </div>
+              <Button
+                className="h-9 rounded-xl px-3"
+                disabled={disabled}
+                onClick={() => onClick(feature.key)}
+                type="button"
+                variant="secondary"
+              >
+                {actionLabel}
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -281,6 +420,13 @@ export function DashboardHomePage({
           >
             <Shield className="mr-2 h-4 w-4" />
             권한/Allowlist
+          </TabsTrigger>
+          <TabsTrigger
+            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+            value="features"
+          >
+            <SlidersHorizontal className="mr-2 h-4 w-4" />
+            기능 권한
           </TabsTrigger>
           <TabsTrigger
             className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
@@ -592,6 +738,164 @@ export function DashboardHomePage({
                 ))}
               </CardContent>
             </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="features">
+          <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+            <Card className="rounded-[24px] border-border shadow-none">
+              <CardHeader>
+                <CardTitle>기능별 Authorization</CardTitle>
+                <CardDescription>
+                  사용자별로 허용된 기능과 차단된 기능을 분리해 관리합니다. 현재는 자산
+                  라이브러리만 실제 권한 검사에 연결되어 있습니다.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {session.authenticated && currentUser?.role === "ADMIN" ? (
+                  userFeatureAuthorizations.length > 0 ? (
+                    <>
+                      <div className="space-y-3">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                          사용자 선택
+                        </p>
+                        <Select
+                          onValueChange={setSelectedFeatureUserEmail}
+                          value={selectedFeatureUserEmail}
+                        >
+                          <SelectTrigger className="h-11 rounded-xl border-border bg-background">
+                            <SelectValue placeholder="사용자를 선택하세요" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {userFeatureAuthorizations.map((user) => (
+                              <SelectItem key={user.email} value={user.email}>
+                                {user.displayName} · {user.organizationName ?? "조직 미지정"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {selectedFeatureUser ? (
+                        <div className="space-y-4 rounded-[20px] border border-border bg-muted/20 p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="text-lg font-semibold">{selectedFeatureUser.displayName}</p>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {selectedFeatureUser.email}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Badge variant={selectedFeatureUser.role === "ADMIN" ? "default" : "outline"}>
+                                {selectedFeatureUser.role === "ADMIN" ? "Admin" : "일반 사용자"}
+                              </Badge>
+                              {selectedFeatureUser.positionTitle ? (
+                                <Badge variant="secondary">{selectedFeatureUser.positionTitle}</Badge>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="rounded-2xl border border-border bg-card p-4">
+                              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                                조직
+                              </p>
+                              <p className="mt-2 text-sm font-medium">
+                                {selectedFeatureUser.organizationName ?? "조직 미지정"}
+                              </p>
+                            </div>
+                            <div className="rounded-2xl border border-border bg-card p-4">
+                              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                                편집 상태
+                              </p>
+                              <p className="mt-2 text-sm font-medium">
+                                {selectedFeatureUser.featureAccessLocked
+                                  ? "Admin은 모든 기능이 항상 허용됩니다."
+                                  : "Allow/Deny를 바꾸고 저장하면 즉시 반영됩니다."}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4">
+                            <p className="text-sm text-muted-foreground">
+                              현재 Allow {selectedAllowedFeatures.length}개 · Deny {selectedDeniedFeatures.length}개
+                            </p>
+                            <Button
+                              className="h-10 rounded-xl px-4"
+                              disabled={isSavingFeatureAccess || selectedFeatureUser.featureAccessLocked}
+                              onClick={() => void handleFeatureAccessSave(selectedFeatureUser)}
+                              type="button"
+                            >
+                              {selectedFeatureUser.featureAccessLocked
+                                ? "Admin 고정"
+                                : isSavingFeatureAccess
+                                  ? "저장 중..."
+                                  : "기능 권한 저장"}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                      아직 로그인한 사용자가 없어 기능 권한 대상을 표시할 수 없습니다.
+                    </div>
+                  )
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                    관리자 권한이 있는 계정으로 로그인하면 여기서 사용자별 기능 Allow/Deny를 저장할 수 있습니다.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-6">
+              <Card className="rounded-[24px] border-border shadow-none">
+                <CardHeader>
+                  <CardTitle>Allow</CardTitle>
+                  <CardDescription>
+                    현재 선택한 사용자가 접근 가능한 기능입니다.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {selectedFeatureUser ? renderFeatureItems(
+                    selectedAllowedFeatures,
+                    "bg-emerald-50",
+                    "현재 허용된 기능이 없습니다.",
+                    "Deny로 이동",
+                    (featureKey) => moveFeature(selectedFeatureUser, featureKey, false),
+                    isSavingFeatureAccess || selectedFeatureUser.featureAccessLocked,
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                      먼저 사용자를 선택하세요.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-[24px] border-border shadow-none">
+                <CardHeader>
+                  <CardTitle>Deny</CardTitle>
+                  <CardDescription>
+                    아직 허용되지 않은 기능입니다. 준비 중 기능도 미리 Allow 대상으로 올릴 수 있습니다.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {selectedFeatureUser ? renderFeatureItems(
+                    selectedDeniedFeatures,
+                    "bg-slate-50",
+                    "현재 차단된 기능이 없습니다.",
+                    "Allow로 이동",
+                    (featureKey) => moveFeature(selectedFeatureUser, featureKey, true),
+                    isSavingFeatureAccess || selectedFeatureUser.featureAccessLocked,
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
+                      먼저 사용자를 선택하세요.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </TabsContent>
 

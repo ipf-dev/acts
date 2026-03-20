@@ -1,18 +1,24 @@
 package com.acts.asset
 
 import com.acts.auth.AdminAuditLogService
+import com.acts.auth.AppFeatureKey
 import com.acts.auth.UserAccountEntity
+import com.acts.auth.UserFeatureAccessService
 import com.acts.auth.UserRole
 import org.springframework.stereotype.Service
 
 @Service
 class AssetAuthorizationService(
     private val adminAuditLogService: AdminAuditLogService,
+    private val userFeatureAccessService: UserFeatureAccessService,
 ) {
     fun filterVisibleAssets(
         actor: UserAccountEntity,
         assets: List<AssetEntity>,
-    ): List<AssetEntity> = assets
+    ): List<AssetEntity> {
+        requireLibraryAccess(actor)
+        return assets
+    }
 
     fun permissionsFor(
         actor: UserAccountEntity,
@@ -28,10 +34,12 @@ class AssetAuthorizationService(
         asset: AssetEntity,
         action: AssetAccessAction,
     ) {
+        requireLibraryAccess(actor)
         return
     }
 
     fun requireEditAccess(actor: UserAccountEntity, asset: AssetEntity) {
+        requireLibraryAccess(actor)
         if (canEdit(actor, asset)) {
             return
         }
@@ -46,6 +54,7 @@ class AssetAuthorizationService(
     }
 
     fun requireDeleteAccess(actor: UserAccountEntity, asset: AssetEntity) {
+        requireLibraryAccess(actor)
         if (canDelete(actor, asset)) {
             return
         }
@@ -60,6 +69,7 @@ class AssetAuthorizationService(
     }
 
     fun requireExportAllAccess(actor: UserAccountEntity) {
+        requireLibraryAccess(actor)
         if (canExportAll(actor)) {
             return
         }
@@ -68,6 +78,14 @@ class AssetAuthorizationService(
     }
 
     fun canExportAll(actor: UserAccountEntity): Boolean = actor.role == UserRole.ADMIN || actor.companyWideViewer
+
+    fun requireLibraryAccess(actor: UserAccountEntity) {
+        if (userFeatureAccessService.isFeatureAllowed(actor.email, actor.role, AppFeatureKey.ASSET_LIBRARY)) {
+            return
+        }
+
+        throw SecurityException("자산 라이브러리 기능 권한이 없습니다.")
+    }
 
     private fun canEdit(actor: UserAccountEntity, asset: AssetEntity): Boolean =
         actor.role == UserRole.ADMIN || asset.ownerEmail.equals(actor.email, ignoreCase = true)

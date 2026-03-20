@@ -86,6 +86,9 @@ export function DashboardShell({
     }
   }, [activeNavigationKey, onNavigate, session.user?.role]);
 
+  const hasAssetLibraryAccess =
+    !session.authenticated || session.allowedFeatureKeys.includes("ASSET_LIBRARY");
+
   async function handleLogout(): Promise<void> {
     setIsLoggingOut(true);
 
@@ -97,11 +100,14 @@ export function DashboardShell({
   }
 
   const visibleNavigationItems = navigationItems.filter(
-    (item) => item.key !== "admin" || session.user?.role === "ADMIN"
+    (item) =>
+      (item.key !== "admin" || session.user?.role === "ADMIN") &&
+      (item.key !== "assets" || hasAssetLibraryAccess)
   );
   const activeNavigationItem =
     visibleNavigationItems.find((item) => item.key === activeNavigationKey) ?? visibleNavigationItems[0];
   const currentUser = session.user;
+  const showAssetSearch = activeNavigationKey === "assets" && hasAssetLibraryAccess;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -222,7 +228,7 @@ export function DashboardShell({
               </div>
 
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                {activeNavigationKey === "assets" ? (
+                {showAssetSearch ? (
                   <div className="relative w-full max-w-[450px]">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -235,7 +241,7 @@ export function DashboardShell({
                 ) : (
                   <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Workspace</p>
-                    <p className="mt-1 text-sm font-medium">{activeNavigationItem.label}</p>
+                    <p className="mt-1 text-sm font-medium">{activeNavigationItem?.label ?? "접근 불가"}</p>
                   </div>
                 )}
 
@@ -270,7 +276,20 @@ export function DashboardShell({
             </div>
           </header>
 
-          <main className="flex-1 px-4 py-6 lg:px-6 lg:py-6">{children}</main>
+          <main className="flex-1 px-4 py-6 lg:px-6 lg:py-6">
+            {visibleNavigationItems.length === 0 ? (
+              <div className="flex min-h-[60vh] items-center justify-center">
+                <div className="max-w-md rounded-[28px] border border-border bg-card p-8 text-center shadow-sm">
+                  <p className="text-lg font-semibold">허용된 기능이 없습니다</p>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                    현재 계정에는 접근 가능한 좌측 기능이 없습니다. 관리자에게 기능 권한 Allow 설정을 요청하세요.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              children
+            )}
+          </main>
         </div>
       </div>
     </div>

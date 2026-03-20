@@ -5,6 +5,7 @@ export interface AppHealthView {
 
 export type UserRole = "USER" | "ADMIN";
 export type UserMappingMode = "MANUAL" | "UNMAPPED";
+export type AppFeatureKeyView = "ASSET_LIBRARY";
 
 export interface OrganizationOptionView {
   id: number;
@@ -61,6 +62,7 @@ export interface AuthSessionView {
   authenticated: boolean;
   loginConfigured: boolean;
   allowedDomain: string;
+  allowedFeatureKeys: AppFeatureKeyView[];
   user: AuthUserView | null;
 }
 
@@ -71,6 +73,28 @@ export interface ManualAssignmentInput {
 
 export interface ViewerAllowlistInput {
   email: string;
+}
+
+export interface AppFeatureView {
+  key: AppFeatureKeyView;
+  label: string;
+  description: string;
+  implemented: boolean;
+}
+
+export interface UserFeatureAuthorizationView {
+  email: string;
+  displayName: string;
+  organizationName: string | null;
+  positionTitle: string | null;
+  role: UserRole;
+  featureAccessLocked: boolean;
+  allowedFeatures: AppFeatureView[];
+  deniedFeatures: AppFeatureView[];
+}
+
+export interface UserFeatureAccessInput {
+  allowedFeatureKeys: AppFeatureKeyView[];
 }
 
 export type AssetTypeView = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" | "SCENARIO" | "OTHER";

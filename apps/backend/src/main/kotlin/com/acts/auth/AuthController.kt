@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 class AuthController(
     private val authProperties: ActsAuthProperties,
     private val userDirectoryService: UserDirectoryService,
+    private val userFeatureAccessService: UserFeatureAccessService,
     private val googleLoginAvailability: GoogleLoginAvailability,
 ) {
     @GetMapping("/login/google")
@@ -42,6 +43,7 @@ class AuthController(
                 authenticated = false,
                 loginConfigured = googleLoginAvailability.isConfigured(),
                 allowedDomain = authProperties.allowedDomain,
+                allowedFeatureKeys = emptyList(),
                 user = null,
             )
 
@@ -50,19 +52,25 @@ class AuthController(
                 authenticated = false,
                 loginConfigured = googleLoginAvailability.isConfigured(),
                 allowedDomain = authProperties.allowedDomain,
+                allowedFeatureKeys = emptyList(),
                 user = null,
             )
 
         val displayName = oidcUser.fullName ?: oidcUser.givenName ?: email.substringBefore("@")
+        val userProfile = userDirectoryService.syncLogin(
+            email = email,
+            displayName = displayName,
+        )
 
         return AuthSessionResponse(
             authenticated = true,
             loginConfigured = googleLoginAvailability.isConfigured(),
             allowedDomain = authProperties.allowedDomain,
-            user = userDirectoryService.syncLogin(
+            allowedFeatureKeys = userFeatureAccessService.resolveAllowedFeatureKeys(
                 email = email,
-                displayName = displayName,
+                role = userProfile.role,
             ),
+            user = userProfile,
         )
     }
 
@@ -121,6 +129,10 @@ class AuthController(
     @GetMapping("/admin/audit-logs")
     fun listAuditLogs(): List<AuditLogResponse> = userDirectoryService.listAuditLogs()
 
+    @GetMapping("/admin/user-feature-access")
+    fun listUserFeatureAccess(): List<UserFeatureAuthorizationResponse> =
+        userFeatureAccessService.listUserFeatureAuthorizations()
+
     @PutMapping("/admin/users/{email}/assignment")
     fun updateManualAssignment(
         @PathVariable email: String,
@@ -144,6 +156,24 @@ class AuthController(
         } catch (_: IllegalArgumentException) {
             ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
         }
+    }
+
+    @PutMapping("/admin/users/{email}/feature-access")
+    fun updateUserFeatureAccess(
+        @PathVariable email: String,
+        @RequestBody request: UserFeatureAccessUpdateRequest,
+        authentication: Authentication?,
+    ): ResponseEntity<UserFeatureAuthorizationResponse> = try {
+        ResponseEntity.ok(
+            userFeatureAccessService.saveUserFeatureAccess(
+                email = email,
+                allowedFeatureKeys = request.allowedFeatureKeys,
+                actorEmail = currentActorEmail(authentication),
+                actorName = currentActorName(authentication),
+            ),
+        )
+    } catch (_: IllegalArgumentException) {
+        ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
     }
 
     private fun currentActorEmail(authentication: Authentication?): String = authentication?.name?.lowercase() ?: "system"

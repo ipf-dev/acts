@@ -43,7 +43,8 @@ Expected first-slice backend capabilities:
 - PostgreSQL-backed user directory plus single organization catalog
 - user org assignment lookup with admin override support
 - company-wide viewer allowlist with immediate permission recalculation
-- audit logging for login success plus admin org and permission changes
+- per-user feature allow/deny overrides with audit logging
+- audit logging for login success plus admin org, feature, and permission changes
 - asset metadata in PostgreSQL with binary files stored in object storage
 - LocalStack S3-backed multipart upload endpoint for the first asset slice
 - asset catalog tables for `assets`, `asset_files`, `asset_tags`, and `asset_events`
@@ -72,8 +73,10 @@ Expected first-slice frontend surfaces:
 - Figma Make 기준의 shell 레이아웃, 현재 사용자 프로필 메뉴, 자산 검색 헤더
 - searchable admin user table with per-user organization assignment
 - admin allowlist management and audit log views
+- admin feature authorization tab with per-user allow/deny split and save flow for the currently implemented asset library feature
 - admin policy tab for retention settings and deleted asset restore status/actions
 - asset library page with upload modal, tag chips, search, org/creator filters, and company-wide viewer export action
+- shell-level feature gating so denied users cannot enter the implemented asset library surface
 - asset detail modal plus detail page with image/video preview, summary, history, editable metadata, download action, and owner/admin delete action
 - generation request forms and result views
 - searchable asset detail flows

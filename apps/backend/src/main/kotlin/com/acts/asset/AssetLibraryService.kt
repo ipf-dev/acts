@@ -36,6 +36,7 @@ class AssetLibraryService(
 
         val actor = userAccountRepository.findById(command.actorEmail.lowercase())
             .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
+        assetAuthorizationService.requireLibraryAccess(actor)
         val resolvedFileName = normalizeText(command.fileName).trim()
         val resolvedTitle = command.title.normalizedOrNull() ?: resolvedFileName.substringBeforeLast(".", resolvedFileName)
         val resolvedDescription = command.description.normalizedOrNull()

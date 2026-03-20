@@ -15,6 +15,7 @@ export function createAnonymousSession(): AuthSessionView {
     authenticated: false,
     loginConfigured: false,
     allowedDomain: "iportfolio.co.kr",
+    allowedFeatureKeys: [],
     user: null
   };
 }

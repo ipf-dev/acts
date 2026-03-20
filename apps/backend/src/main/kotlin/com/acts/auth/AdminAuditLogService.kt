@@ -56,6 +56,32 @@ class AdminAuditLogService(
         )
     }
 
+    fun recordUserFeatureAccessUpdated(
+        actorEmail: String,
+        actorName: String?,
+        targetEmail: String,
+        targetName: String?,
+        beforeState: UserFeatureAccessAuditSnapshot,
+        afterState: UserFeatureAccessAuditSnapshot,
+    ) {
+        if (beforeState == afterState) {
+            return
+        }
+
+        saveAuditLog(
+            category = AuditLogCategory.PERMISSION,
+            outcome = AuditLogOutcome.SUCCESS,
+            actorEmail = actorEmail,
+            actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.USER_FEATURE_ACCESS_UPDATED,
+            targetEmail = targetEmail,
+            targetName = targetName.normalizedAuditName(),
+            detail = buildUserFeatureAccessDetail(targetName, targetEmail, afterState),
+            beforeState = objectMapper.writeValueAsString(beforeState),
+            afterState = objectMapper.writeValueAsString(afterState),
+        )
+    }
+
     fun recordViewerAllowlistAdded(
         actorEmail: String,
         actorName: String?,
@@ -271,6 +297,12 @@ class AdminAuditLogService(
         val afterOrg = afterProfile.organizationName ?: "미지정"
         return "${afterProfile.displayName}: ${beforeOrg} -> ${afterOrg}"
     }
+
+    private fun buildUserFeatureAccessDetail(
+        targetName: String?,
+        targetEmail: String,
+        snapshot: UserFeatureAccessAuditSnapshot,
+    ): String = "${targetName.normalizedAuditName() ?: targetEmail} 기능 권한 변경 · Allow ${snapshot.allowedFeatureKeys.size}개 / Deny ${snapshot.deniedFeatureKeys.size}개"
 }
 
 private data class UserAssignmentAuditSnapshot(

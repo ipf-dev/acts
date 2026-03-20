@@ -7,11 +7,14 @@ import type {
   AssetUploadInput,
   AuditLogView,
   AppHealthView,
+  AppFeatureKeyView,
   AuthSessionView,
   AuthUserView,
   DeletedAssetView,
   ManualAssignmentInput,
   OrganizationOptionView,
+  UserFeatureAccessInput,
+  UserFeatureAuthorizationView,
   ViewerAllowlistEntryView,
   ViewerAllowlistInput
 } from "./dashboard-types";
@@ -31,6 +34,7 @@ export interface DashboardApi {
   health(): Promise<AppHealthView>;
   getSession(): Promise<AuthSessionView>;
   listOrganizations(): Promise<OrganizationOptionView[]>;
+  listUserFeatureAccess(): Promise<UserFeatureAuthorizationView[]>;
   listUsers(): Promise<AuthUserView[]>;
   listViewerAllowlist(): Promise<ViewerAllowlistEntryView[]>;
   addViewerAllowlist(input: ViewerAllowlistInput): Promise<ViewerAllowlistEntryView[]>;
@@ -38,6 +42,10 @@ export interface DashboardApi {
   listAuditLogs(): Promise<AuditLogView[]>;
   logout(): Promise<void>;
   saveManualAssignment(email: string, input: ManualAssignmentInput): Promise<AuthUserView>;
+  saveUserFeatureAccess(
+    email: string,
+    input: UserFeatureAccessInput
+  ): Promise<UserFeatureAuthorizationView>;
 }
 
 export interface DownloadedFile {
@@ -168,6 +176,9 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     async listOrganizations() {
       return readJson<OrganizationOptionView[]>("/api/auth/admin/organizations");
     },
+    async listUserFeatureAccess() {
+      return readJson<UserFeatureAuthorizationView[]>("/api/auth/admin/user-feature-access");
+    },
     async listUsers() {
       return readJson<AuthUserView[]>("/api/auth/admin/users");
     },
@@ -210,6 +221,20 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
         },
         body: JSON.stringify(input)
       });
+    },
+    async saveUserFeatureAccess(email, input) {
+      return readJson<UserFeatureAuthorizationView>(
+        `/api/auth/admin/users/${encodeURIComponent(email)}/feature-access`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            allowedFeatureKeys: input.allowedFeatureKeys as AppFeatureKeyView[]
+          })
+        }
+      );
     }
   };
 }

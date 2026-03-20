@@ -2,6 +2,7 @@ package com.acts.asset
 
 import com.acts.auth.OrganizationRepository
 import com.acts.auth.UserDirectoryService
+import com.acts.auth.UserFeatureAccessService
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -24,6 +25,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     private val assetLibraryService: AssetLibraryService,
     private val organizationRepository: OrganizationRepository,
     private val userDirectoryService: UserDirectoryService,
+    private val userFeatureAccessService: UserFeatureAccessService,
 ) {
     @MockBean
     private lateinit var assetBinaryStorage: AssetBinaryStorage
@@ -431,6 +433,32 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThatThrownBy { assetLibraryService.exportAssets("tony@iportfolio.co.kr") }
             .isInstanceOf(SecurityException::class.java)
             .hasMessageContaining("내보내기 권한")
+    }
+
+    @Test
+    fun `denied asset library feature blocks asset access`() {
+        uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "권한 테스트 애셋",
+            fileName = "permission.txt",
+        )
+        userDirectoryService.syncLogin(
+            email = "sohee.han@iportfolio.co.kr",
+            displayName = "한소희",
+        )
+        userFeatureAccessService.saveUserFeatureAccess(
+            email = "sohee.han@iportfolio.co.kr",
+            allowedFeatureKeys = emptyList(),
+            actorEmail = "minsungkim@iportfolio.co.kr",
+            actorName = "Min Sung Kim",
+        )
+
+        assertThatThrownBy {
+            assetLibraryService.listAssets(actorEmail = "sohee.han@iportfolio.co.kr")
+        }
+            .isInstanceOf(SecurityException::class.java)
+            .hasMessageContaining("자산 라이브러리")
     }
 
     private fun uploadAsset(

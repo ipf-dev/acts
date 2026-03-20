@@ -14,6 +14,8 @@ import type {
   AuthSessionView,
   AuthUserView,
   OrganizationOptionView,
+  AppFeatureKeyView,
+  UserFeatureAuthorizationView,
   ViewerAllowlistEntryView
 } from "../../dashboard-types";
 import { DashboardHomePage } from "./dashboard-home-page";
@@ -31,9 +33,11 @@ interface DashboardHomePageState {
   isSavingPolicy: boolean;
   isSavingAssignment: boolean;
   isSavingAllowlist: boolean;
+  isSavingFeatureAccess: boolean;
   processingDeletedAssetId: number | null;
   organizations: OrganizationOptionView[];
   session: AuthSessionView;
+  userFeatureAuthorizations: UserFeatureAuthorizationView[];
   viewerAllowlist: ViewerAllowlistEntryView[];
 }
 
@@ -45,16 +49,18 @@ async function loadAdminData(): Promise<{
   assetRetentionPolicy: AssetRetentionPolicyView;
   auditLogs: AuditLogView[];
   deletedAssets: DeletedAssetView[];
+  featureAuthorizations: UserFeatureAuthorizationView[];
   organizations: OrganizationOptionView[];
   viewerAllowlist: ViewerAllowlistEntryView[];
 }> {
-  const [adminUsers, organizations, viewerAllowlist, auditLogs, assetRetentionPolicy, deletedAssets] = await Promise.all([
+  const [adminUsers, organizations, viewerAllowlist, auditLogs, assetRetentionPolicy, deletedAssets, featureAuthorizations] = await Promise.all([
     dashboardApi.listUsers(),
     dashboardApi.listOrganizations(),
     dashboardApi.listViewerAllowlist(),
     dashboardApi.listAuditLogs(),
     dashboardApi.getAssetRetentionPolicy(),
-    dashboardApi.listDeletedAssets()
+    dashboardApi.listDeletedAssets(),
+    dashboardApi.listUserFeatureAccess()
   ]);
 
   return {
@@ -62,6 +68,7 @@ async function loadAdminData(): Promise<{
     assetRetentionPolicy,
     auditLogs,
     deletedAssets,
+    featureAuthorizations,
     organizations,
     viewerAllowlist
   };
@@ -81,9 +88,11 @@ export function DashboardHomePageContainer(): React.JSX.Element {
     isSavingPolicy: false,
     isSavingAssignment: false,
     isSavingAllowlist: false,
+    isSavingFeatureAccess: false,
     processingDeletedAssetId: null,
     organizations: [],
     session: createAnonymousSession(),
+    userFeatureAuthorizations: [],
     viewerAllowlist: []
   });
 
@@ -109,6 +118,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         let assetRetentionPolicy: AssetRetentionPolicyView | null = null;
         let auditLogs: AuditLogView[] = [];
         let deletedAssets: DeletedAssetView[] = [];
+        let featureAuthorizations: UserFeatureAuthorizationView[] = [];
         let organizations: OrganizationOptionView[] = [];
         let viewerAllowlist: ViewerAllowlistEntryView[] = [];
         let authErrorMessage = getLoginFailureMessage(initialLocationSearch);
@@ -116,7 +126,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
 
         if (session.authenticated && session.user?.role === "ADMIN") {
           try {
-            ({ adminUsers, assetRetentionPolicy, auditLogs, deletedAssets, organizations, viewerAllowlist } = await loadAdminData());
+            ({ adminUsers, assetRetentionPolicy, auditLogs, deletedAssets, featureAuthorizations, organizations, viewerAllowlist } = await loadAdminData());
           } catch (error: unknown) {
             authErrorMessage = error instanceof Error ? error.message : "Unknown error.";
             authSuccessMessage = null;
@@ -136,9 +146,11 @@ export function DashboardHomePageContainer(): React.JSX.Element {
           isSavingPolicy: false,
           isSavingAssignment: false,
           isSavingAllowlist: false,
+          isSavingFeatureAccess: false,
           processingDeletedAssetId: null,
           organizations,
           session,
+          userFeatureAuthorizations: featureAuthorizations,
           viewerAllowlist
         };
 
@@ -203,6 +215,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         isSavingAssignment: false,
         organizations: adminData.organizations,
         session,
+        userFeatureAuthorizations: adminData.featureAuthorizations,
         viewerAllowlist: adminData.viewerAllowlist
       }));
     } catch (error: unknown) {
@@ -239,6 +252,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         isSavingAllowlist: false,
         organizations: adminData.organizations,
         session,
+        userFeatureAuthorizations: adminData.featureAuthorizations,
         viewerAllowlist: adminData.viewerAllowlist
       }));
     } catch (error: unknown) {
@@ -275,6 +289,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         isSavingAllowlist: false,
         organizations: adminData.organizations,
         session,
+        userFeatureAuthorizations: adminData.featureAuthorizations,
         viewerAllowlist: adminData.viewerAllowlist
       }));
     } catch (error: unknown) {
@@ -315,6 +330,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         isSavingPolicy: false,
         organizations: adminData.organizations,
         session,
+        userFeatureAuthorizations: adminData.featureAuthorizations,
         viewerAllowlist: adminData.viewerAllowlist
       }));
     } catch (error: unknown) {
@@ -352,6 +368,7 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         organizations: adminData.organizations,
         processingDeletedAssetId: null,
         session,
+        userFeatureAuthorizations: adminData.featureAuthorizations,
         viewerAllowlist: adminData.viewerAllowlist
       }));
     } catch (error: unknown) {
@@ -359,6 +376,47 @@ export function DashboardHomePageContainer(): React.JSX.Element {
         ...currentState,
         authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
         processingDeletedAssetId: null
+      }));
+    }
+  }
+
+  async function handleSaveUserFeatureAccess(
+    email: string,
+    allowedFeatureKeys: AppFeatureKeyView[]
+  ): Promise<void> {
+    setState((currentState) => ({
+      ...currentState,
+      authErrorMessage: null,
+      authSuccessMessage: null,
+      isSavingFeatureAccess: true
+    }));
+
+    try {
+      await dashboardApi.saveUserFeatureAccess(email, { allowedFeatureKeys });
+
+      const [session, adminData] = await Promise.all([
+        dashboardApi.getSession(),
+        loadAdminData()
+      ]);
+
+      setState((currentState) => ({
+        ...currentState,
+        adminUsers: adminData.adminUsers,
+        assetRetentionPolicy: adminData.assetRetentionPolicy,
+        auditLogs: adminData.auditLogs,
+        authSuccessMessage: "사용자 기능 권한이 업데이트되었습니다.",
+        deletedAssets: adminData.deletedAssets,
+        isSavingFeatureAccess: false,
+        organizations: adminData.organizations,
+        session,
+        userFeatureAuthorizations: adminData.featureAuthorizations,
+        viewerAllowlist: adminData.viewerAllowlist
+      }));
+    } catch (error: unknown) {
+      setState((currentState) => ({
+        ...currentState,
+        authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
+        isSavingFeatureAccess: false
       }));
     }
   }
@@ -377,15 +435,18 @@ export function DashboardHomePageContainer(): React.JSX.Element {
       isSavingPolicy={state.isSavingPolicy}
       isSavingAssignment={state.isSavingAssignment}
       isSavingAllowlist={state.isSavingAllowlist}
+      isSavingFeatureAccess={state.isSavingFeatureAccess}
       onAddViewerAllowlist={handleAddViewerAllowlist}
       onLogout={handleLogout}
       onRemoveViewerAllowlist={handleRemoveViewerAllowlist}
       onRestoreDeletedAsset={handleRestoreDeletedAsset}
       onSaveAssetRetentionPolicy={handleSaveAssetRetentionPolicy}
+      onSaveUserFeatureAccess={handleSaveUserFeatureAccess}
       onSaveManualAssignment={handleSaveManualAssignment}
       organizations={state.organizations}
       processingDeletedAssetId={state.processingDeletedAssetId}
       session={state.session}
+      userFeatureAuthorizations={state.userFeatureAuthorizations}
       viewerAllowlist={state.viewerAllowlist}
     />
   );
