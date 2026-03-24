@@ -313,7 +313,10 @@ export function AssetDetailPage({
                       <section className="grid gap-4 sm:grid-cols-2">
                         <AssetDataField label="MIME" value={asset.currentFile.mimeType} />
                         <AssetDataField label="현재 버전" value={`v${asset.currentFile.versionNumber}`} />
-                        <AssetDataField label="체크섬" value={asset.currentFile.checksumSha256.slice(0, 12)} />
+                        <AssetDataField
+                          label="체크섬"
+                          value={asset.currentFile.checksumSha256?.slice(0, 12) ?? "계산 중"}
+                        />
                         <AssetDataField
                           label="해상도"
                           value={

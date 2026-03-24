@@ -161,7 +161,7 @@ export interface AssetFileView {
   originalFileName: string;
   mimeType: string;
   fileSizeBytes: number;
-  checksumSha256: string;
+  checksumSha256: string | null;
   versionNumber: number;
   createdByEmail: string;
   createdByName: string;
