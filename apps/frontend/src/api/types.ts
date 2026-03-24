@@ -99,16 +99,12 @@ export interface UserFeatureAccessInput {
 
 export type AssetTypeView = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" | "SCENARIO" | "OTHER";
 export type AssetStatusView = "READY";
-export type AssetSourceTypeView = "EXTERNAL_UPLOAD";
-
 export interface AssetSummaryView {
   id: number;
   title: string;
   type: AssetTypeView;
   status: AssetStatusView;
   description: string | null;
-  sourceType: AssetSourceTypeView;
-  sourceDetail: string | null;
   originalFileName: string;
   mimeType: string;
   fileSizeBytes: number;
@@ -133,7 +129,6 @@ export interface AssetUploadInput {
   file: File;
   title?: string;
   description?: string;
-  sourceDetail?: string;
   tags: string[];
   widthPx?: number;
   heightPx?: number;

@@ -6,6 +6,5 @@ data class AssetUploadIntentRequest(
     val fileSizeBytes: Long,
     val title: String? = null,
     val description: String? = null,
-    val sourceDetail: String? = null,
     val tags: List<String> = emptyList(),
 )

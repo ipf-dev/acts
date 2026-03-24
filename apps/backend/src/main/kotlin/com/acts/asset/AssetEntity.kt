@@ -32,11 +32,6 @@ class AssetEntity(
     var assetStatus: AssetStatus,
     @Column(columnDefinition = "text")
     var description: String? = null,
-    @Enumerated(EnumType.STRING)
-    @Column(name = "source_type", nullable = false)
-    var sourceType: AssetSourceType,
-    @Column(name = "source_detail")
-    var sourceDetail: String? = null,
     @Column(name = "original_file_name", nullable = false)
     var originalFileName: String,
     @Column(name = "mime_type", nullable = false)

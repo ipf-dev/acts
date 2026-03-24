@@ -146,7 +146,7 @@ class AssetLifecycleServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = title,
                 description = "설명",
-                sourceDetail = "외부 등록",
+
                 tags = listOf("태그"),
             ),
             actorEmail = "coco@iportfolio.co.kr",

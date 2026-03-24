@@ -122,7 +122,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = "코코의 첫 모험 시나리오",
                 description = "축제에 가는 이야기 초안",
-                sourceDetail = "외부 등록",
+
                 tags = listOf("코코", "축제"),
             ),
             actorEmail = "coco@iportfolio.co.kr",
@@ -164,7 +164,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = "폴리17",
                 description = "한글 파일명 검색 테스트",
-                sourceDetail = "외부 등록",
+
                 tags = emptyList(),
             ),
             actorEmail = "coco@iportfolio.co.kr",
@@ -201,7 +201,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = "코코의 첫 모험 시나리오",
                 description = "축제에 가는 이야기 초안",
-                sourceDetail = "외부 등록",
+
                 tags = listOf("코코", "축제"),
             ),
             actorEmail = "coco@iportfolio.co.kr",
@@ -253,7 +253,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = "이미지 프리뷰 테스트",
                 description = "프리뷰 설명",
-                sourceDetail = "외부 등록",
+
                 tags = listOf("이미지"),
             ),
             actorEmail = "coco@iportfolio.co.kr",
@@ -299,7 +299,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 12L,
                 title = "영상 프리뷰 테스트",
                 description = "썸네일 생성",
-                sourceDetail = "외부 등록",
+
                 tags = listOf("영상"),
             ),
             actorEmail = "coco@iportfolio.co.kr",
@@ -337,7 +337,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = "코코의 첫 모험 시나리오",
                 description = "초기 설명",
-                sourceDetail = "외부 등록",
+
                 tags = listOf("코코", "축제"),
             ),
             actorEmail = "coco@iportfolio.co.kr",
@@ -525,7 +525,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = title,
                 description = "설명",
-                sourceDetail = "외부 등록",
+
                 tags = listOf("태그"),
             ),
             actorEmail = actorEmail,

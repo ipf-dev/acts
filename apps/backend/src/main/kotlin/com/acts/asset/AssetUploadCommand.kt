@@ -6,7 +6,6 @@ data class AssetUploadCommand(
     val title: String?,
     val description: String?,
     val requestedTags: List<String>,
-    val sourceDetail: String?,
     val fileName: String,
     val contentType: String?,
     val contentBytes: ByteArray,

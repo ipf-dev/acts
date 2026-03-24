@@ -279,8 +279,6 @@ function AssetMetadataPanel({ asset }: { asset: AssetDetailView }): React.JSX.El
   return (
     <div className="grid grid-cols-2 gap-3">
       <MetadataCard label="카테고리" value={typeLabelMap[asset.type]} />
-      <MetadataCard label="저장 타입" value={asset.sourceType} />
-      <MetadataCard label="생성 루트" value={asset.sourceDetail ?? "외부 등록"} />
       <MetadataCard label="콘텐츠 ID" value={String(asset.id)} />
     </div>
   );

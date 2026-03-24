@@ -262,8 +262,6 @@ export function AssetDetailPage({
                       <section className="grid gap-6 border-y border-border py-5 sm:grid-cols-2">
                         <AssetDataField label="카테고리" value={typeLabelMap[asset.type]} />
                         <AssetDataField label="파일 형식" value={asset.fileExtension ?? asset.mimeType} />
-                        <AssetDataField label="생성 루트" value={asset.sourceDetail ?? "외부 등록"} />
-                        <AssetDataField label="저장 타입" value={asset.sourceType} />
                         <AssetDataField label="원본 파일명" value={asset.originalFileName} />
                         <AssetDataField label="파일 크기" value={formatFileSize(asset.fileSizeBytes)} />
                       </section>

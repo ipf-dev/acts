@@ -8,8 +8,6 @@ data class AssetSummaryResponse(
     val type: AssetType,
     val status: AssetStatus,
     val description: String?,
-    val sourceType: AssetSourceType,
-    val sourceDetail: String?,
     val originalFileName: String,
     val mimeType: String,
     val fileSizeBytes: Long,

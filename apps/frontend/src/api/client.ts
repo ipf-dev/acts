@@ -156,7 +156,6 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
             fileSizeBytes: input.file.size,
             title: input.title,
             description: input.description,
-            sourceDetail: input.sourceDetail,
             tags: input.tags,
           }),
         }
