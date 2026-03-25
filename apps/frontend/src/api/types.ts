@@ -95,17 +95,21 @@ export interface UserFeatureAccessInput {
 }
 
 export type AssetTypeView = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" | "SCENARIO" | "OTHER";
+export type AssetSourceKindView = "FILE" | "LINK";
 export type AssetStatusView = "READY";
 export interface AssetSummaryView {
   id: number;
   title: string;
   type: AssetTypeView;
+  sourceKind: AssetSourceKindView;
   status: AssetStatusView;
   description: string | null;
   originalFileName: string;
   mimeType: string;
   fileSizeBytes: number;
   fileExtension: string | null;
+  linkUrl: string | null;
+  linkType: string | null;
   versionNumber: number;
   ownerEmail: string;
   ownerName: string;
@@ -129,6 +133,17 @@ export interface AssetUploadInput {
   tags: string[];
   widthPx?: number;
   heightPx?: number;
+}
+
+export interface AssetLinkRegistrationItemInput {
+  url: string;
+  title?: string;
+  linkType?: string;
+  tags: string[];
+}
+
+export interface AssetLinkRegistrationInput {
+  links: AssetLinkRegistrationItemInput[];
 }
 
 export interface DeletedAssetView {
@@ -174,6 +189,6 @@ export interface AssetEventView {
 }
 
 export interface AssetDetailView extends AssetSummaryView {
-  currentFile: AssetFileView;
+  currentFile: AssetFileView | null;
   events: AssetEventView[];
 }

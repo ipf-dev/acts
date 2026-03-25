@@ -1,6 +1,6 @@
 import type { AssetTypeView } from "../../api/types";
 
-export interface AssetUploadDraftView {
+export interface AssetFileUploadDraftView {
   description: string;
   id: string;
   file: File;
@@ -13,4 +13,21 @@ export interface AssetUploadDraftView {
   tags: string[];
   title: string;
   type: AssetTypeView;
+}
+
+export interface AssetLinkDraftView {
+  id: string;
+  linkType: string;
+  tagInput: string;
+  tags: string[];
+  title: string;
+  url: string;
+}
+
+export interface AssetLinkComposerView {
+  linkType: string;
+  tagInput: string;
+  tags: string[];
+  title: string;
+  url: string;
 }

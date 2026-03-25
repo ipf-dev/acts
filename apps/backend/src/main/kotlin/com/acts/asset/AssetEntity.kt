@@ -28,6 +28,9 @@ class AssetEntity(
     @Column(name = "asset_type", nullable = false)
     var assetType: AssetType,
     @Enumerated(EnumType.STRING)
+    @Column(name = "source_kind", nullable = false)
+    var sourceKind: AssetSourceKind = AssetSourceKind.FILE,
+    @Enumerated(EnumType.STRING)
     @Column(name = "asset_status", nullable = false)
     var assetStatus: AssetStatus,
     @Column(columnDefinition = "text")
@@ -40,6 +43,10 @@ class AssetEntity(
     var fileSizeBytes: Long,
     @Column(name = "file_extension")
     var fileExtension: String? = null,
+    @Column(name = "link_url", columnDefinition = "text")
+    var linkUrl: String? = null,
+    @Column(name = "link_type")
+    var linkType: String? = null,
     @Column(name = "owner_email", nullable = false)
     var ownerEmail: String,
     @Column(name = "owner_name", nullable = false)

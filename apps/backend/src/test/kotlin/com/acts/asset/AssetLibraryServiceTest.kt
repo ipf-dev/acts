@@ -18,6 +18,7 @@ import org.mockito.kotlin.argThat
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.any
+import org.mockito.kotlin.never
 import org.mockito.kotlin.whenever
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -190,6 +191,52 @@ class AssetLibraryServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `registers link assets without S3 upload and exposes them in search detail`() {
+        val registeredLinks = assetLibraryService.registerLinks(
+            request = AssetLinkRegistrationRequest(
+                links = listOf(
+                    AssetLinkRegistrationItemRequest(
+                        url = "youtube.com/watch?v=demo",
+                        title = "레퍼런스 영상",
+                        linkType = "",
+                        tags = listOf("레퍼런스", "영상"),
+                    ),
+                    AssetLinkRegistrationItemRequest(
+                        url = "https://drive.google.com/file/d/abc123/view",
+                        title = "",
+                        linkType = "Google Drive",
+                        tags = listOf("시나리오", "최종본"),
+                    ),
+                ),
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+
+        val youtubeAsset = registeredLinks.first { asset -> asset.linkType == "YouTube" }
+        val searchedAssets = assetLibraryService.listAssets(
+            actorEmail = "tony@iportfolio.co.kr",
+            query = AssetListQuery(search = "youtube 레퍼런스"),
+        )
+        val assetDetail = assetLibraryService.getAsset(
+            assetId = youtubeAsset.id,
+            actorEmail = "tony@iportfolio.co.kr",
+        )
+
+        assertThat(registeredLinks).hasSize(2)
+        assertThat(youtubeAsset.sourceKind).isEqualTo(AssetSourceKind.LINK)
+        assertThat(youtubeAsset.type).isEqualTo(AssetType.VIDEO)
+        assertThat(youtubeAsset.linkUrl).isEqualTo("https://youtube.com/watch?v=demo")
+        assertThat(youtubeAsset.canDownload).isFalse()
+        assertThat(searchedAssets).extracting("id").contains(youtubeAsset.id)
+        assertThat(assetDetail.currentFile).isNull()
+        assertThat(assetDetail.linkUrl).isEqualTo("https://youtube.com/watch?v=demo")
+        assertThat(assetDetail.events.first().eventType).isEqualTo(AssetEventType.CREATED)
+        verify(assetBinaryStorage, never()).presignUploadUrl(any(), any(), any())
+        verify(assetBinaryStorage, never()).store(any(), any(), any())
+    }
+
+    @Test
     fun `returns asset detail with history and downloadable file`() {
         val intentResponse = assetLibraryService.initiateUpload(
             request = AssetUploadIntentRequest(
@@ -222,7 +269,8 @@ class AssetLibraryServiceTest @Autowired constructor(
             actorEmail = "coco@iportfolio.co.kr",
         )
 
-        assertThat(assetDetail.currentFile.originalFileName).isEqualTo("coco_festival_story.txt")
+        assertThat(assetDetail.currentFile).isNotNull
+        assertThat(assetDetail.currentFile?.originalFileName).isEqualTo("coco_festival_story.txt")
         assertThat(assetDetail.events).hasSize(1)
         assertThat(assetDetail.events.single().eventType).isEqualTo(AssetEventType.CREATED)
         assertThat(assetDetail.tags).contains("코코", "축제")
@@ -470,6 +518,19 @@ class AssetLibraryServiceTest @Autowired constructor(
             actorName = "Tony",
             title = "콘텐츠 애셋",
             fileName = "content-export.txt",
+        )
+        assetLibraryService.registerLinks(
+            request = AssetLinkRegistrationRequest(
+                links = listOf(
+                    AssetLinkRegistrationItemRequest(
+                        url = "https://www.notion.so/harmony/demo",
+                        title = "노션 링크",
+                        tags = listOf("문서"),
+                    ),
+                ),
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
         )
 
         val exportResult = assetLibraryService.exportAssets("leader@iportfolio.co.kr")

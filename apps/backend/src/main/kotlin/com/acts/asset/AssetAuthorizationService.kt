@@ -26,7 +26,7 @@ class AssetAuthorizationService(
     ): AssetPermissionSnapshot = AssetPermissionSnapshot(
         canEdit = canEdit(actor, asset),
         canDelete = canDelete(actor, asset),
-        canDownload = true,
+        canDownload = asset.sourceKind == AssetSourceKind.FILE,
     )
 
     fun requireViewAccess(

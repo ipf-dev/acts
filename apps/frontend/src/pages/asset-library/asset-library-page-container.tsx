@@ -9,7 +9,10 @@ import {
 import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../api/types";
 import { getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
 import { AssetLibraryPage } from "./asset-library-page";
-import type { AssetUploadDraftView } from "./asset-library-page-model";
+import type {
+  AssetFileUploadDraftView,
+  AssetLinkDraftView
+} from "./asset-library-page-model";
 
 interface AssetLibraryPageState {
   assetDetail: AssetDetailView | null;
@@ -96,7 +99,7 @@ export function AssetLibraryPageContainer({
     };
   }, []);
 
-  async function handleUploadAssets(drafts: AssetUploadDraftView[]): Promise<void> {
+  async function handleUploadAssets(drafts: AssetFileUploadDraftView[]): Promise<void> {
     setState((currentState) => ({
       ...currentState,
       authErrorMessage: null,
@@ -128,6 +131,45 @@ export function AssetLibraryPageContainer({
         ...currentState,
         authErrorMessage: getAssetApiErrorMessage(error, {
           fallback: "자산 업로드에 실패했습니다."
+        }),
+        isUploading: false
+      }));
+    }
+  }
+
+  async function handleRegisterAssetLinks(drafts: AssetLinkDraftView[]): Promise<void> {
+    setState((currentState) => ({
+      ...currentState,
+      authErrorMessage: null,
+      authSuccessMessage: null,
+      isUploading: true
+    }));
+
+    try {
+      await dashboardApi.registerAssetLinks({
+        links: drafts.map((draft) => ({
+          linkType: draft.linkType,
+          tags: draft.tags,
+          title: draft.title,
+          url: draft.url
+        }))
+      });
+
+      const [assets, session] = await Promise.all([dashboardApi.listAssets(), dashboardApi.getSession()]);
+
+      setState((currentState) => ({
+        ...currentState,
+        assets,
+        authSuccessMessage: `${drafts.length}개 링크 등록이 완료되었습니다.`,
+        isUploading: false,
+        session
+      }));
+    } catch (error: unknown) {
+      setState((currentState) => ({
+        ...currentState,
+        authErrorMessage: getAssetApiErrorMessage(error, {
+          badRequest: "링크 정보가 올바르지 않습니다.",
+          fallback: "링크 등록에 실패했습니다."
         }),
         isUploading: false
       }));
@@ -279,6 +321,7 @@ export function AssetLibraryPageContainer({
       onExportAssets={handleExportAssets}
       onOpenAssetDetail={handleOpenAssetDetail}
       onOpenAssetPage={onOpenAssetPage}
+      onRegisterAssetLinks={handleRegisterAssetLinks}
       onSearchQueryChange={onSearchQueryChange}
       onUploadAssets={handleUploadAssets}
       searchQuery={searchQuery}

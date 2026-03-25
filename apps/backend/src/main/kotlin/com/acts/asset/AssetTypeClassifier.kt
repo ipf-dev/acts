@@ -21,6 +21,28 @@ class AssetTypeClassifier {
         }
     }
 
+    fun classifyLink(
+        url: String,
+        linkType: String?,
+    ): AssetType {
+        val normalizedUrl = url.lowercase()
+        val normalizedLinkType = linkType?.lowercase().orEmpty()
+
+        return when {
+            normalizedLinkType.contains("youtube") ||
+                normalizedUrl.contains("youtube.com") ||
+                normalizedUrl.contains("youtu.be") -> AssetType.VIDEO
+            normalizedLinkType.contains("drive") ||
+                normalizedLinkType.contains("document") ||
+                normalizedLinkType.contains("notion") ||
+                normalizedUrl.contains("drive.google.com") ||
+                normalizedUrl.contains("docs.google.com") ||
+                normalizedUrl.contains("notion.so") ||
+                normalizedUrl.contains("notion.site") -> AssetType.DOCUMENT
+            else -> AssetType.OTHER
+        }
+    }
+
     companion object {
         private val imageExtensions = setOf("png", "jpg", "jpeg", "gif", "webp", "svg")
         private val videoExtensions = setOf("mp4", "mov", "avi", "m4v", "webm")

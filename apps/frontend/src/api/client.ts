@@ -2,6 +2,7 @@ import type {
   AssetDetailView,
   AssetRetentionPolicyInput,
   AssetRetentionPolicyView,
+  AssetLinkRegistrationInput,
   AssetSummaryView,
   AssetUpdateInput,
   AssetUploadInput,
@@ -27,6 +28,7 @@ export interface DashboardApi {
   getAssetRetentionPolicy(): Promise<AssetRetentionPolicyView>;
   listDeletedAssets(): Promise<DeletedAssetView[]>;
   listAssets(): Promise<AssetSummaryView[]>;
+  registerAssetLinks(input: AssetLinkRegistrationInput): Promise<AssetSummaryView[]>;
   restoreAsset(assetId: number): Promise<void>;
   updateAsset(assetId: number, input: AssetUpdateInput): Promise<AssetDetailView>;
   updateAssetRetentionPolicy(input: AssetRetentionPolicyInput): Promise<AssetRetentionPolicyView>;
@@ -115,6 +117,15 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     },
     async listAssets() {
       return readJson<AssetSummaryView[]>("/api/assets");
+    },
+    async registerAssetLinks(input) {
+      return readJson<AssetSummaryView[]>("/api/assets/links", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
     },
     async restoreAsset(assetId) {
       const response = await fetchFn(`/api/assets/${assetId}/restore`, {

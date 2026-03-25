@@ -28,7 +28,14 @@ import { formatFileSize, typeLabelMap } from "./asset-detail-model";
 import { AssetTypeIcon } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
 import { AssetUploadModal } from "./asset-upload-modal";
-import type { AssetUploadDraftView } from "./asset-library-page-model";
+import {
+  getAssetPrimaryText
+} from "./asset-library-utils";
+import type {
+  AssetFileUploadDraftView,
+  AssetLinkComposerView,
+  AssetLinkDraftView
+} from "./asset-library-page-model";
 
 interface AssetLibraryPageProps {
   assetDetail: AssetDetailView | null;
@@ -47,13 +54,15 @@ interface AssetLibraryPageProps {
   onExportAssets: () => Promise<void>;
   onOpenAssetDetail: (assetId: number) => void;
   onOpenAssetPage: (assetId: number) => void;
+  onRegisterAssetLinks: (drafts: AssetLinkDraftView[]) => Promise<void>;
   onSearchQueryChange: (value: string) => void;
-  onUploadAssets: (drafts: AssetUploadDraftView[]) => Promise<void>;
+  onUploadAssets: (drafts: AssetFileUploadDraftView[]) => Promise<void>;
   searchQuery: string;
   session: AuthSessionView;
 }
 
 type AssetLibraryLayoutMode = "grid" | "list";
+type AssetUploadMode = "FILE" | "LINK";
 
 const cardDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "short"
@@ -76,28 +85,32 @@ export function AssetLibraryPage({
   onExportAssets,
   onOpenAssetDetail,
   onOpenAssetPage,
+  onRegisterAssetLinks,
   onSearchQueryChange,
   onUploadAssets,
   searchQuery,
   session
 }: AssetLibraryPageProps): React.JSX.Element {
   const [creatorFilter, setCreatorFilter] = useState("ALL");
-  const [drafts, setDrafts] = useState<AssetUploadDraftView[]>([]);
+  const [fileDrafts, setFileDrafts] = useState<AssetFileUploadDraftView[]>([]);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<AssetLibraryLayoutMode>("grid");
+  const [linkComposer, setLinkComposer] = useState<AssetLinkComposerView>(createEmptyLinkComposer());
+  const [linkDrafts, setLinkDrafts] = useState<AssetLinkDraftView[]>([]);
   const [organizationFilter, setOrganizationFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
+  const [uploadMode, setUploadMode] = useState<AssetUploadMode>("FILE");
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const draftsRef = useRef<AssetUploadDraftView[]>([]);
+  const fileDraftsRef = useRef<AssetFileUploadDraftView[]>([]);
 
   useEffect(() => {
-    draftsRef.current = drafts;
-  }, [drafts]);
+    fileDraftsRef.current = fileDrafts;
+  }, [fileDrafts]);
 
   useEffect(() => {
     return () => {
-      draftsRef.current.forEach((draft) => {
+      fileDraftsRef.current.forEach((draft) => {
         if (draft.previewUrl) {
           URL.revokeObjectURL(draft.previewUrl);
         }
@@ -123,6 +136,8 @@ export function AssetLibraryPage({
       asset.title,
       asset.description ?? "",
       asset.originalFileName,
+      asset.linkType ?? "",
+      asset.linkUrl ?? "",
       asset.ownerName,
       asset.organizationName ?? "",
       ...asset.tags
@@ -162,7 +177,7 @@ export function AssetLibraryPage({
   async function handleFileDrop(files: File[]): Promise<void> {
     const nextDrafts = await Promise.all(files.map((file) => createDraftFromFile(file)));
 
-    setDrafts((currentDrafts) => {
+    setFileDrafts((currentDrafts) => {
       const existingNames = new Set(currentDrafts.map((draft) => `${draft.file.name}:${draft.file.size}`));
       const uniqueDrafts = nextDrafts.filter((draft) => {
         const isDuplicate = existingNames.has(`${draft.file.name}:${draft.file.size}`);
@@ -176,7 +191,7 @@ export function AssetLibraryPage({
   }
 
   function handleRemoveDraft(draftId: string): void {
-    setDrafts((currentDrafts) =>
+    setFileDrafts((currentDrafts) =>
       currentDrafts.filter((draft) => {
         if (draft.id === draftId && draft.previewUrl) {
           URL.revokeObjectURL(draft.previewUrl);
@@ -187,25 +202,25 @@ export function AssetLibraryPage({
   }
 
   function handleTitleChange(draftId: string, value: string): void {
-    setDrafts((currentDrafts) =>
+    setFileDrafts((currentDrafts) =>
       currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, title: value } : draft))
     );
   }
 
   function handleDescriptionChange(draftId: string, value: string): void {
-    setDrafts((currentDrafts) =>
+    setFileDrafts((currentDrafts) =>
       currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, description: value } : draft))
     );
   }
 
   function handleTagInputChange(draftId: string, value: string): void {
-    setDrafts((currentDrafts) =>
+    setFileDrafts((currentDrafts) =>
       currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, tagInput: value } : draft))
     );
   }
 
   function handleAddTag(draftId: string): void {
-    setDrafts((currentDrafts) =>
+    setFileDrafts((currentDrafts) =>
       currentDrafts.map((draft) => {
         if (draft.id !== draftId) {
           return draft;
@@ -226,21 +241,94 @@ export function AssetLibraryPage({
   }
 
   function handleRemoveTag(draftId: string, tag: string): void {
-    setDrafts((currentDrafts) =>
+    setFileDrafts((currentDrafts) =>
       currentDrafts.map((draft) =>
         draft.id === draftId ? { ...draft, tags: draft.tags.filter((value) => value !== tag) } : draft
       )
     );
   }
 
-  async function handleUploadSubmit(): Promise<void> {
-    await onUploadAssets(drafts);
-    drafts.forEach((draft) => {
-      if (draft.previewUrl) {
-        URL.revokeObjectURL(draft.previewUrl);
+  function handleLinkComposerChange(
+    key: keyof AssetLinkComposerView,
+    value: string | string[]
+  ): void {
+    setLinkComposer((currentComposer) => ({
+      ...currentComposer,
+      [key]: value
+    }));
+  }
+
+  function handleAddLinkComposerTag(): void {
+    const normalizedTag = normalizeTag(linkComposer.tagInput);
+    if (!normalizedTag) {
+      return;
+    }
+
+    setLinkComposer((currentComposer) => ({
+      ...currentComposer,
+      tagInput: "",
+      tags: currentComposer.tags.includes(normalizedTag)
+        ? currentComposer.tags
+        : [...currentComposer.tags, normalizedTag]
+    }));
+  }
+
+  function handleRemoveLinkComposerTag(tag: string): void {
+    setLinkComposer((currentComposer) => ({
+      ...currentComposer,
+      tags: currentComposer.tags.filter((value) => value !== tag)
+    }));
+  }
+
+  function handleAddLinkDraft(): void {
+    const normalizedUrl = normalizeUrlInput(linkComposer.url);
+    if (!normalizedUrl) {
+      return;
+    }
+
+    const host = extractLinkHost(normalizedUrl);
+    const resolvedTitle = normalizeDisplayValue(linkComposer.title).trim() || host;
+    const resolvedLinkType = normalizeDisplayValue(linkComposer.linkType).trim() || inferLinkType(normalizedUrl);
+
+    setLinkDrafts((currentDrafts) => {
+      if (currentDrafts.some((draft) => draft.url === normalizedUrl)) {
+        return currentDrafts;
       }
+
+      return [
+        ...currentDrafts,
+        {
+          id: crypto.randomUUID(),
+          linkType: resolvedLinkType,
+          tagInput: "",
+          tags: linkComposer.tags,
+          title: resolvedTitle,
+          url: normalizedUrl
+        }
+      ];
     });
-    setDrafts([]);
+    setLinkComposer(createEmptyLinkComposer());
+  }
+
+  function handleRemoveLinkDraft(draftId: string): void {
+    setLinkDrafts((currentDrafts) => currentDrafts.filter((draft) => draft.id !== draftId));
+  }
+
+  async function handleUploadSubmit(): Promise<void> {
+    if (uploadMode === "FILE") {
+      await onUploadAssets(fileDrafts);
+      fileDrafts.forEach((draft) => {
+        if (draft.previewUrl) {
+          URL.revokeObjectURL(draft.previewUrl);
+        }
+      });
+      setFileDrafts([]);
+    } else {
+      await onRegisterAssetLinks(linkDrafts);
+      setLinkDrafts([]);
+      setLinkComposer(createEmptyLinkComposer());
+    }
+
     setIsUploadModalOpen(false);
   }
 
@@ -251,6 +339,8 @@ export function AssetLibraryPage({
     setOrganizationFilter("ALL");
     setCreatorFilter("ALL");
   }
+
+  const activeDraftCount = uploadMode === "FILE" ? fileDrafts.length : linkDrafts.length;
 
   return (
     <section className="space-y-6">
@@ -438,6 +528,7 @@ export function AssetLibraryPage({
                     >
                       <AssetPreviewPanel
                         assetId={asset.id}
+                        sourceKind={asset.sourceKind}
                         assetType={asset.type}
                         cacheKey={asset.updatedAt}
                         className="aspect-[16/10] w-full"
@@ -457,10 +548,15 @@ export function AssetLibraryPage({
                       </div>
 
                       <p className="mt-4 line-clamp-2 min-h-[40px] text-[13px] leading-5 text-muted-foreground">
-                        {asset.description ?? asset.originalFileName}
+                        {getAssetPrimaryText(asset)}
                       </p>
 
                       <div className="mt-3 flex flex-wrap gap-1.5">
+                        {asset.sourceKind === "LINK" ? (
+                          <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] text-foreground/80">
+                            {asset.linkType ?? "링크"}
+                          </span>
+                        ) : null}
                         {asset.tags.slice(0, 3).map((tag) => (
                           <span
                             className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground/80"
@@ -521,6 +617,7 @@ export function AssetLibraryPage({
                               <div className="flex items-center gap-3">
                                 <AssetPreviewPanel
                                   assetId={asset.id}
+                                  sourceKind={asset.sourceKind}
                                   assetType={asset.type}
                                   cacheKey={asset.updatedAt}
                                   className="h-12 w-16 flex-none rounded-xl"
@@ -529,7 +626,7 @@ export function AssetLibraryPage({
                                 <div className="min-w-0">
                                   <p className="line-clamp-1 font-medium">{asset.title}</p>
                                   <p className="mt-1 text-xs text-muted-foreground">
-                                    {asset.description ?? asset.originalFileName}
+                                    {getAssetPrimaryText(asset)}
                                   </p>
                                 </div>
                               </div>
@@ -599,18 +696,27 @@ export function AssetLibraryPage({
       )}
 
       <AssetUploadModal
-        drafts={drafts}
+        fileDrafts={fileDrafts}
         isOpen={isUploadModalOpen && session.authenticated}
         isUploading={isUploading}
+        linkComposer={linkComposer}
+        linkDrafts={linkDrafts}
+        onActiveTabChange={setUploadMode}
+        onAddLinkDraft={handleAddLinkDraft}
         onAddTag={handleAddTag}
         onClose={() => setIsUploadModalOpen(false)}
         onDescriptionChange={handleDescriptionChange}
         onFileDrop={handleFileDrop}
+        onLinkComposerChange={handleLinkComposerChange}
+        onLinkTagAdd={handleAddLinkComposerTag}
+        onLinkTagRemove={handleRemoveLinkComposerTag}
+        onRemoveLinkDraft={handleRemoveLinkDraft}
         onRemoveDraft={handleRemoveDraft}
         onRemoveTag={handleRemoveTag}
         onSubmit={handleUploadSubmit}
         onTagInputChange={handleTagInputChange}
         onTitleChange={handleTitleChange}
+        uploadMode={uploadMode}
       />
       <AssetDetailModal
         asset={assetDetail}
@@ -627,7 +733,7 @@ export function AssetLibraryPage({
   );
 }
 
-async function createDraftFromFile(file: File): Promise<AssetUploadDraftView> {
+async function createDraftFromFile(file: File): Promise<AssetFileUploadDraftView> {
   const type = inferAssetType(file);
   const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
   const dimensions = previewUrl ? await readImageSize(previewUrl) : null;
@@ -646,6 +752,16 @@ async function createDraftFromFile(file: File): Promise<AssetUploadDraftView> {
     tags: createSuggestedTags(normalizedFileName, type),
     title: normalizeDisplayValue(normalizedFileName.replace(/\.[^/.]+$/, "")),
     type
+  };
+}
+
+function createEmptyLinkComposer(): AssetLinkComposerView {
+  return {
+    linkType: "",
+    tagInput: "",
+    tags: [],
+    title: "",
+    url: ""
   };
 }
 
@@ -686,6 +802,15 @@ function normalizeTag(value: string): string | null {
   return isBlank(normalizedValue) ? null : normalizedValue;
 }
 
+function normalizeUrlInput(value: string): string | null {
+  const normalizedValue = normalizeDisplayValue(value).trim();
+  if (isBlank(normalizedValue)) {
+    return null;
+  }
+
+  return normalizedValue.includes("://") ? normalizedValue : `https://${normalizedValue}`;
+}
+
 function normalizeDisplayValue(value: string): string {
   return value.normalize("NFC");
 }
@@ -711,6 +836,30 @@ function readImageSize(previewUrl: string): Promise<{ height: number; width: num
     };
     image.src = previewUrl;
   });
+}
+
+function extractLinkHost(url: string): string {
+  try {
+    return new URL(url).host.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function inferLinkType(url: string): string {
+  const host = extractLinkHost(url).toLowerCase();
+
+  if (host.includes("drive.google.com") || host.includes("docs.google.com")) {
+    return "Google Drive";
+  }
+  if (host.includes("youtube.com") || host.includes("youtu.be")) {
+    return "YouTube";
+  }
+  if (host.includes("notion.so") || host.includes("notion.site")) {
+    return "Notion";
+  }
+
+  return extractLinkHost(url);
 }
 
 const assetTypeOptions: AssetSummaryView["type"][] = [

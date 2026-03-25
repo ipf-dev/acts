@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import type React from "react";
 import { Film } from "lucide-react";
-import type { AssetSummaryView } from "../../api/types";
+import type { AssetSourceKindView, AssetSummaryView } from "../../api/types";
 import { cn } from "../../lib/utils";
 import { buildAssetPreviewUrl } from "./asset-library-utils";
 import { AssetTypeIcon } from "./asset-detail-section";
 
 interface AssetPreviewPanelProps {
   assetId: number;
+  sourceKind: AssetSourceKindView;
   assetType: AssetSummaryView["type"];
   cacheKey: string;
   className?: string;
@@ -17,6 +18,7 @@ interface AssetPreviewPanelProps {
 
 export function AssetPreviewPanel({
   assetId,
+  sourceKind,
   assetType,
   cacheKey,
   className,
@@ -24,11 +26,11 @@ export function AssetPreviewPanel({
   title
 }: AssetPreviewPanelProps): React.JSX.Element {
   const [hasPreviewError, setHasPreviewError] = useState(false);
-  const isPreviewable = assetType === "IMAGE" || assetType === "VIDEO";
+  const isPreviewable = sourceKind === "FILE" && (assetType === "IMAGE" || assetType === "VIDEO");
 
   useEffect(() => {
     setHasPreviewError(false);
-  }, [assetId, assetType, cacheKey]);
+  }, [assetId, sourceKind, assetType, cacheKey]);
 
   if (!isPreviewable || hasPreviewError) {
     return (

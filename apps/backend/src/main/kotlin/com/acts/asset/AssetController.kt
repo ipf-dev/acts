@@ -300,6 +300,30 @@ class AssetController(
         }
     }
 
+    @PostMapping("/links", consumes = ["application/json"])
+    fun registerLinks(
+        authentication: Authentication?,
+        @RequestBody request: AssetLinkRegistrationRequest,
+    ): ResponseEntity<List<AssetSummaryResponse>> {
+        val actorEmail = currentActorEmail(authentication)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+        val actorName = currentActorName(authentication)
+
+        return try {
+            ResponseEntity.ok(
+                assetLibraryService.registerLinks(
+                    request = request,
+                    actorEmail = actorEmail,
+                    actorName = actorName,
+                ),
+            )
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
+    }
+
     @PostMapping("/{assetId}/complete", consumes = ["application/json"])
     fun completeUpload(
         authentication: Authentication?,

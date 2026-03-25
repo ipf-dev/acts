@@ -3,6 +3,7 @@ import type React from "react";
 import {
   ChevronRight,
   Download,
+  ExternalLink,
   MoreHorizontal,
   Save,
   Trash2,
@@ -40,6 +41,7 @@ import {
   AssetTypeIcon
 } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
+import { getAssetPrimaryText, openAssetExternalLink } from "./asset-library-utils";
 
 interface AssetDetailPageProps {
   asset: AssetDetailView | null;
@@ -81,6 +83,7 @@ export function AssetDetailPage({
   const canDelete = asset?.canDelete ?? false;
   const canEdit = asset?.canEdit ?? false;
   const canDownload = asset?.canDownload ?? false;
+  const isLinkAsset = asset?.sourceKind === "LINK";
 
   useEffect(() => {
     if (!asset) {
@@ -196,15 +199,26 @@ export function AssetDetailPage({
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
-                className="h-10 rounded-xl bg-primary px-4 text-sm"
-                disabled={!canDownload || isDownloading}
-                onClick={() => void onDownload()}
-                type="button"
-              >
-                <Download className="h-4 w-4" />
-                {isDownloading ? "다운로드 중" : "다운로드"}
-              </Button>
+              {isLinkAsset && asset?.linkUrl ? (
+                <Button
+                  className="h-10 rounded-xl bg-primary px-4 text-sm"
+                  onClick={() => openAssetExternalLink(asset.linkUrl!)}
+                  type="button"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  외부 열기
+                </Button>
+              ) : (
+                <Button
+                  className="h-10 rounded-xl bg-primary px-4 text-sm"
+                  disabled={!canDownload || isDownloading}
+                  onClick={() => void onDownload()}
+                  type="button"
+                >
+                  <Download className="h-4 w-4" />
+                  {isDownloading ? "다운로드 중" : "다운로드"}
+                </Button>
+              )}
               {canDelete ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -246,6 +260,7 @@ export function AssetDetailPage({
                     <CardContent className="space-y-6 p-6">
                       <AssetPreviewPanel
                         assetId={asset.id}
+                        sourceKind={asset.sourceKind}
                         assetType={asset.type}
                         cacheKey={asset.updatedAt}
                         className="aspect-[16/9] w-full rounded-[20px]"
@@ -255,15 +270,29 @@ export function AssetDetailPage({
                       <section className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">설명</p>
                         <p className="text-sm leading-7 text-foreground">
-                          {asset.description ?? asset.originalFileName}
+                          {getAssetPrimaryText(asset)}
                         </p>
                       </section>
 
                       <section className="grid gap-6 border-y border-border py-5 sm:grid-cols-2">
                         <AssetDataField label="카테고리" value={typeLabelMap[asset.type]} />
-                        <AssetDataField label="파일 형식" value={asset.fileExtension ?? asset.mimeType} />
-                        <AssetDataField label="원본 파일명" value={asset.originalFileName} />
-                        <AssetDataField label="파일 크기" value={formatFileSize(asset.fileSizeBytes)} />
+                        {asset.sourceKind === "FILE" ? (
+                          <>
+                            <AssetDataField label="파일 형식" value={asset.fileExtension ?? asset.mimeType} />
+                            <AssetDataField label="원본 파일명" value={asset.originalFileName} />
+                            <AssetDataField label="파일 크기" value={formatFileSize(asset.fileSizeBytes)} />
+                          </>
+                        ) : (
+                          <>
+                            <AssetDataField label="링크 유형" value={asset.linkType ?? "링크"} />
+                            <AssetDataField
+                              label="URL"
+                              value={asset.linkUrl ?? "-"}
+                              valueClassName="break-all text-[13px] font-normal leading-5 text-muted-foreground"
+                            />
+                            <AssetDataField label="소스" value="외부 링크" />
+                          </>
+                        )}
                       </section>
 
                       <section className="space-y-2">
@@ -311,12 +340,29 @@ export function AssetDetailPage({
                   <Card className="rounded-[24px] border-border shadow-none">
                     <CardContent className="space-y-5 p-6">
                       <section className="grid gap-4 sm:grid-cols-2">
-                        <AssetDataField label="MIME" value={asset.currentFile.mimeType} />
-                        <AssetDataField label="현재 버전" value={`v${asset.currentFile.versionNumber}`} />
                         <AssetDataField
-                          label="체크섬"
-                          value={asset.currentFile.checksumSha256?.slice(0, 12) ?? "계산 중"}
+                          label="소스"
+                          value={asset.sourceKind === "FILE" ? "파일 업로드" : "외부 링크"}
                         />
+                        <AssetDataField label="현재 버전" value={`v${asset.versionNumber}`} />
+                        {asset.currentFile ? (
+                          <>
+                            <AssetDataField label="MIME" value={asset.currentFile.mimeType} />
+                            <AssetDataField
+                              label="체크섬"
+                              value={asset.currentFile.checksumSha256?.slice(0, 12) ?? "계산 중"}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <AssetDataField label="링크 유형" value={asset.linkType ?? "링크"} />
+                            <AssetDataField
+                              label="등록 URL"
+                              value={asset.linkUrl ?? "-"}
+                              valueClassName="break-all text-[13px] font-normal leading-5 text-muted-foreground"
+                            />
+                          </>
+                        )}
                         <AssetDataField
                           label="해상도"
                           value={
@@ -344,7 +390,11 @@ export function AssetDetailPage({
                           <AssetDataField label="소유자" value={asset.ownerName} />
                           <AssetDataField
                             label="조회 범위"
-                            value="모든 로그인 사용자가 목록, 상세, 다운로드에 접근할 수 있습니다."
+                            value={
+                              asset.sourceKind === "FILE"
+                                ? "모든 로그인 사용자가 목록, 상세, 다운로드에 접근할 수 있습니다."
+                                : "모든 로그인 사용자가 목록, 상세, 외부 링크 열기에 접근할 수 있습니다."
+                            }
                             valueClassName="text-[13px] font-normal leading-5 text-muted-foreground"
                           />
                         </div>
@@ -448,8 +498,16 @@ export function AssetDetailPage({
                             <AssetDataField label="삭제 권한" value={asset.canDelete ? "허용" : "불가"} />
                             <AssetDataField label="편집 권한" value={asset.canEdit ? "허용" : "불가"} />
                             <AssetDataField
-                              label="다운로드 권한"
-                              value={asset.canDownload ? "허용" : "불가"}
+                              label={asset.sourceKind === "FILE" ? "다운로드 권한" : "링크 열기"}
+                              value={
+                                asset.sourceKind === "FILE"
+                                  ? asset.canDownload
+                                    ? "허용"
+                                    : "불가"
+                                  : asset.linkUrl
+                                    ? "허용"
+                                    : "불가"
+                              }
                             />
                           </section>
                         )}

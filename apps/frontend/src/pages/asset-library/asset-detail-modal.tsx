@@ -3,6 +3,7 @@ import type React from "react";
 import {
   Download,
   Eye,
+  ExternalLink,
   Sparkles,
   Trash2,
   X
@@ -24,6 +25,7 @@ import {
   AssetTypeIcon
 } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
+import { getAssetPrimaryText, openAssetExternalLink } from "./asset-library-utils";
 
 interface AssetDetailModalProps {
   asset: AssetDetailView | null;
@@ -172,6 +174,7 @@ function AssetSummaryPanel({
       <section className="rounded-[18px] border border-[#dfe4f0] bg-[#fcfcfe] px-4 py-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]">
         <AssetPreviewPanel
           assetId={asset.id}
+          sourceKind={asset.sourceKind}
           assetType={asset.type}
           cacheKey={asset.updatedAt}
           className="mb-4 aspect-[16/9] w-full rounded-[16px]"
@@ -180,7 +183,7 @@ function AssetSummaryPanel({
 
         <div>
           <p className="text-[12px] text-muted-foreground">설명</p>
-          <p className="mt-1 text-[14px] leading-6 text-foreground">{asset.description ?? asset.originalFileName}</p>
+          <p className="mt-1 text-[14px] leading-6 text-foreground">{getAssetPrimaryText(asset)}</p>
         </div>
 
         <div className="my-4 h-px bg-border" />
@@ -191,7 +194,19 @@ function AssetSummaryPanel({
           <AssetDataField label="생성일" value={detailDateFormatter.format(new Date(asset.createdAt))} />
           <AssetDataField label="최종 수정일" value={detailDateFormatter.format(new Date(asset.updatedAt))} />
           <AssetDataField label="상태" value={<AssetStatusChip status={asset.status} />} />
-          <AssetDataField label="파일 크기" value={formatFileSize(asset.fileSizeBytes)} />
+          {asset.sourceKind === "FILE" ? (
+            <AssetDataField label="파일 크기" value={formatFileSize(asset.fileSizeBytes)} />
+          ) : (
+            <AssetDataField label="링크 유형" value={asset.linkType ?? "링크"} />
+          )}
+          {asset.sourceKind === "LINK" ? (
+            <AssetDataField
+              className="col-span-2"
+              label="링크"
+              value={asset.linkUrl ?? "-"}
+              valueClassName="break-all text-[13px] font-normal leading-5 text-muted-foreground"
+            />
+          ) : null}
         </div>
 
         <div className="my-4 h-px bg-border" />
@@ -218,15 +233,26 @@ function AssetSummaryPanel({
           <Eye className="h-4 w-4" />
           상세 보기
         </Button>
-        <Button
-          className="h-9 rounded-lg px-3 text-[13px] font-medium"
-          disabled={!asset.canDownload || isDownloading}
-          onClick={() => void onDownload(asset.id)}
-          type="button"
-        >
-          <Download className="h-4 w-4" />
-          {isDownloading ? "다운로드 중" : "다운로드"}
-        </Button>
+        {asset.sourceKind === "LINK" && asset.linkUrl ? (
+          <Button
+            className="h-9 rounded-lg px-3 text-[13px] font-medium"
+            onClick={() => openAssetExternalLink(asset.linkUrl!)}
+            type="button"
+          >
+            <ExternalLink className="h-4 w-4" />
+            외부 열기
+          </Button>
+        ) : (
+          <Button
+            className="h-9 rounded-lg px-3 text-[13px] font-medium"
+            disabled={!asset.canDownload || isDownloading}
+            onClick={() => void onDownload(asset.id)}
+            type="button"
+          >
+            <Download className="h-4 w-4" />
+            {isDownloading ? "다운로드 중" : "다운로드"}
+          </Button>
+        )}
         {asset.canDelete ? (
           <Button
             className="h-9 rounded-lg px-3 text-[13px] font-medium"
@@ -280,6 +306,11 @@ function AssetMetadataPanel({ asset }: { asset: AssetDetailView }): React.JSX.El
     <div className="grid grid-cols-2 gap-3">
       <MetadataCard label="카테고리" value={typeLabelMap[asset.type]} />
       <MetadataCard label="콘텐츠 ID" value={String(asset.id)} />
+      <MetadataCard label="소스" value={asset.sourceKind === "FILE" ? "파일" : "링크"} />
+      <MetadataCard
+        label={asset.sourceKind === "FILE" ? "원본 파일명" : "링크 유형"}
+        value={asset.sourceKind === "FILE" ? asset.originalFileName : asset.linkType ?? "링크"}
+      />
     </div>
   );
 }

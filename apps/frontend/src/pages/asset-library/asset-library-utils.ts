@@ -1,4 +1,5 @@
 import { ApiError, type DownloadedFile } from "../../api/client";
+import type { AssetSummaryView } from "../../api/types";
 
 interface AssetApiErrorMessages {
   badRequest?: string;
@@ -50,4 +51,20 @@ export function triggerFileDownload(file: DownloadedFile): void {
 
 export function buildAssetPreviewUrl(assetId: number, cacheKey: string): string {
   return `/api/assets/${assetId}/preview?v=${encodeURIComponent(cacheKey)}`;
+}
+
+export function getAssetPrimaryText(asset: Pick<AssetSummaryView, "description" | "linkUrl" | "originalFileName" | "sourceKind">): string {
+  if (asset.description) {
+    return asset.description;
+  }
+
+  if (asset.sourceKind === "LINK") {
+    return asset.linkUrl ?? asset.originalFileName;
+  }
+
+  return asset.originalFileName;
+}
+
+export function openAssetExternalLink(linkUrl: string): void {
+  window.open(linkUrl, "_blank", "noopener,noreferrer");
 }

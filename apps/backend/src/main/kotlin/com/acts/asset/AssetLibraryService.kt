@@ -16,6 +16,7 @@ import com.acts.auth.user.UserAccountRepository
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 import java.io.ByteArrayOutputStream
+import java.net.URI
 import java.text.Normalizer
 import java.time.Instant
 import java.time.ZoneOffset
@@ -41,6 +42,10 @@ class AssetLibraryService(
     private val assetTypeClassifier: AssetTypeClassifier,
     private val userAccountRepository: UserAccountRepository,
 ) {
+    companion object {
+        private const val LINK_MIME_TYPE = "text/uri-list"
+    }
+
     @Transactional
     fun initiateUpload(request: AssetUploadIntentRequest, actorEmail: String, actorName: String?): AssetUploadIntentResponse {
         val actor = requireActor(actorEmail)
@@ -67,12 +72,15 @@ class AssetLibraryService(
             AssetEntity(
                 title = resolvedTitle,
                 assetType = assetType,
+                sourceKind = AssetSourceKind.FILE,
                 assetStatus = AssetStatus.UPLOADING,
                 description = resolvedDescription,
                 originalFileName = resolvedFileName,
                 mimeType = contentType,
                 fileSizeBytes = request.fileSizeBytes,
                 fileExtension = resolvedFileName.substringAfterLast(".", "").normalizedOrNull(),
+                linkUrl = null,
+                linkType = null,
                 ownerEmail = actor.email,
                 ownerName = actor.displayName,
                 organization = actor.organization,
@@ -84,6 +92,8 @@ class AssetLibraryService(
                     ownerName = actor.displayName,
                     organizationName = actor.organization?.name,
                     tags = tags.map { tag -> tag.value },
+                    linkUrl = null,
+                    linkType = null,
                 ),
                 widthPx = null,
                 heightPx = null,
@@ -125,6 +135,96 @@ class AssetLibraryService(
     }
 
     @Transactional
+    fun registerLinks(
+        request: AssetLinkRegistrationRequest,
+        actorEmail: String,
+        actorName: String?,
+    ): List<AssetSummaryResponse> {
+        val actor = requireActor(actorEmail)
+        assetAuthorizationService.requireLibraryAccess(actor)
+        require(request.links.isNotEmpty()) { "등록할 링크가 없습니다." }
+
+        return request.links.map { linkRequest ->
+            val resolvedUrl = normalizeLinkUrl(
+                linkRequest.url.normalizedOrNull()
+                    ?: throw IllegalArgumentException("URL은 비어 있을 수 없습니다."),
+            )
+            val resolvedHost = extractLinkHost(resolvedUrl)
+            val resolvedLinkType = linkRequest.linkType.normalizedOrNull() ?: inferLinkType(resolvedUrl)
+            val assetType = assetTypeClassifier.classifyLink(
+                url = resolvedUrl,
+                linkType = resolvedLinkType,
+            )
+            val resolvedTitle = linkRequest.title.normalizedOrNull() ?: resolvedHost
+            val tags = assetTagSuggestionService.buildTags(
+                fileName = resolvedHost,
+                title = resolvedTitle,
+                assetType = assetType,
+                requestedTags = linkRequest.tags,
+            )
+
+            val asset = assetRepository.save(
+                AssetEntity(
+                    title = resolvedTitle,
+                    assetType = assetType,
+                    sourceKind = AssetSourceKind.LINK,
+                    assetStatus = AssetStatus.READY,
+                    description = null,
+                    originalFileName = resolvedHost,
+                    mimeType = LINK_MIME_TYPE,
+                    fileSizeBytes = 0,
+                    fileExtension = null,
+                    linkUrl = resolvedUrl,
+                    linkType = resolvedLinkType,
+                    ownerEmail = actor.email,
+                    ownerName = actor.displayName,
+                    organization = actor.organization,
+                    currentVersionNumber = 1,
+                    searchText = buildSearchText(
+                        title = resolvedTitle,
+                        description = null,
+                        fileName = resolvedHost,
+                        ownerName = actor.displayName,
+                        organizationName = actor.organization?.name,
+                        tags = tags.map { tag -> tag.value },
+                        linkUrl = resolvedUrl,
+                        linkType = resolvedLinkType,
+                    ),
+                    widthPx = null,
+                    heightPx = null,
+                    durationMs = null,
+                ),
+            )
+
+            assetTagRepository.saveAll(
+                tags.map { tagCandidate ->
+                    AssetTagEntity(
+                        asset = asset,
+                        value = tagCandidate.value,
+                        normalizedValue = tagCandidate.normalizedValue,
+                        source = tagCandidate.source,
+                    )
+                },
+            )
+
+            assetEventRepository.save(
+                AssetEventEntity(
+                    asset = asset,
+                    eventType = AssetEventType.CREATED,
+                    actorEmail = actor.email,
+                    actorName = actorName ?: actor.displayName,
+                    detail = "외부 링크로 자산이 등록되었습니다.",
+                ),
+            )
+
+            asset.toSummaryResponse(
+                tags = tags.map { tag -> tag.value },
+                permissions = assetAuthorizationService.permissionsFor(actor, asset),
+            )
+        }
+    }
+
+    @Transactional
     fun completeUpload(assetId: Long, request: AssetUploadCompleteRequest, actorEmail: String): AssetSummaryResponse {
         val actor = requireActor(actorEmail)
         val asset = assetRepository.findById(assetId)
@@ -148,6 +248,8 @@ class AssetLibraryService(
             ownerName = actor.displayName,
             organizationName = asset.organization?.name,
             tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId).map { it.value },
+            linkUrl = asset.linkUrl,
+            linkType = asset.linkType,
         )
         assetRepository.save(asset)
 
@@ -210,8 +312,11 @@ class AssetLibraryService(
             asset = asset,
             action = AssetAccessAction.DETAIL_VIEW,
         )
-        val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
-            ?: throw IllegalArgumentException("현재 파일 정보를 찾을 수 없습니다.")
+        val currentFile = when (asset.sourceKind) {
+            AssetSourceKind.FILE -> assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
+                ?: throw IllegalArgumentException("현재 파일 정보를 찾을 수 없습니다.")
+            AssetSourceKind.LINK -> null
+        }
         val tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId)
             .map { assetTag -> assetTag.value }
         val events = assetEventRepository.findAllByAsset_IdOrderByCreatedAtDescIdDesc(assetId)
@@ -269,6 +374,8 @@ class AssetLibraryService(
             ownerName = asset.ownerName,
             organizationName = asset.organization?.name,
             tags = nextTags.map { tag -> tag.value },
+            linkUrl = asset.linkUrl,
+            linkType = asset.linkType,
         )
         val savedAsset = assetRepository.save(asset)
 
@@ -321,6 +428,7 @@ class AssetLibraryService(
             asset = asset,
             action = AssetAccessAction.DETAIL_VIEW,
         )
+        require(asset.sourceKind == AssetSourceKind.FILE) { "링크 자산은 프리뷰를 지원하지 않습니다." }
         val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("프리뷰 대상 파일을 찾을 수 없습니다.")
 
@@ -351,6 +459,7 @@ class AssetLibraryService(
             asset = asset,
             action = AssetAccessAction.DOWNLOAD,
         )
+        require(asset.sourceKind == AssetSourceKind.FILE) { "링크 자산은 다운로드할 수 없습니다." }
         val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("다운로드할 파일을 찾을 수 없습니다.")
         val loadedAssetObject = assetBinaryStorage.load(
@@ -412,6 +521,20 @@ class AssetLibraryService(
         val zipContent = ByteArrayOutputStream().use { buffer ->
             ZipOutputStream(buffer).use { zipOutputStream ->
                 assets.forEach { asset ->
+                    if (asset.sourceKind == AssetSourceKind.LINK) {
+                        zipOutputStream.putNextEntry(
+                            ZipEntry(
+                                buildExportEntryName(
+                                    asset,
+                                    "${asset.title}-link.txt",
+                                ),
+                            ),
+                        )
+                        zipOutputStream.write(buildLinkExportContent(asset).toByteArray())
+                        zipOutputStream.closeEntry()
+                        return@forEach
+                    }
+
                     val assetId = requireNotNull(asset.id)
                     val currentFile = currentFilesByAssetId[assetId]
                         ?: throw IllegalArgumentException("내보낼 파일 정보를 찾을 수 없습니다.")
@@ -447,6 +570,8 @@ class AssetLibraryService(
                 add(title.normalizedSearchValue())
                 description?.normalizedSearchValue()?.let(::add)
                 add(originalFileName.normalizedSearchValue())
+                linkType?.normalizedSearchValue()?.let(::add)
+                linkUrl?.normalizedSearchValue()?.let(::add)
                 add(ownerName.normalizedSearchValue())
                 add(ownerEmail.normalizedSearchValue())
                 organizationName?.normalizedSearchValue()?.let(::add)
@@ -486,12 +611,15 @@ class AssetLibraryService(
         id = requireNotNull(id),
         title = title,
         type = assetType,
+        sourceKind = sourceKind,
         status = assetStatus,
         description = description,
         originalFileName = originalFileName,
         mimeType = mimeType,
         fileSizeBytes = fileSizeBytes,
         fileExtension = fileExtension,
+        linkUrl = linkUrl,
+        linkType = linkType,
         versionNumber = currentVersionNumber,
         ownerEmail = ownerEmail,
         ownerName = ownerName,
@@ -510,19 +638,22 @@ class AssetLibraryService(
 
     private fun AssetEntity.toDetailResponse(
         tags: List<String>,
-        currentFile: AssetFileEntity,
+        currentFile: AssetFileEntity?,
         events: List<AssetEventResponse>,
         permissions: AssetPermissionSnapshot,
     ): AssetDetailResponse = AssetDetailResponse(
         id = requireNotNull(id),
         title = title,
         type = assetType,
+        sourceKind = sourceKind,
         status = assetStatus,
         description = description,
         originalFileName = originalFileName,
         mimeType = mimeType,
         fileSizeBytes = fileSizeBytes,
         fileExtension = fileExtension,
+        linkUrl = linkUrl,
+        linkType = linkType,
         versionNumber = currentVersionNumber,
         ownerEmail = ownerEmail,
         ownerName = ownerName,
@@ -537,18 +668,20 @@ class AssetLibraryService(
         canDownload = permissions.canDownload,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        currentFile = AssetFileResponse(
-            bucketName = currentFile.bucketName,
-            objectKey = currentFile.objectKey,
-            originalFileName = currentFile.originalFileName,
-            mimeType = currentFile.mimeType,
-            fileSizeBytes = currentFile.fileSizeBytes,
-            checksumSha256 = currentFile.checksumSha256,
-            versionNumber = currentFile.versionNumber,
-            createdByEmail = currentFile.createdByEmail,
-            createdByName = currentFile.createdByName,
-            createdAt = currentFile.createdAt,
-        ),
+        currentFile = currentFile?.let { resolvedCurrentFile ->
+            AssetFileResponse(
+                bucketName = resolvedCurrentFile.bucketName,
+                objectKey = resolvedCurrentFile.objectKey,
+                originalFileName = resolvedCurrentFile.originalFileName,
+                mimeType = resolvedCurrentFile.mimeType,
+                fileSizeBytes = resolvedCurrentFile.fileSizeBytes,
+                checksumSha256 = resolvedCurrentFile.checksumSha256,
+                versionNumber = resolvedCurrentFile.versionNumber,
+                createdByEmail = resolvedCurrentFile.createdByEmail,
+                createdByName = resolvedCurrentFile.createdByName,
+                createdAt = resolvedCurrentFile.createdAt,
+            )
+        },
         events = events,
     )
 
@@ -576,12 +709,16 @@ class AssetLibraryService(
         ownerName: String,
         organizationName: String?,
         tags: List<String>,
+        linkUrl: String?,
+        linkType: String?,
     ): String = buildList {
         add(title)
         add(fileName)
         add(ownerName)
         description?.let(::add)
         organizationName?.let(::add)
+        linkType?.let(::add)
+        linkUrl?.let(::add)
         addAll(tags)
     }.joinToString(" ") { value -> value.normalizedSearchValue() }
 
@@ -619,6 +756,12 @@ class AssetLibraryService(
             .withZone(ZoneOffset.UTC)
             .format(Instant.now())
         return "acts-assets-export-$timestamp.zip"
+    }
+
+    private fun buildLinkExportContent(asset: AssetEntity): String = buildString {
+        appendLine("title: ${asset.title}")
+        appendLine("linkType: ${asset.linkType ?: "기타"}")
+        appendLine("url: ${asset.linkUrl ?: ""}")
     }
 
     private fun storeGeneratedPreviewIfNeeded(
@@ -678,6 +821,39 @@ class AssetLibraryService(
         ?.let(::normalizeText)
         ?.trim()
         ?.takeIf { value -> value.isNotEmpty() }
+
+    private fun normalizeLinkUrl(value: String): String {
+        val candidate = if (value.contains("://")) value else "https://$value"
+
+        return try {
+            val uri = URI.create(candidate)
+            require(!uri.host.isNullOrBlank()) { "올바른 URL을 입력해 주세요." }
+            uri.normalize().toString()
+        } catch (_: IllegalArgumentException) {
+            throw IllegalArgumentException("올바른 URL을 입력해 주세요.")
+        }
+    }
+
+    private fun extractLinkHost(url: String): String = try {
+        URI.create(url).host
+            ?.removePrefix("www.")
+            ?.lowercase()
+            ?.takeIf { host -> host.isNotBlank() }
+            ?: url
+    } catch (_: IllegalArgumentException) {
+        url
+    }
+
+    private fun inferLinkType(url: String): String {
+        val host = extractLinkHost(url)
+
+        return when {
+            host.contains("drive.google.com") || host.contains("docs.google.com") -> "Google Drive"
+            host.contains("youtube.com") || host.contains("youtu.be") -> "YouTube"
+            host.contains("notion.so") || host.contains("notion.site") -> "Notion"
+            else -> host
+        }
+    }
 
     private fun String?.normalizedSearchTerms(): List<String> = this
         ?.let(::normalizeText)
