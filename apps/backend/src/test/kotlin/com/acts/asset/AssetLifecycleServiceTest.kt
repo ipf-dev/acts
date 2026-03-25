@@ -54,7 +54,6 @@ class AssetLifecycleServiceTest @Autowired constructor(
         userDirectoryService.saveManualAssignment(
             email = "coco@iportfolio.co.kr",
             organizationId = organizationId,
-            positionTitle = "기획자",
             actorEmail = "admin@iportfolio.co.kr",
             actorName = "Admin",
         )
@@ -66,7 +65,6 @@ class AssetLifecycleServiceTest @Autowired constructor(
         userDirectoryService.saveManualAssignment(
             email = "admin@iportfolio.co.kr",
             organizationId = organizationId,
-            positionTitle = "본부장",
             actorEmail = "admin@iportfolio.co.kr",
             actorName = "Admin",
         )

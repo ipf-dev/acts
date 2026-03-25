@@ -41,7 +41,9 @@ Expected first-slice backend capabilities:
 - domain-restricted Google SSO and session identity lookup
 - auth success event logging at the SSO boundary
 - PostgreSQL-backed user directory plus single organization catalog
+- seeded internal account roster with stored role precedence over bootstrap admin emails
 - user org assignment lookup with admin override support
+- authorization derived from user role and company-wide viewer status
 - company-wide viewer allowlist with immediate permission recalculation
 - per-user feature allow/deny overrides with audit logging
 - audit logging for login success plus admin org, feature, and permission changes
@@ -71,9 +73,9 @@ Expected first-slice frontend surfaces:
 - login entry, session status, and admin override screens
 - user-facing auth failure notification after login redirects
 - Figma Make 기준의 shell 레이아웃, 현재 사용자 프로필 메뉴, 자산 검색 헤더
-- searchable admin user table with per-user organization assignment
+- searchable admin user table with per-user organization assignment, role visibility, and company-wide viewer state
 - admin allowlist management and audit log views
-- admin feature authorization tab with per-user allow/deny split and save flow for the currently implemented asset library feature
+- admin feature authorization tab with searchable user selection, per-feature allow/deny matrix, and save flow for the currently implemented asset library feature
 - admin policy tab for retention settings and deleted asset restore status/actions
 - asset library page with upload modal, tag chips, search, org/creator filters, and company-wide viewer export action
 - shell-level feature gating so denied users cannot enter the implemented asset library surface

@@ -51,7 +51,6 @@ export interface AuthUserView {
   displayName: string;
   organizationId: number | null;
   organizationName: string | null;
-  positionTitle: string | null;
   mappingMode: UserMappingMode;
   role: UserRole;
   companyWideViewer: boolean;
@@ -68,7 +67,6 @@ export interface AuthSessionView {
 
 export interface ManualAssignmentInput {
   organizationId: number;
-  positionTitle: string;
 }
 
 export interface ViewerAllowlistInput {
@@ -86,7 +84,6 @@ export interface UserFeatureAuthorizationView {
   email: string;
   displayName: string;
   organizationName: string | null;
-  positionTitle: string | null;
   role: UserRole;
   featureAccessLocked: boolean;
   allowedFeatures: AppFeatureView[];

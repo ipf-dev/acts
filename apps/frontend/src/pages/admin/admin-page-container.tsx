@@ -186,8 +186,7 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
 
   async function handleSaveManualAssignment(
     email: string,
-    organizationId: number,
-    positionTitle: string
+    organizationId: number
   ): Promise<void> {
     setState((currentState) => ({
       ...currentState,
@@ -198,8 +197,7 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
 
     try {
       await dashboardApi.saveManualAssignment(email, {
-        organizationId,
-        positionTitle
+        organizationId
       });
 
       const [session, adminData] = await Promise.all([

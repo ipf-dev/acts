@@ -26,8 +26,6 @@ class UserAccountEntity(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id")
     var organization: OrganizationEntity? = null,
-    @Column(name = "position_title")
-    var positionTitle: String? = null,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var role: UserRole,

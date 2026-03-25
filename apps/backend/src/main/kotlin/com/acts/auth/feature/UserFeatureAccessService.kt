@@ -116,7 +116,6 @@ class UserFeatureAccessService(
             email = account.email,
             displayName = account.displayName,
             organizationName = account.organization?.name,
-            positionTitle = account.positionTitle,
             role = account.role,
             featureAccessLocked = account.role == UserRole.ADMIN,
             allowedFeatures = featureResponses.filter { feature -> featureAccess.getValue(feature.key) },

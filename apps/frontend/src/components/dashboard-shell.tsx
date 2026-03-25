@@ -174,9 +174,6 @@ export function DashboardShell({
                 <DropdownMenuLabel>현재 세션</DropdownMenuLabel>
                 <DropdownMenuItem className="cursor-default flex-col items-start gap-1" disabled>
                   <span>{currentUser?.organizationName ?? "조직 미지정"}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {currentUser?.positionTitle ?? "직급 미지정"}
-                  </span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => void handleLogout()}>
@@ -222,7 +219,6 @@ export function DashboardShell({
                 {currentUser ? (
                   <div className="hidden text-right lg:block">
                     <p className="text-sm font-medium">{currentUser.organizationName ?? "조직 미지정"}</p>
-                    <p className="text-xs text-muted-foreground">{currentUser.positionTitle ?? "직급 미지정"}</p>
                   </div>
                 ) : null}
               </div>

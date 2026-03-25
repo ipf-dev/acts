@@ -26,17 +26,15 @@ class UserDirectoryService(
     @Transactional
     fun syncLogin(email: String, displayName: String): AuthUserProfile {
         val normalizedEmail = email.lowercase()
-        val resolvedRole = resolveRole(normalizedEmail)
-        val account = userAccountRepository.findById(normalizedEmail)
-            .orElseGet {
-                UserAccountEntity(
-                    email = normalizedEmail,
-                    displayName = displayName,
-                    role = resolvedRole,
-                    mappingMode = UserMappingMode.UNMAPPED,
-                    companyWideViewer = resolveCompanyWideViewer(normalizedEmail, resolvedRole),
-                )
-            }
+        val existingAccount = userAccountRepository.findById(normalizedEmail).orElse(null)
+        val resolvedRole = existingAccount?.role ?: resolveBootstrapRole(normalizedEmail)
+        val account = existingAccount ?: UserAccountEntity(
+            email = normalizedEmail,
+            displayName = displayName,
+            role = resolvedRole,
+            mappingMode = UserMappingMode.UNMAPPED,
+            companyWideViewer = resolveCompanyWideViewer(normalizedEmail, resolvedRole),
+        )
 
         account.displayName = displayName.trim()
         account.role = resolvedRole
@@ -63,28 +61,24 @@ class UserDirectoryService(
     fun saveManualAssignment(
         email: String,
         organizationId: Long,
-        positionTitle: String?,
         actorEmail: String,
         actorName: String?,
     ): AuthUserProfile {
         val normalizedEmail = email.lowercase()
-        val resolvedRole = resolveRole(normalizedEmail)
-        val account = userAccountRepository.findById(normalizedEmail)
-            .orElseGet {
-                UserAccountEntity(
-                    email = normalizedEmail,
-                    displayName = normalizedEmail.substringBefore("@"),
-                    role = resolvedRole,
-                    mappingMode = UserMappingMode.UNMAPPED,
-                    companyWideViewer = resolveCompanyWideViewer(normalizedEmail, resolvedRole),
-                )
-            }
+        val existingAccount = userAccountRepository.findById(normalizedEmail).orElse(null)
+        val resolvedRole = existingAccount?.role ?: resolveBootstrapRole(normalizedEmail)
+        val account = existingAccount ?: UserAccountEntity(
+            email = normalizedEmail,
+            displayName = normalizedEmail.substringBefore("@"),
+            role = resolvedRole,
+            mappingMode = UserMappingMode.UNMAPPED,
+            companyWideViewer = resolveCompanyWideViewer(normalizedEmail, resolvedRole),
+        )
         val beforeProfile = account.toProfile()
         val organization = organizationRepository.findById(organizationId)
             .orElseThrow { IllegalArgumentException("Organization does not exist.") }
 
         account.organization = organization
-        account.positionTitle = positionTitle.normalizedOrNull()
         account.mappingMode = UserMappingMode.MANUAL
         account.role = resolvedRole
         account.companyWideViewer = resolveCompanyWideViewer(normalizedEmail, resolvedRole)
@@ -103,11 +97,12 @@ class UserDirectoryService(
     @Transactional
     fun listViewerAllowlist(): List<ViewerAllowlistEntryResponse> = viewerAllowlistRepository.findAllByOrderByEmailAsc()
         .map { entry ->
+            val account = userAccountRepository.findById(entry.email).orElse(null)
             ViewerAllowlistEntryResponse(
                 email = entry.email,
                 effectiveCompanyWideViewer = resolveCompanyWideViewer(
                     email = entry.email,
-                    role = resolveRole(entry.email),
+                    role = account?.role ?: resolveBootstrapRole(entry.email),
                 ),
                 createdAt = entry.createdAt,
             )
@@ -178,7 +173,7 @@ class UserDirectoryService(
     @Transactional
     fun listAuditLogs(): List<AuditLogResponse> = adminAuditLogService.listRecentLogs()
 
-    private fun resolveRole(email: String): UserRole = if (
+    private fun resolveBootstrapRole(email: String): UserRole = if (
         authProperties.adminEmails.any { it.equals(email, ignoreCase = true) }
     ) {
         UserRole.ADMIN
@@ -193,7 +188,6 @@ class UserDirectoryService(
 
     private fun recalculateEffectivePermissions(email: String) {
         val account = userAccountRepository.findById(email).orElse(null) ?: return
-        account.role = resolveRole(email)
         account.companyWideViewer = resolveCompanyWideViewer(email, account.role)
         userAccountRepository.save(account)
     }
@@ -211,7 +205,7 @@ class UserDirectoryService(
         email = email,
         allowlisted = viewerAllowlistRepository.existsById(email),
         effectiveCompanyWideViewer = account?.let { resolveCompanyWideViewer(email, it.role) }
-            ?: resolveCompanyWideViewer(email, resolveRole(email)),
+            ?: resolveCompanyWideViewer(email, resolveBootstrapRole(email)),
     )
 }
 
@@ -220,11 +214,8 @@ private fun UserAccountEntity.toProfile(): AuthUserProfile = AuthUserProfile(
     displayName = displayName,
     organizationId = organization?.id,
     organizationName = organization?.name,
-    positionTitle = positionTitle,
     mappingMode = mappingMode,
     role = role,
     companyWideViewer = companyWideViewer,
     manualAssignmentRequired = organization == null,
 )
-
-private fun String?.normalizedOrNull(): String? = this?.trim()?.takeIf { it.isNotEmpty() }

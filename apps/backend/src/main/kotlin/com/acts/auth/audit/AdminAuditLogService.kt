@@ -311,7 +311,6 @@ private data class UserAssignmentAuditSnapshot(
     val email: String,
     val organizationId: Long?,
     val organizationName: String?,
-    val positionTitle: String?,
     val role: String,
     val companyWideViewer: Boolean,
 ) {
@@ -320,7 +319,6 @@ private data class UserAssignmentAuditSnapshot(
             email = profile.email,
             organizationId = profile.organizationId,
             organizationName = profile.organizationName,
-            positionTitle = profile.positionTitle,
             role = profile.role.name,
             companyWideViewer = profile.companyWideViewer,
         )

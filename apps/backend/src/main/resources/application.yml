@@ -10,6 +10,9 @@ acts:
   auth:
     allowed-domain: iportfolio.co.kr
     admin-emails:
-      - minsungkim@iportfolio.co.kr
+      - sykim@iportfolio.co.kr
+      - jlee@iportfolio.co.kr
+      - bson@iportfolio.co.kr
+      - sbyoon@iportfolio.co.kr
   storage:
     region: ap-northeast-2

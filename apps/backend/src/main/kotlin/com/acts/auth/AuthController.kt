@@ -156,7 +156,6 @@ class AuthController(
                 userDirectoryService.saveManualAssignment(
                     email = email,
                     organizationId = request.organizationId,
-                    positionTitle = request.positionTitle,
                     actorEmail = currentActorEmail(authentication),
                     actorName = currentActorName(authentication),
                 ),

@@ -7,7 +7,6 @@ data class AuthUserProfile(
     val displayName: String,
     val organizationId: Long?,
     val organizationName: String?,
-    val positionTitle: String?,
     val mappingMode: UserMappingMode,
     val role: UserRole,
     val companyWideViewer: Boolean,

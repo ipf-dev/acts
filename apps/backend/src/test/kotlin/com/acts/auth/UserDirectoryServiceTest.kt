@@ -40,13 +40,12 @@ class UserDirectoryServiceTest @Autowired constructor(
 
         assertThat(profile.mappingMode).isEqualTo(UserMappingMode.UNMAPPED)
         assertThat(profile.organizationName).isNull()
-        assertThat(profile.positionTitle).isNull()
         assertThat(profile.companyWideViewer).isFalse()
         assertThat(profile.manualAssignmentRequired).isTrue()
     }
 
     @Test
-    fun `manual assignment stores organization and position title and records an audit log`() {
+    fun `manual assignment stores organization and records an audit log`() {
         userDirectoryService.syncLogin(
             email = "coco@iportfolio.co.kr",
             displayName = "Coco",
@@ -55,7 +54,6 @@ class UserDirectoryServiceTest @Autowired constructor(
         val profile = userDirectoryService.saveManualAssignment(
             email = "coco@iportfolio.co.kr",
             organizationId = marketingOrganization.id!!,
-            positionTitle = "마케터",
             actorEmail = "minsungkim@iportfolio.co.kr",
             actorName = "Min Sung Kim",
         )
@@ -65,7 +63,6 @@ class UserDirectoryServiceTest @Autowired constructor(
         assertThat(profile.mappingMode).isEqualTo(UserMappingMode.MANUAL)
         assertThat(profile.organizationId).isEqualTo(marketingOrganization.id)
         assertThat(profile.organizationName).isEqualTo("마케팅팀")
-        assertThat(profile.positionTitle).isEqualTo("마케터")
         assertThat(profile.manualAssignmentRequired).isFalse()
 
         assertThat(auditLogs).hasSize(1)
@@ -75,7 +72,6 @@ class UserDirectoryServiceTest @Autowired constructor(
         assertThat(auditLogs.single().beforeState).contains("\"organizationName\":null")
         assertThat(auditLogs.single().afterState)
             .contains("\"organizationName\":\"마케팅팀\"")
-            .contains("\"positionTitle\":\"마케터\"")
     }
 
     @Test

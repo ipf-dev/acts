@@ -63,7 +63,6 @@ class AssetLibraryServiceTest @Autowired constructor(
         userDirectoryService.saveManualAssignment(
             email = "coco@iportfolio.co.kr",
             organizationId = requireNotNull(marketingOrganization.id),
-            positionTitle = "기획자",
             actorEmail = "minsungkim@iportfolio.co.kr",
             actorName = "Min Sung Kim",
         )
@@ -74,7 +73,6 @@ class AssetLibraryServiceTest @Autowired constructor(
         userDirectoryService.saveManualAssignment(
             email = "tony@iportfolio.co.kr",
             organizationId = requireNotNull(contentOrganization.id),
-            positionTitle = "디자이너",
             actorEmail = "minsungkim@iportfolio.co.kr",
             actorName = "Min Sung Kim",
         )
@@ -85,7 +83,6 @@ class AssetLibraryServiceTest @Autowired constructor(
         userDirectoryService.saveManualAssignment(
             email = "leader@iportfolio.co.kr",
             organizationId = requireNotNull(strategyOrganization.id),
-            positionTitle = "본부장",
             actorEmail = "minsungkim@iportfolio.co.kr",
             actorName = "Min Sung Kim",
         )
