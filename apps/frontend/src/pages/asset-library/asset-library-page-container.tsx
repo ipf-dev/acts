@@ -7,7 +7,6 @@ import {
   getLoginSuccessMessage
 } from "../../api/auth";
 import type {
-  AssetDetailView,
   AssetTagOptionCatalogView,
   AssetSummaryView,
   AuthSessionView,
@@ -21,15 +20,11 @@ import type {
 } from "./asset-library-page-model";
 
 interface AssetLibraryPageState {
-  assetDetail: AssetDetailView | null;
   assets: AssetSummaryView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   characterOptions: CharacterTagOptionView[];
   tagOptions: AssetTagOptionCatalogView;
-  isAssetDetailLoading: boolean;
-  isDeleting: boolean;
-  isDownloading: boolean;
   isExporting: boolean;
   isLoading: boolean;
   isUploading: boolean;
@@ -57,15 +52,11 @@ export function AssetLibraryPageContainer({
   session: initialSession
 }: AssetLibraryPageContainerProps): React.JSX.Element {
   const [state, setState] = useState<AssetLibraryPageState>({
-    assetDetail: null,
     assets: [],
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
     characterOptions: [],
     tagOptions: emptyTagOptions,
-    isAssetDetailLoading: false,
-    isDeleting: false,
-    isDownloading: false,
     isExporting: false,
     isLoading: true,
     isUploading: false,
@@ -204,104 +195,6 @@ export function AssetLibraryPageContainer({
     }
   }
 
-  async function handleOpenAssetDetail(assetId: number): Promise<void> {
-    setState((currentState) => ({
-      ...currentState,
-      assetDetail: null,
-      authErrorMessage: null,
-      isAssetDetailLoading: true
-    }));
-
-    try {
-      const assetDetail = await dashboardApi.getAsset(assetId);
-
-      setState((currentState) => ({
-        ...currentState,
-        assetDetail,
-        isAssetDetailLoading: false
-      }));
-    } catch (error: unknown) {
-      setState((currentState) => ({
-        ...currentState,
-        authErrorMessage: getAssetApiErrorMessage(error, {
-          denied: "현재 권한으로는 이 자산을 열 수 없습니다.",
-          fallback: "자산 상세 정보를 불러오지 못했습니다.",
-          notFound: "대상 자산을 찾을 수 없습니다."
-        }),
-        isAssetDetailLoading: false
-      }));
-    }
-  }
-
-  function handleCloseAssetDetail(): void {
-    setState((currentState) => ({
-      ...currentState,
-      assetDetail: null,
-      isAssetDetailLoading: false
-    }));
-  }
-
-  async function handleDeleteAsset(assetId: number): Promise<void> {
-    setState((currentState) => ({
-      ...currentState,
-      authErrorMessage: null,
-      authSuccessMessage: null,
-      isDeleting: true
-    }));
-
-    try {
-      await dashboardApi.deleteAsset(assetId);
-
-      setState((currentState) => ({
-        ...currentState,
-        assetDetail: null,
-        assets: currentState.assets.filter((asset) => asset.id !== assetId),
-        authSuccessMessage: "애셋이 삭제되었습니다.",
-        isAssetDetailLoading: false,
-        isDeleting: false
-      }));
-    } catch (error: unknown) {
-      setState((currentState) => ({
-        ...currentState,
-        authErrorMessage: getAssetApiErrorMessage(error, {
-          denied: "삭제 권한이 없습니다.",
-          fallback: "자산 삭제에 실패했습니다.",
-          notFound: "삭제할 자산을 찾을 수 없습니다."
-        }),
-        isDeleting: false
-      }));
-    }
-  }
-
-  async function handleDownloadAsset(assetId: number): Promise<void> {
-    setState((currentState) => ({
-      ...currentState,
-      authErrorMessage: null,
-      authSuccessMessage: null,
-      isDownloading: true
-    }));
-
-    try {
-      const file = await dashboardApi.downloadAsset(assetId);
-      triggerFileDownload(file);
-
-      setState((currentState) => ({
-        ...currentState,
-        isDownloading: false
-      }));
-    } catch (error: unknown) {
-      setState((currentState) => ({
-        ...currentState,
-        authErrorMessage: getAssetApiErrorMessage(error, {
-          denied: "현재 권한으로는 이 자산을 다운로드할 수 없습니다.",
-          fallback: "자산 다운로드에 실패했습니다.",
-          notFound: "다운로드할 자산을 찾을 수 없습니다."
-        }),
-        isDownloading: false
-      }));
-    }
-  }
-
   async function handleExportAssets(): Promise<void> {
     setState((currentState) => ({
       ...currentState,
@@ -333,23 +226,15 @@ export function AssetLibraryPageContainer({
 
   return (
     <AssetLibraryPage
-      assetDetail={state.assetDetail}
       assets={state.assets}
       authErrorMessage={state.authErrorMessage}
       authSuccessMessage={state.authSuccessMessage}
       characterOptions={state.characterOptions}
       tagOptions={state.tagOptions}
-      isAssetDetailLoading={state.isAssetDetailLoading}
-      isDeleting={state.isDeleting}
-      isDownloading={state.isDownloading}
       isExporting={state.isExporting}
       isLoading={state.isLoading}
       isUploading={state.isUploading}
-      onCloseAssetDetail={handleCloseAssetDetail}
-      onDeleteAsset={handleDeleteAsset}
-      onDownloadAsset={handleDownloadAsset}
       onExportAssets={handleExportAssets}
-      onOpenAssetDetail={handleOpenAssetDetail}
       onOpenAssetPage={onOpenAssetPage}
       onRegisterAssetLinks={handleRegisterAssetLinks}
       onSearchQueryChange={onSearchQueryChange}

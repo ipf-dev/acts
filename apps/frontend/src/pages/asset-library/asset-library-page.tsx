@@ -22,14 +22,12 @@ import {
 } from "../../components/ui/select";
 import { GOOGLE_LOGIN_PATH } from "../../api/auth";
 import type {
-  AssetDetailView,
   AssetTagOptionCatalogView,
   AssetSummaryView,
   AuthSessionView,
   CharacterTagOptionView
 } from "../../api/types";
 import { cn, isBlank } from "../../lib/utils";
-import { AssetDetailModal } from "./asset-detail-modal";
 import { typeLabelMap } from "./asset-detail-model";
 import { AssetTypeIcon } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
@@ -38,23 +36,15 @@ import { flattenAssetTags, getAssetPrimaryText } from "./asset-library-utils";
 import type { AssetFileUploadDraftView, AssetLinkDraftView } from "./asset-library-page-model";
 
 interface AssetLibraryPageProps {
-  assetDetail: AssetDetailView | null;
   assets: AssetSummaryView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   characterOptions: CharacterTagOptionView[];
   tagOptions: AssetTagOptionCatalogView;
-  isAssetDetailLoading: boolean;
-  isDeleting: boolean;
-  isDownloading: boolean;
   isExporting: boolean;
   isLoading: boolean;
   isUploading: boolean;
-  onCloseAssetDetail: () => void;
-  onDeleteAsset: (assetId: number) => Promise<void>;
-  onDownloadAsset: (assetId: number) => Promise<void>;
   onExportAssets: () => Promise<void>;
-  onOpenAssetDetail: (assetId: number) => void;
   onOpenAssetPage: (assetId: number) => void;
   onRegisterAssetLinks: (drafts: AssetLinkDraftView[]) => Promise<void>;
   onSearchQueryChange: (value: string) => void;
@@ -70,23 +60,15 @@ const cardDateFormatter = new Intl.DateTimeFormat("ko-KR", {
 });
 
 export function AssetLibraryPage({
-  assetDetail,
   assets,
   authErrorMessage,
   authSuccessMessage,
   characterOptions,
   tagOptions,
-  isAssetDetailLoading,
-  isDeleting,
-  isDownloading,
   isExporting,
   isLoading,
   isUploading,
-  onCloseAssetDetail,
-  onDeleteAsset,
-  onDownloadAsset,
   onExportAssets,
-  onOpenAssetDetail,
   onOpenAssetPage,
   onRegisterAssetLinks,
   onSearchQueryChange,
@@ -317,7 +299,7 @@ export function AssetLibraryPage({
                   >
                     <button
                       className="block w-full text-left"
-                      onClick={() => onOpenAssetDetail(asset.id)}
+                      onClick={() => onOpenAssetPage(asset.id)}
                       type="button"
                     >
                       <AssetPreviewPanel
@@ -449,7 +431,7 @@ export function AssetLibraryPage({
                             <td className="px-4 py-4">
                               <Button
                                 className="h-8 rounded-xl px-3 text-xs"
-                                onClick={() => onOpenAssetDetail(asset.id)}
+                                onClick={() => onOpenAssetPage(asset.id)}
                                 type="button"
                                 variant="outline"
                               >
@@ -492,17 +474,6 @@ export function AssetLibraryPage({
         onRegisterAssetLinks={onRegisterAssetLinks}
         tagOptions={tagOptions}
         onUploadAssets={onUploadAssets}
-      />
-      <AssetDetailModal
-        asset={assetDetail}
-        isDeleting={isDeleting}
-        isDownloading={isDownloading}
-        isLoading={isAssetDetailLoading}
-        isOpen={Boolean(assetDetail) || isAssetDetailLoading}
-        onClose={onCloseAssetDetail}
-        onDelete={onDeleteAsset}
-        onDownload={onDownloadAsset}
-        onOpenDetailPage={onOpenAssetPage}
       />
     </section>
   );
