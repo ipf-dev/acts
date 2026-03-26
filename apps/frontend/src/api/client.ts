@@ -1,5 +1,6 @@
 import type {
   AdminAssetTagCatalogView,
+  AssetTagOptionCatalogView,
   AssetTagMergeInput,
   AssetTagRenameInput,
   AssetDetailView,
@@ -35,6 +36,7 @@ export interface DashboardApi {
   getAsset(assetId: number): Promise<AssetDetailView>;
   getAdminAssetTagCatalog(): Promise<AdminAssetTagCatalogView>;
   getAssetRetentionPolicy(): Promise<AssetRetentionPolicyView>;
+  listAssetTagOptions(): Promise<AssetTagOptionCatalogView>;
   listDeletedAssets(): Promise<DeletedAssetView[]>;
   listAssets(): Promise<AssetSummaryView[]>;
   listCharacterTagOptions(): Promise<CharacterTagOptionView[]>;
@@ -161,6 +163,9 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     },
     async getAssetRetentionPolicy() {
       return readJson<AssetRetentionPolicyView>("/api/assets/policy");
+    },
+    async listAssetTagOptions() {
+      return readJson<AssetTagOptionCatalogView>("/api/assets/tags/options");
     },
     async listDeletedAssets() {
       return readJson<DeletedAssetView[]>("/api/assets/deleted");

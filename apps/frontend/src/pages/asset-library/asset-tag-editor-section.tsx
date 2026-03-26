@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type React from "react";
-import { Check, ChevronDown, MapPin, Tags, UserRound, X } from "lucide-react";
+import { Check, ChevronDown, MapPin, Plus, Tags, UserRound, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -9,7 +9,12 @@ import {
   DropdownMenuTrigger
 } from "../../components/ui/dropdown-menu";
 import { Input } from "../../components/ui/input";
-import type { CharacterTagOptionView } from "../../api/types";
+import type {
+  AssetTagOptionCatalogView,
+  AssetTagValueOptionView,
+  CharacterTagOptionView
+} from "../../api/types";
+import { suggestTagValues } from "../../lib/asset-tag-search/utils";
 import { cn } from "../../lib/utils";
 import type { AssetTagDraftView } from "./asset-library-page-model";
 
@@ -19,10 +24,11 @@ export type AssetTagInputKey = "locationInput" | "keywordInput";
 interface AssetTagEditorProps {
   characterOptions: CharacterTagOptionView[];
   className?: string;
-  onAddTag: (collectionKey: AssetTagCollectionKey) => void;
+  onAddTag: (collectionKey: AssetTagCollectionKey, explicitValue?: string) => void;
   onCharacterToggle: (characterTagId: number) => void;
   onRemoveTag: (collectionKey: AssetTagCollectionKey, value: string) => void;
   onTagInputChange: (inputKey: AssetTagInputKey, value: string) => void;
+  tagOptions?: AssetTagOptionCatalogView;
   value: AssetTagDraftView;
 }
 
@@ -32,14 +38,14 @@ const tagTypeConfig = {
     icon: Tags,
     inputKey: "keywordInput" as const,
     label: "키워드",
-    placeholder: "키워드 추가"
+    placeholder: "키워드 입력 또는 검색"
   },
   locations: {
     chipTone: "bg-[#eaf7ef] text-[#247a47]",
     icon: MapPin,
     inputKey: "locationInput" as const,
     label: "장소",
-    placeholder: "장소 추가"
+    placeholder: "장소 입력 또는 검색"
   }
 };
 
@@ -50,6 +56,7 @@ export function AssetTagEditor({
   onCharacterToggle,
   onRemoveTag,
   onTagInputChange,
+  tagOptions,
   value
 }: AssetTagEditorProps): React.JSX.Element {
   const compositionStateRef = useRef<Record<AssetTagInputKey, boolean>>({
@@ -60,6 +67,11 @@ export function AssetTagEditor({
     keywordInput: null,
     locationInput: null
   });
+  const selectedCharacterNames = characterOptions
+    .filter((option) => value.characterTagIds.includes(option.id))
+    .map((option) => option.name);
+  const characterTriggerLabel =
+    selectedCharacterNames.length > 0 ? selectedCharacterNames.join(", ") : "캐릭터를 선택하세요";
 
   function handleTagInputKeyDown(
     collectionKey: AssetTagCollectionKey,
@@ -112,11 +124,7 @@ export function AssetTagEditor({
             >
               <span className="flex min-w-0 items-center gap-2">
                 <UserRound className="h-4 w-4 text-muted-foreground" />
-                <span className="truncate text-foreground">
-                  {value.characterTagIds.length > 0
-                    ? `${value.characterTagIds.length}명 선택됨`
-                    : "캐릭터를 선택하세요"}
-                </span>
+                <span className="truncate text-foreground">{characterTriggerLabel}</span>
               </span>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -164,6 +172,11 @@ export function AssetTagEditor({
         const config = tagTypeConfig[collectionKey];
         const Icon = config.icon;
         const tags = value[collectionKey];
+        const suggestions = suggestTagValues(
+          tagOptions?.[collectionKey] ?? [],
+          value[config.inputKey],
+          tags
+        );
 
         return (
           <div className="space-y-2" key={collectionKey}>
@@ -185,27 +198,75 @@ export function AssetTagEditor({
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm">
-              <Input
-                className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                onChange={(event) => onTagInputChange(config.inputKey, event.target.value)}
-                onCompositionEnd={() => handleTagInputCompositionEnd(config.inputKey)}
-                onCompositionStart={() => handleTagInputCompositionStart(config.inputKey)}
-                onKeyDown={(event) => handleTagInputKeyDown(collectionKey, config.inputKey, event)}
-                placeholder={config.placeholder}
-                value={value[config.inputKey]}
-              />
-              <button
-                className="text-xs font-medium text-primary"
-                onClick={() => onAddTag(collectionKey)}
-                type="button"
-              >
-                추가
-              </button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 rounded-2xl border border-border bg-background px-2.5 py-2 shadow-sm transition-colors focus-within:border-primary/30">
+                <div className="min-w-0 flex-1">
+                  <Input
+                    className="h-8 min-w-0 border-0 bg-transparent px-2 py-0 shadow-none focus-visible:ring-0"
+                    onChange={(event) => onTagInputChange(config.inputKey, event.target.value)}
+                    onCompositionEnd={() => handleTagInputCompositionEnd(config.inputKey)}
+                    onCompositionStart={() => handleTagInputCompositionStart(config.inputKey)}
+                    onKeyDown={(event) => handleTagInputKeyDown(collectionKey, config.inputKey, event)}
+                    placeholder={config.placeholder}
+                    value={value[config.inputKey]}
+                  />
+                </div>
+                <button
+                  className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+                  onClick={() => onAddTag(collectionKey)}
+                  type="button"
+                >
+                  <Plus className="h-3 w-3" />
+                  추가
+                </button>
+              </div>
+
+              {suggestions.length > 0 ? (
+                <TagSuggestionList
+                  icon={<Icon className="h-3 w-3" />}
+                  label={`${config.label} 추천`}
+                  onSelect={(suggestedValue) => onAddTag(collectionKey, suggestedValue)}
+                  suggestions={suggestions}
+                />
+              ) : null}
             </div>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function TagSuggestionList({
+  icon,
+  label,
+  onSelect,
+  suggestions
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onSelect: (value: string) => void;
+  suggestions: AssetTagValueOptionView[];
+}): React.JSX.Element {
+  return (
+    <div className="rounded-2xl border border-border bg-background p-2 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+      <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-muted-foreground">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="space-y-1">
+        {suggestions.map((suggestion) => (
+          <button
+            className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-muted"
+            key={suggestion.value}
+            onClick={() => onSelect(suggestion.value)}
+            type="button"
+          >
+            <span className="truncate text-sm text-foreground">{suggestion.value}</span>
+            <span className="shrink-0 text-[11px] text-muted-foreground">사용 {suggestion.usageCount}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

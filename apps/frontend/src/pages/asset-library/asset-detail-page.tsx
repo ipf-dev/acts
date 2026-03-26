@@ -453,9 +453,9 @@ export function AssetDetailPage({
 
                             <AssetTagEditor
                               characterOptions={characterOptions}
-                              onAddTag={(collectionKey) => {
+                              onAddTag={(collectionKey, explicitValue) => {
                                 if (collectionKey === "locations") {
-                                  const normalizedValue = normalizeTagValue(locationInput);
+                                  const normalizedValue = normalizeTagValue(explicitValue ?? locationInput);
                                   if (!normalizedValue) {
                                     return;
                                   }
@@ -468,7 +468,7 @@ export function AssetDetailPage({
                                   return;
                                 }
 
-                                const normalizedValue = normalizeTagValue(keywordInput);
+                                const normalizedValue = normalizeTagValue(explicitValue ?? keywordInput);
                                 if (!normalizedValue) {
                                   return;
                                 }

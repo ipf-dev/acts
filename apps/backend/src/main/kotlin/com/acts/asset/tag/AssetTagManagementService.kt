@@ -40,6 +40,17 @@ class AssetTagManagementService(
     }
 
     @Transactional
+    fun listTagOptions(actorEmail: String): AssetTagOptionCatalogResponse {
+        val actor = requireActor(actorEmail)
+        assetAuthorizationService.requireLibraryAccess(actor)
+
+        return AssetTagOptionCatalogResponse(
+            locations = assetTagRepository.findValueOptionsByTagType(AssetTagType.LOCATION),
+            keywords = assetTagRepository.findValueOptionsByTagType(AssetTagType.KEYWORD),
+        )
+    }
+
+    @Transactional
     fun getAdminCatalog(actorEmail: String): AdminAssetTagCatalogResponse {
         requireAdmin(actorEmail)
         return loadAdminCatalog()

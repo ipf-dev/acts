@@ -76,9 +76,9 @@ Expected first-slice frontend surfaces:
 - searchable admin user table with per-user organization assignment, role visibility, and company-wide viewer state
 - admin allowlist management and audit log views
 - admin feature authorization tab with searchable user selection, per-feature allow/deny matrix, and save flow for the currently implemented asset library feature
-- admin tag management tab with character create/edit/delete + alias support and location/keyword rename/merge/delete actions
+- admin tag management tab with character create/edit/delete + alias support and location/keyword search, usage-sorted pagination, and unified rename/merge/delete dialogs
 - admin policy tab for retention settings and deleted asset restore status/actions
-- asset library page with file/link split upload modal, character dropdown + location/keyword tag inputs, grouped tag display, search, org/creator filters, and company-wide viewer export action
+- asset library page with file/link split upload modal, character dropdown + location/keyword tag suggestion search, grouped tag display, search, org/creator filters, and company-wide viewer export action
 - shell-level feature gating so denied users cannot enter the implemented asset library surface
 - asset detail modal plus detail page with image/video preview or external link summary, history, editable metadata, download/open-link action, and owner/admin delete action
 - generation request forms and result views

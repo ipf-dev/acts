@@ -13,7 +13,7 @@ import {
 import { Input } from "../../components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
-import type { CharacterTagOptionView } from "../../api/types";
+import type { AssetTagOptionCatalogView, CharacterTagOptionView } from "../../api/types";
 import { commitPendingTagInputs, normalizeTagValue, toggleCharacterTagId } from "./asset-library-utils";
 import { formatFileSize, typeLabelMap } from "./asset-detail-model";
 import type {
@@ -30,6 +30,7 @@ interface AssetUploadModalProps {
   isUploading: boolean;
   onClose: () => void;
   onRegisterAssetLinks: (drafts: AssetLinkDraftView[]) => Promise<void>;
+  tagOptions: AssetTagOptionCatalogView;
   onUploadAssets: (drafts: AssetFileUploadDraftView[]) => Promise<void>;
 }
 
@@ -39,6 +40,7 @@ export function AssetUploadModal({
   isUploading,
   onClose,
   onRegisterAssetLinks,
+  tagOptions,
   onUploadAssets
 }: AssetUploadModalProps): React.JSX.Element | null {
   const [fileDrafts, setFileDrafts] = useState<AssetFileUploadDraftView[]>([]);
@@ -140,9 +142,15 @@ export function AssetUploadModal({
     );
   }
 
-  function handleAddDraftTag(draftId: string, collectionKey: AssetTagCollectionKey): void {
+  function handleAddDraftTag(
+    draftId: string,
+    collectionKey: AssetTagCollectionKey,
+    explicitValue?: string
+  ): void {
     setFileDrafts((currentDrafts) =>
-      currentDrafts.map((draft) => (draft.id === draftId ? addDraftTagValue(draft, collectionKey) : draft))
+      currentDrafts.map((draft) =>
+        draft.id === draftId ? addDraftTagValue(draft, collectionKey, explicitValue) : draft
+      )
     );
   }
 
@@ -187,8 +195,8 @@ export function AssetUploadModal({
     }));
   }
 
-  function handleAddLinkComposerTag(collectionKey: AssetTagCollectionKey): void {
-    setLinkComposer((currentComposer) => addDraftTagValue(currentComposer, collectionKey));
+  function handleAddLinkComposerTag(collectionKey: AssetTagCollectionKey, explicitValue?: string): void {
+    setLinkComposer((currentComposer) => addDraftTagValue(currentComposer, collectionKey, explicitValue));
   }
 
   function handleRemoveLinkComposerTag(collectionKey: AssetTagCollectionKey, tag: string): void {
@@ -345,10 +353,13 @@ export function AssetUploadModal({
 
                         <AssetTagEditor
                           characterOptions={characterOptions}
-                          onAddTag={(collectionKey) => handleAddDraftTag(draft.id, collectionKey)}
+                          onAddTag={(collectionKey, explicitValue) =>
+                            handleAddDraftTag(draft.id, collectionKey, explicitValue)
+                          }
                           onCharacterToggle={(characterTagId) => handleToggleDraftCharacter(draft.id, characterTagId)}
                           onRemoveTag={(collectionKey, tag) => handleRemoveDraftTag(draft.id, collectionKey, tag)}
                           onTagInputChange={(key, value) => handleDraftTagInputChange(draft.id, key, value)}
+                          tagOptions={tagOptions}
                           value={draft}
                         />
                       </div>
@@ -402,6 +413,7 @@ export function AssetUploadModal({
                     onCharacterToggle={handleToggleLinkCharacter}
                     onRemoveTag={handleRemoveLinkComposerTag}
                     onTagInputChange={handleLinkTagInputChange}
+                    tagOptions={tagOptions}
                     value={linkComposer}
                   />
 
@@ -557,10 +569,11 @@ function inferAssetType(file: File): AssetFileUploadDraftView["type"] {
 
 function addDraftTagValue<T extends AssetLinkComposerView | AssetFileUploadDraftView>(
   draft: T,
-  collectionKey: AssetTagCollectionKey
+  collectionKey: AssetTagCollectionKey,
+  explicitValue?: string
 ): T {
   const inputKey = collectionKey === "locations" ? "locationInput" : "keywordInput";
-  const normalizedTag = normalizeTagValue(draft[inputKey]);
+  const normalizedTag = normalizeTagValue(explicitValue ?? draft[inputKey]);
   if (!normalizedTag) {
     return draft;
   }

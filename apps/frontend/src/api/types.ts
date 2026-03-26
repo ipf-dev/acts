@@ -26,6 +26,16 @@ export interface CharacterTagOptionView {
   aliases: string[];
 }
 
+export interface AssetTagValueOptionView {
+  value: string;
+  usageCount: number;
+}
+
+export interface AssetTagOptionCatalogView {
+  locations: AssetTagValueOptionView[];
+  keywords: AssetTagValueOptionView[];
+}
+
 export interface AdminCharacterTagView {
   id: number;
   name: string;

@@ -27,6 +27,20 @@ class AssetTagController(
         }
     }
 
+    @GetMapping("/options")
+    fun listTagOptions(authentication: Authentication?): ResponseEntity<AssetTagOptionCatalogResponse> {
+        val actorEmail = currentActorEmail(authentication)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+
+        return try {
+            ResponseEntity.ok(assetTagManagementService.listTagOptions(actorEmail))
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
+    }
+
     private fun currentActorEmail(authentication: Authentication?): String? = when (val principal = authentication?.principal) {
         is OidcUser -> principal.email?.lowercase()
         else -> authentication?.name?.lowercase()

@@ -8,6 +8,7 @@ import {
 } from "../../api/auth";
 import type {
   AssetDetailView,
+  AssetTagOptionCatalogView,
   AssetSummaryView,
   AuthSessionView,
   CharacterTagOptionView
@@ -25,6 +26,7 @@ interface AssetLibraryPageState {
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   characterOptions: CharacterTagOptionView[];
+  tagOptions: AssetTagOptionCatalogView;
   isAssetDetailLoading: boolean;
   isDeleting: boolean;
   isDownloading: boolean;
@@ -36,6 +38,10 @@ interface AssetLibraryPageState {
 
 const dashboardApi = createDashboardApi();
 const initialLocationSearch = window.location.search;
+const emptyTagOptions: AssetTagOptionCatalogView = {
+  keywords: [],
+  locations: []
+};
 
 interface AssetLibraryPageContainerProps {
   onOpenAssetPage: (assetId: number) => void;
@@ -56,6 +62,7 @@ export function AssetLibraryPageContainer({
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
     characterOptions: [],
+    tagOptions: emptyTagOptions,
     isAssetDetailLoading: false,
     isDeleting: false,
     isDownloading: false,
@@ -71,12 +78,13 @@ export function AssetLibraryPageContainer({
 
     async function loadPage(): Promise<void> {
       try {
-        const [assets, characterOptions] = initialSession.authenticated
+        const [assets, characterOptions, tagOptions] = initialSession.authenticated
           ? await Promise.all([
               dashboardApi.listAssets(),
-              dashboardApi.listCharacterTagOptions()
+              dashboardApi.listCharacterTagOptions(),
+              dashboardApi.listAssetTagOptions().catch(() => emptyTagOptions)
             ])
-          : [[], []];
+          : [[], [], emptyTagOptions];
 
         if (!isActive) {
           return;
@@ -88,6 +96,7 @@ export function AssetLibraryPageContainer({
           authErrorMessage: getLoginFailureMessage(initialLocationSearch),
           authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
           characterOptions,
+          tagOptions,
           isLoading: false,
           session: initialSession
         }));
@@ -130,12 +139,16 @@ export function AssetLibraryPageContainer({
         }).then(() => undefined)
       );
 
-      const assets = await dashboardApi.listAssets();
+      const [assets, tagOptions] = await Promise.all([
+        dashboardApi.listAssets(),
+        dashboardApi.listAssetTagOptions().catch(() => null)
+      ]);
 
       setState((currentState) => ({
         ...currentState,
         assets,
         authSuccessMessage: `${drafts.length}개 애셋 업로드가 완료되었습니다.`,
+        tagOptions: tagOptions ?? currentState.tagOptions,
         isUploading: false
       }));
     } catch (error: unknown) {
@@ -167,12 +180,16 @@ export function AssetLibraryPageContainer({
         }))
       });
 
-      const assets = await dashboardApi.listAssets();
+      const [assets, tagOptions] = await Promise.all([
+        dashboardApi.listAssets(),
+        dashboardApi.listAssetTagOptions().catch(() => null)
+      ]);
 
       setState((currentState) => ({
         ...currentState,
         assets,
         authSuccessMessage: `${drafts.length}개 링크 등록이 완료되었습니다.`,
+        tagOptions: tagOptions ?? currentState.tagOptions,
         isUploading: false
       }));
     } catch (error: unknown) {
@@ -321,6 +338,7 @@ export function AssetLibraryPageContainer({
       authErrorMessage={state.authErrorMessage}
       authSuccessMessage={state.authSuccessMessage}
       characterOptions={state.characterOptions}
+      tagOptions={state.tagOptions}
       isAssetDetailLoading={state.isAssetDetailLoading}
       isDeleting={state.isDeleting}
       isDownloading={state.isDownloading}

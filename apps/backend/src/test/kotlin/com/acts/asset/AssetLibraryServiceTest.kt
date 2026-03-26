@@ -201,6 +201,47 @@ class AssetLibraryServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `lists reusable location and keyword tag options sorted by usage count`() {
+        uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "광장 장면 1",
+            fileName = "village-square-1.txt",
+            requestedTags = AssetStructuredTagsRequest(
+                locations = listOf("마을 광장"),
+                keywords = listOf("달리기", "낮"),
+            ),
+        )
+        uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "광장 장면 2",
+            fileName = "village-square-2.txt",
+            requestedTags = AssetStructuredTagsRequest(
+                locations = listOf("마을 광장"),
+                keywords = listOf("달리기"),
+            ),
+        )
+        uploadAsset(
+            actorEmail = "tony@iportfolio.co.kr",
+            actorName = "Tony",
+            title = "숲 장면",
+            fileName = "forest-school.txt",
+            requestedTags = AssetStructuredTagsRequest(
+                locations = listOf("숲속 학교"),
+                keywords = listOf("모험"),
+            ),
+        )
+
+        val tagOptions = assetTagManagementService.listTagOptions("coco@iportfolio.co.kr")
+
+        assertThat(tagOptions.locations).extracting("value").containsExactly("마을 광장", "숲속 학교")
+        assertThat(tagOptions.locations).extracting("usageCount").containsExactly(2L, 1L)
+        assertThat(tagOptions.keywords).extracting("value").containsExactly("달리기", "낮", "모험")
+        assertThat(tagOptions.keywords).extracting("usageCount").containsExactly(2L, 1L, 1L)
+    }
+
+    @Test
     fun `matches korean search terms even when uploaded file name is stored in decomposed unicode`() {
         val decomposedFileName = Normalizer.normalize("폴리17.png", Normalizer.Form.NFD)
 
@@ -781,6 +822,9 @@ class AssetLibraryServiceTest @Autowired constructor(
         actorName: String,
         title: String,
         fileName: String,
+        requestedTags: AssetStructuredTagsRequest = AssetStructuredTagsRequest(
+            keywords = listOf("태그"),
+        ),
     ): AssetSummaryResponse {
         val intentResponse = assetLibraryService.initiateUpload(
             request = AssetUploadIntentRequest(
@@ -789,9 +833,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = title,
                 description = "설명",
-                tags = AssetStructuredTagsRequest(
-                    keywords = listOf("태그"),
-                ),
+                tags = requestedTags,
             ),
             actorEmail = actorEmail,
             actorName = actorName,

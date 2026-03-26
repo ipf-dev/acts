@@ -23,6 +23,7 @@ import {
 import { GOOGLE_LOGIN_PATH } from "../../api/auth";
 import type {
   AssetDetailView,
+  AssetTagOptionCatalogView,
   AssetSummaryView,
   AuthSessionView,
   CharacterTagOptionView
@@ -42,6 +43,7 @@ interface AssetLibraryPageProps {
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   characterOptions: CharacterTagOptionView[];
+  tagOptions: AssetTagOptionCatalogView;
   isAssetDetailLoading: boolean;
   isDeleting: boolean;
   isDownloading: boolean;
@@ -73,6 +75,7 @@ export function AssetLibraryPage({
   authErrorMessage,
   authSuccessMessage,
   characterOptions,
+  tagOptions,
   isAssetDetailLoading,
   isDeleting,
   isDownloading,
@@ -509,6 +512,7 @@ export function AssetLibraryPage({
         isUploading={isUploading}
         onClose={() => setIsUploadModalOpen(false)}
         onRegisterAssetLinks={onRegisterAssetLinks}
+        tagOptions={tagOptions}
         onUploadAssets={onUploadAssets}
       />
       <AssetDetailModal

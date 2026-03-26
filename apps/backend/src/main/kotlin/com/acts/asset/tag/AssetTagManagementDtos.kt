@@ -9,6 +9,16 @@ data class CharacterTagOptionResponse(
     val aliases: List<String>,
 )
 
+data class AssetTagValueOptionResponse(
+    val value: String,
+    val usageCount: Long,
+)
+
+data class AssetTagOptionCatalogResponse(
+    val locations: List<AssetTagValueOptionResponse>,
+    val keywords: List<AssetTagValueOptionResponse>,
+)
+
 data class AdminCharacterTagResponse(
     val id: Long,
     val name: String,
