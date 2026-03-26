@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type React from "react";
 import { Check, ChevronDown, MapPin, Tags, UserRound, X } from "lucide-react";
 import {
@@ -51,6 +52,54 @@ export function AssetTagEditor({
   onTagInputChange,
   value
 }: AssetTagEditorProps): React.JSX.Element {
+  const compositionStateRef = useRef<Record<AssetTagInputKey, boolean>>({
+    keywordInput: false,
+    locationInput: false
+  });
+  const pendingEnterRef = useRef<Record<AssetTagInputKey, AssetTagCollectionKey | null>>({
+    keywordInput: null,
+    locationInput: null
+  });
+
+  function handleTagInputKeyDown(
+    collectionKey: AssetTagCollectionKey,
+    inputKey: AssetTagInputKey,
+    event: React.KeyboardEvent<HTMLInputElement>
+  ): void {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    const nativeEvent = event.nativeEvent as KeyboardEvent;
+    const isComposing =
+      compositionStateRef.current[inputKey] ||
+      nativeEvent.isComposing ||
+      nativeEvent.keyCode === 229;
+
+    if (isComposing) {
+      pendingEnterRef.current[inputKey] = collectionKey;
+      return;
+    }
+
+    event.preventDefault();
+    onAddTag(collectionKey);
+  }
+
+  function handleTagInputCompositionStart(inputKey: AssetTagInputKey): void {
+    compositionStateRef.current[inputKey] = true;
+  }
+
+  function handleTagInputCompositionEnd(inputKey: AssetTagInputKey): void {
+    compositionStateRef.current[inputKey] = false;
+    const pendingCollectionKey = pendingEnterRef.current[inputKey];
+    if (!pendingCollectionKey) {
+      return;
+    }
+
+    pendingEnterRef.current[inputKey] = null;
+    window.requestAnimationFrame(() => onAddTag(pendingCollectionKey));
+  }
+
   return (
     <div className={cn("space-y-4", className)}>
       <div className="space-y-2">
@@ -140,12 +189,9 @@ export function AssetTagEditor({
               <Input
                 className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
                 onChange={(event) => onTagInputChange(config.inputKey, event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    onAddTag(collectionKey);
-                  }
-                }}
+                onCompositionEnd={() => handleTagInputCompositionEnd(config.inputKey)}
+                onCompositionStart={() => handleTagInputCompositionStart(config.inputKey)}
+                onKeyDown={(event) => handleTagInputKeyDown(collectionKey, config.inputKey, event)}
                 placeholder={config.placeholder}
                 value={value[config.inputKey]}
               />

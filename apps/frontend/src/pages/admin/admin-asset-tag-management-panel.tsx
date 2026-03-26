@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type React from "react";
 import { ArrowRightLeft, MapPin, PencilLine, Tags, Trash2, UserRound } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
@@ -38,6 +38,8 @@ export function AdminAssetTagManagement({
   const [characterName, setCharacterName] = useState("");
   const [aliasInput, setAliasInput] = useState("");
   const [aliases, setAliases] = useState<string[]>([]);
+  const aliasCompositionStateRef = useRef(false);
+  const pendingAliasSubmitRef = useRef(false);
 
   function resetCharacterForm(): void {
     setEditingCharacterId(null);
@@ -56,6 +58,40 @@ export function AdminAssetTagManagement({
       currentAliases.includes(normalizedAlias) ? currentAliases : [...currentAliases, normalizedAlias]
     );
     setAliasInput("");
+  }
+
+  function handleAliasKeyDown(event: React.KeyboardEvent<HTMLInputElement>): void {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    const nativeEvent = event.nativeEvent as KeyboardEvent;
+    const isComposing =
+      aliasCompositionStateRef.current ||
+      nativeEvent.isComposing ||
+      nativeEvent.keyCode === 229;
+
+    if (isComposing) {
+      pendingAliasSubmitRef.current = true;
+      return;
+    }
+
+    event.preventDefault();
+    handleAddAlias();
+  }
+
+  function handleAliasCompositionStart(): void {
+    aliasCompositionStateRef.current = true;
+  }
+
+  function handleAliasCompositionEnd(): void {
+    aliasCompositionStateRef.current = false;
+    if (!pendingAliasSubmitRef.current) {
+      return;
+    }
+
+    pendingAliasSubmitRef.current = false;
+    window.requestAnimationFrame(() => handleAddAlias());
   }
 
   async function handleSaveCharacter(): Promise<void> {
@@ -165,12 +201,9 @@ export function AdminAssetTagManagement({
                 <Input
                   disabled={isSaving}
                   onChange={(event) => setAliasInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      handleAddAlias();
-                    }
-                  }}
+                  onCompositionEnd={handleAliasCompositionEnd}
+                  onCompositionStart={handleAliasCompositionStart}
+                  onKeyDown={handleAliasKeyDown}
                   placeholder="검색용 alias 추가"
                   value={aliasInput}
                 />

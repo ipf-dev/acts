@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { ImageIcon, Link2, Plus, Upload, X } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
@@ -13,7 +14,8 @@ import { Input } from "../../components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
 import type { CharacterTagOptionView } from "../../api/types";
-import { typeLabelMap } from "./asset-detail-model";
+import { commitPendingTagInputs, normalizeTagValue, toggleCharacterTagId } from "./asset-library-utils";
+import { formatFileSize, typeLabelMap } from "./asset-detail-model";
 import type {
   AssetFileUploadDraftView,
   AssetLinkComposerView,
@@ -24,66 +26,48 @@ import { AssetTagEditor, type AssetTagCollectionKey, type AssetTagInputKey } fro
 
 interface AssetUploadModalProps {
   characterOptions: CharacterTagOptionView[];
-  fileDrafts: AssetFileUploadDraftView[];
   isOpen: boolean;
   isUploading: boolean;
-  linkComposer: AssetLinkComposerView;
-  linkDrafts: AssetLinkDraftView[];
-  onActiveTabChange: (value: "FILE" | "LINK") => void;
-  onAddLinkDraft: () => void;
-  onAddTag: (draftId: string, collectionKey: AssetTagCollectionKey) => void;
-  onCharacterToggle: (draftId: string, characterTagId: number) => void;
   onClose: () => void;
-  onDescriptionChange: (draftId: string, value: string) => void;
-  onFileDrop: (files: File[]) => Promise<void>;
-  onLinkCharacterToggle: (characterTagId: number) => void;
-  onLinkComposerChange: (key: "url" | "title" | "linkType", value: string) => void;
-  onLinkTagAdd: (collectionKey: AssetTagCollectionKey) => void;
-  onLinkTagInputChange: (key: AssetTagInputKey, value: string) => void;
-  onLinkTagRemove: (collectionKey: AssetTagCollectionKey, tag: string) => void;
-  onRemoveLinkDraft: (draftId: string) => void;
-  onRemoveDraft: (draftId: string) => void;
-  onRemoveTag: (draftId: string, collectionKey: AssetTagCollectionKey, tag: string) => void;
-  onSubmit: () => Promise<void>;
-  onTagInputChange: (draftId: string, key: AssetTagInputKey, value: string) => void;
-  onTitleChange: (draftId: string, value: string) => void;
-  uploadMode: "FILE" | "LINK";
+  onRegisterAssetLinks: (drafts: AssetLinkDraftView[]) => Promise<void>;
+  onUploadAssets: (drafts: AssetFileUploadDraftView[]) => Promise<void>;
 }
 
 export function AssetUploadModal({
   characterOptions,
-  fileDrafts,
   isOpen,
   isUploading,
-  linkComposer,
-  linkDrafts,
-  onActiveTabChange,
-  onAddLinkDraft,
-  onAddTag,
-  onCharacterToggle,
   onClose,
-  onDescriptionChange,
-  onFileDrop,
-  onLinkCharacterToggle,
-  onLinkComposerChange,
-  onLinkTagAdd,
-  onLinkTagInputChange,
-  onLinkTagRemove,
-  onRemoveLinkDraft,
-  onRemoveDraft,
-  onRemoveTag,
-  onSubmit,
-  onTagInputChange,
-  onTitleChange,
-  uploadMode
+  onRegisterAssetLinks,
+  onUploadAssets
 }: AssetUploadModalProps): React.JSX.Element | null {
+  const [fileDrafts, setFileDrafts] = useState<AssetFileUploadDraftView[]>([]);
+  const [linkComposer, setLinkComposer] = useState<AssetLinkComposerView>(createEmptyLinkComposer());
+  const [linkDrafts, setLinkDrafts] = useState<AssetLinkDraftView[]>([]);
+  const [uploadMode, setUploadMode] = useState<"FILE" | "LINK">("FILE");
+  const fileDraftsRef = useRef<AssetFileUploadDraftView[]>([]);
+
+  useEffect(() => {
+    fileDraftsRef.current = fileDrafts;
+  }, [fileDrafts]);
+
+  useEffect(() => {
+    return () => {
+      fileDraftsRef.current.forEach((draft) => {
+        if (draft.previewUrl) {
+          URL.revokeObjectURL(draft.previewUrl);
+        }
+      });
+    };
+  }, []);
+
   async function handleFileSelection(event: React.ChangeEvent<HTMLInputElement>): Promise<void> {
     const nextFiles = Array.from(event.target.files ?? []);
     if (nextFiles.length === 0) {
       return;
     }
 
-    await onFileDrop(nextFiles);
+    await handleFileDrop(nextFiles);
     event.target.value = "";
   }
 
@@ -94,7 +78,182 @@ export function AssetUploadModal({
       return;
     }
 
-    await onFileDrop(nextFiles);
+    await handleFileDrop(nextFiles);
+  }
+
+  async function handleFileDrop(files: File[]): Promise<void> {
+    const nextDrafts = await Promise.all(files.map((file) => createDraftFromFile(file)));
+
+    setFileDrafts((currentDrafts) => {
+      const existingNames = new Set(currentDrafts.map((draft) => `${draft.file.name}:${draft.file.size}`));
+      const uniqueDrafts = nextDrafts.filter((draft) => {
+        const isDuplicate = existingNames.has(`${draft.file.name}:${draft.file.size}`);
+        if (isDuplicate && draft.previewUrl) {
+          URL.revokeObjectURL(draft.previewUrl);
+        }
+        return !isDuplicate;
+      });
+      return [...currentDrafts, ...uniqueDrafts];
+    });
+  }
+
+  function handleRemoveDraft(draftId: string): void {
+    setFileDrafts((currentDrafts) =>
+      currentDrafts.filter((draft) => {
+        if (draft.id === draftId && draft.previewUrl) {
+          URL.revokeObjectURL(draft.previewUrl);
+        }
+        return draft.id !== draftId;
+      })
+    );
+  }
+
+  function handleTitleChange(draftId: string, value: string): void {
+    setFileDrafts((currentDrafts) =>
+      currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, title: value } : draft))
+    );
+  }
+
+  function handleDescriptionChange(draftId: string, value: string): void {
+    setFileDrafts((currentDrafts) =>
+      currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, description: value } : draft))
+    );
+  }
+
+  function handleDraftTagInputChange(
+    draftId: string,
+    key: AssetTagInputKey,
+    value: string
+  ): void {
+    setFileDrafts((currentDrafts) =>
+      currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, [key]: value } : draft))
+    );
+  }
+
+  function handleToggleDraftCharacter(draftId: string, characterTagId: number): void {
+    setFileDrafts((currentDrafts) =>
+      currentDrafts.map((draft) =>
+        draft.id === draftId
+          ? { ...draft, characterTagIds: toggleCharacterTagId(draft.characterTagIds, characterTagId) }
+          : draft
+      )
+    );
+  }
+
+  function handleAddDraftTag(draftId: string, collectionKey: AssetTagCollectionKey): void {
+    setFileDrafts((currentDrafts) =>
+      currentDrafts.map((draft) => (draft.id === draftId ? addDraftTagValue(draft, collectionKey) : draft))
+    );
+  }
+
+  function handleRemoveDraftTag(
+    draftId: string,
+    collectionKey: AssetTagCollectionKey,
+    value: string
+  ): void {
+    setFileDrafts((currentDrafts) =>
+      currentDrafts.map((draft) =>
+        draft.id === draftId
+          ? { ...draft, [collectionKey]: draft[collectionKey].filter((currentValue) => currentValue !== value) }
+          : draft
+      )
+    );
+  }
+
+  function handleLinkComposerChange(
+    key: "url" | "title" | "linkType",
+    value: string
+  ): void {
+    setLinkComposer((currentComposer) => ({
+      ...currentComposer,
+      [key]: value
+    }));
+  }
+
+  function handleLinkTagInputChange(
+    key: AssetTagInputKey,
+    value: string
+  ): void {
+    setLinkComposer((currentComposer) => ({
+      ...currentComposer,
+      [key]: value
+    }));
+  }
+
+  function handleToggleLinkCharacter(characterTagId: number): void {
+    setLinkComposer((currentComposer) => ({
+      ...currentComposer,
+      characterTagIds: toggleCharacterTagId(currentComposer.characterTagIds, characterTagId)
+    }));
+  }
+
+  function handleAddLinkComposerTag(collectionKey: AssetTagCollectionKey): void {
+    setLinkComposer((currentComposer) => addDraftTagValue(currentComposer, collectionKey));
+  }
+
+  function handleRemoveLinkComposerTag(collectionKey: AssetTagCollectionKey, tag: string): void {
+    setLinkComposer((currentComposer) => ({
+      ...currentComposer,
+      [collectionKey]: currentComposer[collectionKey].filter((currentValue) => currentValue !== tag)
+    }));
+  }
+
+  function handleAddLinkDraft(): void {
+    const resolvedComposer = commitPendingTagInputs(linkComposer);
+    const normalizedUrl = normalizeUrlInput(resolvedComposer.url);
+    if (!normalizedUrl) {
+      return;
+    }
+
+    const host = extractLinkHost(normalizedUrl);
+    const resolvedTitle = normalizeDisplayValue(resolvedComposer.title).trim() || host;
+    const resolvedLinkType = normalizeDisplayValue(resolvedComposer.linkType).trim() || inferLinkType(normalizedUrl);
+
+    setLinkDrafts((currentDrafts) => {
+      if (currentDrafts.some((draft) => draft.url === normalizedUrl)) {
+        return currentDrafts;
+      }
+
+      return [
+        ...currentDrafts,
+        {
+          id: crypto.randomUUID(),
+          characterTagIds: resolvedComposer.characterTagIds,
+          keywordInput: "",
+          keywords: resolvedComposer.keywords,
+          linkType: resolvedLinkType,
+          locationInput: "",
+          locations: resolvedComposer.locations,
+          title: resolvedTitle,
+          url: normalizedUrl
+        }
+      ];
+    });
+    setLinkComposer(createEmptyLinkComposer());
+  }
+
+  function handleRemoveLinkDraft(draftId: string): void {
+    setLinkDrafts((currentDrafts) => currentDrafts.filter((draft) => draft.id !== draftId));
+  }
+
+  async function handleSubmit(): Promise<void> {
+    if (uploadMode === "FILE") {
+      const resolvedDrafts = fileDrafts.map((draft) => commitPendingTagInputs(draft));
+      setFileDrafts(resolvedDrafts);
+      await onUploadAssets(resolvedDrafts);
+      resolvedDrafts.forEach((draft) => {
+        if (draft.previewUrl) {
+          URL.revokeObjectURL(draft.previewUrl);
+        }
+      });
+      setFileDrafts([]);
+    } else {
+      await onRegisterAssetLinks(linkDrafts);
+      setLinkDrafts([]);
+      setLinkComposer(createEmptyLinkComposer());
+    }
+
+    onClose();
   }
 
   const activeDraftCount = uploadMode === "FILE" ? fileDrafts.length : linkDrafts.length;
@@ -110,7 +269,7 @@ export function AssetUploadModal({
         </DialogHeader>
 
         <div className="max-h-[calc(90vh-170px)] space-y-4 overflow-y-auto px-6 py-5">
-          <Tabs onValueChange={(value) => onActiveTabChange(value as "FILE" | "LINK")} value={uploadMode}>
+          <Tabs onValueChange={(value) => setUploadMode(value as "FILE" | "LINK")} value={uploadMode}>
             <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-muted/70 p-1">
               <TabsTrigger className="rounded-xl py-2.5" value="FILE">
                 파일 업로드
@@ -163,12 +322,12 @@ export function AssetUploadModal({
 
                       <div className="min-w-0 flex-1 space-y-3">
                         <Input
-                          onChange={(event) => onTitleChange(draft.id, event.target.value)}
+                          onChange={(event) => handleTitleChange(draft.id, event.target.value)}
                           value={draft.title}
                         />
                         <Textarea
                           className="min-h-20 rounded-2xl bg-white"
-                          onChange={(event) => onDescriptionChange(draft.id, event.target.value)}
+                          onChange={(event) => handleDescriptionChange(draft.id, event.target.value)}
                           placeholder="애셋 설명을 입력하세요"
                           value={draft.description}
                         />
@@ -186,10 +345,10 @@ export function AssetUploadModal({
 
                         <AssetTagEditor
                           characterOptions={characterOptions}
-                          onAddTag={(collectionKey) => onAddTag(draft.id, collectionKey)}
-                          onCharacterToggle={(characterTagId) => onCharacterToggle(draft.id, characterTagId)}
-                          onRemoveTag={(collectionKey, tag) => onRemoveTag(draft.id, collectionKey, tag)}
-                          onTagInputChange={(key, value) => onTagInputChange(draft.id, key, value)}
+                          onAddTag={(collectionKey) => handleAddDraftTag(draft.id, collectionKey)}
+                          onCharacterToggle={(characterTagId) => handleToggleDraftCharacter(draft.id, characterTagId)}
+                          onRemoveTag={(collectionKey, tag) => handleRemoveDraftTag(draft.id, collectionKey, tag)}
+                          onTagInputChange={(key, value) => handleDraftTagInputChange(draft.id, key, value)}
                           value={draft}
                         />
                       </div>
@@ -197,7 +356,7 @@ export function AssetUploadModal({
 
                     <button
                       className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      onClick={() => onRemoveDraft(draft.id)}
+                      onClick={() => handleRemoveDraft(draft.id)}
                       type="button"
                     >
                       <X className="h-4 w-4" />
@@ -213,7 +372,7 @@ export function AssetUploadModal({
                   <div className="space-y-2">
                     <p className="text-sm font-medium">URL</p>
                     <Input
-                      onChange={(event) => onLinkComposerChange("url", event.target.value)}
+                      onChange={(event) => handleLinkComposerChange("url", event.target.value)}
                       placeholder="https://drive.google.com/... 또는 https://www.youtube.com/..."
                       value={linkComposer.url}
                     />
@@ -222,7 +381,7 @@ export function AssetUploadModal({
                   <div className="space-y-2">
                     <p className="text-sm font-medium">제목</p>
                     <Input
-                      onChange={(event) => onLinkComposerChange("title", event.target.value)}
+                      onChange={(event) => handleLinkComposerChange("title", event.target.value)}
                       placeholder="비워두면 URL 도메인명으로 자동 등록됩니다."
                       value={linkComposer.title}
                     />
@@ -231,7 +390,7 @@ export function AssetUploadModal({
                   <div className="space-y-2">
                     <p className="text-sm font-medium">링크 유형</p>
                     <Input
-                      onChange={(event) => onLinkComposerChange("linkType", event.target.value)}
+                      onChange={(event) => handleLinkComposerChange("linkType", event.target.value)}
                       placeholder="Google Drive / YouTube / Notion / 기타"
                       value={linkComposer.linkType}
                     />
@@ -239,15 +398,15 @@ export function AssetUploadModal({
 
                   <AssetTagEditor
                     characterOptions={characterOptions}
-                    onAddTag={onLinkTagAdd}
-                    onCharacterToggle={onLinkCharacterToggle}
-                    onRemoveTag={onLinkTagRemove}
-                    onTagInputChange={onLinkTagInputChange}
+                    onAddTag={handleAddLinkComposerTag}
+                    onCharacterToggle={handleToggleLinkCharacter}
+                    onRemoveTag={handleRemoveLinkComposerTag}
+                    onTagInputChange={handleLinkTagInputChange}
                     value={linkComposer}
                   />
 
                   <div className="flex justify-end">
-                    <Button className="rounded-xl px-4" onClick={onAddLinkDraft} type="button" variant="outline">
+                    <Button className="rounded-xl px-4" onClick={handleAddLinkDraft} type="button" variant="outline">
                       <Plus className="h-4 w-4" />
                       목록에 추가
                     </Button>
@@ -285,7 +444,7 @@ export function AssetUploadModal({
 
                       <button
                         className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        onClick={() => onRemoveLinkDraft(draft.id)}
+                        onClick={() => handleRemoveLinkDraft(draft.id)}
                         type="button"
                       >
                         <X className="h-4 w-4" />
@@ -314,7 +473,7 @@ export function AssetUploadModal({
             </Button>
             <Button
               disabled={activeDraftCount === 0 || isUploading}
-              onClick={() => void onSubmit()}
+              onClick={() => void handleSubmit()}
               type="button"
             >
               {isUploading ? "처리 중..." : uploadMode === "FILE" ? `${activeDraftCount}개 업로드` : `${activeDraftCount}개 등록`}
@@ -324,6 +483,151 @@ export function AssetUploadModal({
       </DialogContent>
     </Dialog>
   );
+}
+
+async function createDraftFromFile(file: File): Promise<AssetFileUploadDraftView> {
+  const type = inferAssetType(file);
+  const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+  const dimensions = previewUrl ? await readImageSize(previewUrl) : null;
+  const normalizedFileName = normalizeDisplayValue(file.name);
+
+  return {
+    characterTagIds: [],
+    id: crypto.randomUUID(),
+    file,
+    formatLabel: file.type || file.name.split(".").pop()?.toUpperCase() || "UNKNOWN",
+    keywordInput: "",
+    keywords: createSuggestedKeywords(normalizedFileName, type),
+    locationInput: "",
+    locations: [],
+    previewUrl,
+    sizeLabel: formatFileSize(file.size),
+    suggestedHeight: dimensions?.height ?? null,
+    suggestedWidth: dimensions?.width ?? null,
+    description: "",
+    title: normalizeDisplayValue(normalizedFileName.replace(/\.[^/.]+$/, "")),
+    type
+  };
+}
+
+function createEmptyLinkComposer(): AssetLinkComposerView {
+  return {
+    characterTagIds: [],
+    keywordInput: "",
+    keywords: [],
+    linkType: "",
+    locationInput: "",
+    locations: [],
+    title: "",
+    url: ""
+  };
+}
+
+function createSuggestedKeywords(fileName: string, type: AssetFileUploadDraftView["type"]): string[] {
+  const tokens = normalizeDisplayValue(fileName)
+    .replace(/\.[^/.]+$/, "")
+    .split(/[^0-9A-Za-z가-힣]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2)
+    .slice(0, 4);
+
+  return Array.from(new Set([typeLabelMap[type], ...tokens]));
+}
+
+function inferAssetType(file: File): AssetFileUploadDraftView["type"] {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+
+  if (file.type.startsWith("image/")) {
+    return "IMAGE";
+  }
+  if (file.type.startsWith("video/")) {
+    return "VIDEO";
+  }
+  if (file.type.startsWith("audio/")) {
+    return "AUDIO";
+  }
+  if (extension && ["txt", "md", "rtf"].includes(extension)) {
+    return "SCENARIO";
+  }
+  if (extension && ["pdf", "doc", "docx", "ppt", "pptx", "zip", "ai"].includes(extension)) {
+    return "DOCUMENT";
+  }
+  return "OTHER";
+}
+
+function addDraftTagValue<T extends AssetLinkComposerView | AssetFileUploadDraftView>(
+  draft: T,
+  collectionKey: AssetTagCollectionKey
+): T {
+  const inputKey = collectionKey === "locations" ? "locationInput" : "keywordInput";
+  const normalizedTag = normalizeTagValue(draft[inputKey]);
+  if (!normalizedTag) {
+    return draft;
+  }
+
+  return {
+    ...draft,
+    [inputKey]: "",
+    [collectionKey]: draft[collectionKey].includes(normalizedTag)
+      ? draft[collectionKey]
+      : [...draft[collectionKey], normalizedTag]
+  };
+}
+
+function normalizeUrlInput(value: string): string | null {
+  const normalizedValue = normalizeDisplayValue(value).trim();
+  if (normalizedValue.length === 0) {
+    return null;
+  }
+
+  return normalizedValue.includes("://") ? normalizedValue : `https://${normalizedValue}`;
+}
+
+function normalizeDisplayValue(value: string): string {
+  return value.normalize("NFC");
+}
+
+function readImageSize(previewUrl: string): Promise<{ height: number; width: number }> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      resolve({
+        height: image.naturalHeight,
+        width: image.naturalWidth
+      });
+    };
+    image.onerror = () => {
+      resolve({
+        height: 0,
+        width: 0
+      });
+    };
+    image.src = previewUrl;
+  });
+}
+
+function extractLinkHost(url: string): string {
+  try {
+    return new URL(url).host.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function inferLinkType(url: string): string {
+  const host = extractLinkHost(url).toLowerCase();
+
+  if (host.includes("drive.google.com") || host.includes("docs.google.com")) {
+    return "Google Drive";
+  }
+  if (host.includes("youtube.com") || host.includes("youtu.be")) {
+    return "YouTube";
+  }
+  if (host.includes("notion.so") || host.includes("notion.site")) {
+    return "Notion";
+  }
+
+  return extractLinkHost(url);
 }
 
 function summarizeDraftTags(

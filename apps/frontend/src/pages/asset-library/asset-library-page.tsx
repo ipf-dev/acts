@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useDeferredValue, useState } from "react";
 import type React from "react";
 import {
   Clock3,
@@ -29,22 +29,12 @@ import type {
 } from "../../api/types";
 import { cn, isBlank } from "../../lib/utils";
 import { AssetDetailModal } from "./asset-detail-modal";
-import { formatFileSize, typeLabelMap } from "./asset-detail-model";
+import { typeLabelMap } from "./asset-detail-model";
 import { AssetTypeIcon } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
 import { AssetUploadModal } from "./asset-upload-modal";
-import {
-  commitPendingTagInputs,
-  flattenAssetTags,
-  getAssetPrimaryText,
-  normalizeTagValue,
-  toggleCharacterTagId
-} from "./asset-library-utils";
-import type {
-  AssetFileUploadDraftView,
-  AssetLinkComposerView,
-  AssetLinkDraftView
-} from "./asset-library-page-model";
+import { flattenAssetTags, getAssetPrimaryText } from "./asset-library-utils";
+import type { AssetFileUploadDraftView, AssetLinkDraftView } from "./asset-library-page-model";
 
 interface AssetLibraryPageProps {
   assetDetail: AssetDetailView | null;
@@ -72,7 +62,6 @@ interface AssetLibraryPageProps {
 }
 
 type AssetLibraryLayoutMode = "grid" | "list";
-type AssetUploadMode = "FILE" | "LINK";
 
 const cardDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "short"
@@ -103,31 +92,12 @@ export function AssetLibraryPage({
   session
 }: AssetLibraryPageProps): React.JSX.Element {
   const [creatorFilter, setCreatorFilter] = useState("ALL");
-  const [fileDrafts, setFileDrafts] = useState<AssetFileUploadDraftView[]>([]);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<AssetLibraryLayoutMode>("grid");
-  const [linkComposer, setLinkComposer] = useState<AssetLinkComposerView>(createEmptyLinkComposer());
-  const [linkDrafts, setLinkDrafts] = useState<AssetLinkDraftView[]>([]);
   const [organizationFilter, setOrganizationFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
-  const [uploadMode, setUploadMode] = useState<AssetUploadMode>("FILE");
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const fileDraftsRef = useRef<AssetFileUploadDraftView[]>([]);
-
-  useEffect(() => {
-    fileDraftsRef.current = fileDrafts;
-  }, [fileDrafts]);
-
-  useEffect(() => {
-    return () => {
-      fileDraftsRef.current.forEach((draft) => {
-        if (draft.previewUrl) {
-          URL.revokeObjectURL(draft.previewUrl);
-        }
-      });
-    };
-  }, []);
 
   const creatorOptions = Array.from(new Set(assets.map((asset) => asset.ownerName))).sort((left, right) =>
     left.localeCompare(right, "ko-KR")
@@ -172,193 +142,6 @@ export function AssetLibraryPage({
     organizationFilter !== "ALL" ||
     creatorFilter !== "ALL";
 
-  async function handleFileDrop(files: File[]): Promise<void> {
-    const nextDrafts = await Promise.all(files.map((file) => createDraftFromFile(file)));
-
-    setFileDrafts((currentDrafts) => {
-      const existingNames = new Set(currentDrafts.map((draft) => `${draft.file.name}:${draft.file.size}`));
-      const uniqueDrafts = nextDrafts.filter((draft) => {
-        const isDuplicate = existingNames.has(`${draft.file.name}:${draft.file.size}`);
-        if (isDuplicate && draft.previewUrl) {
-          URL.revokeObjectURL(draft.previewUrl);
-        }
-        return !isDuplicate;
-      });
-      return [...currentDrafts, ...uniqueDrafts];
-    });
-  }
-
-  function handleRemoveDraft(draftId: string): void {
-    setFileDrafts((currentDrafts) =>
-      currentDrafts.filter((draft) => {
-        if (draft.id === draftId && draft.previewUrl) {
-          URL.revokeObjectURL(draft.previewUrl);
-        }
-        return draft.id !== draftId;
-      })
-    );
-  }
-
-  function handleTitleChange(draftId: string, value: string): void {
-    setFileDrafts((currentDrafts) =>
-      currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, title: value } : draft))
-    );
-  }
-
-  function handleDescriptionChange(draftId: string, value: string): void {
-    setFileDrafts((currentDrafts) =>
-      currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, description: value } : draft))
-    );
-  }
-
-  function handleDraftTagInputChange(
-    draftId: string,
-    key: "locationInput" | "keywordInput",
-    value: string
-  ): void {
-    setFileDrafts((currentDrafts) =>
-      currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, [key]: value } : draft))
-    );
-  }
-
-  function handleToggleDraftCharacter(draftId: string, characterTagId: number): void {
-    setFileDrafts((currentDrafts) =>
-      currentDrafts.map((draft) => {
-        if (draft.id !== draftId) {
-          return draft;
-        }
-
-        return {
-          ...draft,
-          characterTagIds: toggleCharacterTagId(draft.characterTagIds, characterTagId)
-        };
-      })
-    );
-  }
-
-  function handleAddDraftTag(
-    draftId: string,
-    collectionKey: "locations" | "keywords"
-  ): void {
-    setFileDrafts((currentDrafts) =>
-      currentDrafts.map((draft) =>
-        draft.id === draftId
-          ? addDraftTagValue(draft, collectionKey)
-          : draft
-      )
-    );
-  }
-
-  function handleRemoveDraftTag(
-    draftId: string,
-    collectionKey: "locations" | "keywords",
-    value: string
-  ): void {
-    setFileDrafts((currentDrafts) =>
-      currentDrafts.map((draft) =>
-        draft.id === draftId
-          ? { ...draft, [collectionKey]: draft[collectionKey].filter((currentValue) => currentValue !== value) }
-          : draft
-      )
-    );
-  }
-
-  function handleLinkComposerChange(
-    key: "url" | "title" | "linkType",
-    value: string
-  ): void {
-    setLinkComposer((currentComposer) => ({
-      ...currentComposer,
-      [key]: value
-    }));
-  }
-
-  function handleLinkTagInputChange(
-    key: "locationInput" | "keywordInput",
-    value: string
-  ): void {
-    setLinkComposer((currentComposer) => ({
-      ...currentComposer,
-      [key]: value
-    }));
-  }
-
-  function handleToggleLinkCharacter(characterTagId: number): void {
-    setLinkComposer((currentComposer) => ({
-      ...currentComposer,
-      characterTagIds: toggleCharacterTagId(currentComposer.characterTagIds, characterTagId)
-    }));
-  }
-
-  function handleAddLinkComposerTag(collectionKey: "locations" | "keywords"): void {
-    setLinkComposer((currentComposer) => addDraftTagValue(currentComposer, collectionKey));
-  }
-
-  function handleRemoveLinkComposerTag(collectionKey: "locations" | "keywords", value: string): void {
-    setLinkComposer((currentComposer) => ({
-      ...currentComposer,
-      [collectionKey]: currentComposer[collectionKey].filter((currentValue) => currentValue !== value)
-    }));
-  }
-
-  function handleAddLinkDraft(): void {
-    const resolvedComposer = commitPendingTagInputs(linkComposer);
-    const normalizedUrl = normalizeUrlInput(resolvedComposer.url);
-    if (!normalizedUrl) {
-      return;
-    }
-
-    const host = extractLinkHost(normalizedUrl);
-    const resolvedTitle = normalizeDisplayValue(resolvedComposer.title).trim() || host;
-    const resolvedLinkType = normalizeDisplayValue(resolvedComposer.linkType).trim() || inferLinkType(normalizedUrl);
-
-    setLinkDrafts((currentDrafts) => {
-      if (currentDrafts.some((draft) => draft.url === normalizedUrl)) {
-        return currentDrafts;
-      }
-
-      return [
-        ...currentDrafts,
-        {
-          id: crypto.randomUUID(),
-          characterTagIds: resolvedComposer.characterTagIds,
-          keywordInput: "",
-          keywords: resolvedComposer.keywords,
-          linkType: resolvedLinkType,
-          locationInput: "",
-          locations: resolvedComposer.locations,
-          title: resolvedTitle,
-          url: normalizedUrl
-        }
-      ];
-    });
-    setLinkComposer(createEmptyLinkComposer());
-  }
-
-  function handleRemoveLinkDraft(draftId: string): void {
-    setLinkDrafts((currentDrafts) => currentDrafts.filter((draft) => draft.id !== draftId));
-  }
-
-  async function handleUploadSubmit(): Promise<void> {
-    if (uploadMode === "FILE") {
-      const resolvedDrafts = fileDrafts.map((draft) => commitPendingTagInputs(draft));
-      setFileDrafts(resolvedDrafts);
-      await onUploadAssets(resolvedDrafts);
-      fileDrafts.forEach((draft) => {
-        if (draft.previewUrl) {
-          URL.revokeObjectURL(draft.previewUrl);
-        }
-      });
-      setFileDrafts([]);
-    } else {
-      await onRegisterAssetLinks(linkDrafts);
-      setLinkDrafts([]);
-      setLinkComposer(createEmptyLinkComposer());
-    }
-
-    setIsUploadModalOpen(false);
-  }
-
   function resetFilters(): void {
     onSearchQueryChange("");
     setTypeFilter("ALL");
@@ -366,8 +149,6 @@ export function AssetLibraryPage({
     setOrganizationFilter("ALL");
     setCreatorFilter("ALL");
   }
-
-  const activeDraftCount = uploadMode === "FILE" ? fileDrafts.length : linkDrafts.length;
 
   return (
     <section className="space-y-6">
@@ -724,30 +505,11 @@ export function AssetLibraryPage({
 
       <AssetUploadModal
         characterOptions={characterOptions}
-        fileDrafts={fileDrafts}
         isOpen={isUploadModalOpen && session.authenticated}
         isUploading={isUploading}
-        linkComposer={linkComposer}
-        linkDrafts={linkDrafts}
-        onActiveTabChange={setUploadMode}
-        onAddLinkDraft={handleAddLinkDraft}
-        onAddTag={handleAddDraftTag}
         onClose={() => setIsUploadModalOpen(false)}
-        onCharacterToggle={handleToggleDraftCharacter}
-        onDescriptionChange={handleDescriptionChange}
-        onFileDrop={handleFileDrop}
-        onLinkComposerChange={handleLinkComposerChange}
-        onLinkTagAdd={handleAddLinkComposerTag}
-        onLinkTagRemove={handleRemoveLinkComposerTag}
-        onLinkCharacterToggle={handleToggleLinkCharacter}
-        onLinkTagInputChange={handleLinkTagInputChange}
-        onRemoveLinkDraft={handleRemoveLinkDraft}
-        onRemoveDraft={handleRemoveDraft}
-        onRemoveTag={handleRemoveDraftTag}
-        onSubmit={handleUploadSubmit}
-        onTagInputChange={handleDraftTagInputChange}
-        onTitleChange={handleTitleChange}
-        uploadMode={uploadMode}
+        onRegisterAssetLinks={onRegisterAssetLinks}
+        onUploadAssets={onUploadAssets}
       />
       <AssetDetailModal
         asset={assetDetail}
@@ -764,153 +526,12 @@ export function AssetLibraryPage({
   );
 }
 
-async function createDraftFromFile(file: File): Promise<AssetFileUploadDraftView> {
-  const type = inferAssetType(file);
-  const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
-  const dimensions = previewUrl ? await readImageSize(previewUrl) : null;
-  const normalizedFileName = normalizeDisplayValue(file.name);
-
-  return {
-    characterTagIds: [],
-    id: crypto.randomUUID(),
-    file,
-    formatLabel: file.type || file.name.split(".").pop()?.toUpperCase() || "UNKNOWN",
-    keywordInput: "",
-    keywords: createSuggestedKeywords(normalizedFileName, type),
-    locationInput: "",
-    locations: [],
-    previewUrl,
-    sizeLabel: formatFileSize(file.size),
-    suggestedHeight: dimensions?.height ?? null,
-    suggestedWidth: dimensions?.width ?? null,
-    description: "",
-    title: normalizeDisplayValue(normalizedFileName.replace(/\.[^/.]+$/, "")),
-    type
-  };
-}
-
-function createEmptyLinkComposer(): AssetLinkComposerView {
-  return {
-    characterTagIds: [],
-    keywordInput: "",
-    keywords: [],
-    linkType: "",
-    locationInput: "",
-    locations: [],
-    title: "",
-    url: ""
-  };
-}
-
-function createSuggestedKeywords(fileName: string, type: AssetSummaryView["type"]): string[] {
-  const tokens = normalizeDisplayValue(fileName)
-    .replace(/\.[^/.]+$/, "")
-    .split(/[^0-9A-Za-z가-힣]+/)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 2)
-    .slice(0, 4);
-
-  return Array.from(new Set([typeLabelMap[type], ...tokens]));
-}
-
-function inferAssetType(file: File): AssetSummaryView["type"] {
-  const extension = file.name.split(".").pop()?.toLowerCase();
-
-  if (file.type.startsWith("image/")) {
-    return "IMAGE";
-  }
-  if (file.type.startsWith("video/")) {
-    return "VIDEO";
-  }
-  if (file.type.startsWith("audio/")) {
-    return "AUDIO";
-  }
-  if (extension && ["txt", "md", "rtf"].includes(extension)) {
-    return "SCENARIO";
-  }
-  if (extension && ["pdf", "doc", "docx", "ppt", "pptx", "zip", "ai"].includes(extension)) {
-    return "DOCUMENT";
-  }
-  return "OTHER";
-}
-
-function addDraftTagValue<T extends AssetLinkComposerView | AssetFileUploadDraftView>(
-  draft: T,
-  collectionKey: "locations" | "keywords"
-): T {
-  const inputKey = collectionKey === "locations" ? "locationInput" : "keywordInput";
-  const normalizedTag = normalizeTagValue(draft[inputKey]);
-  if (!normalizedTag) {
-    return draft;
-  }
-
-  return {
-    ...draft,
-    [inputKey]: "",
-    [collectionKey]: draft[collectionKey].includes(normalizedTag)
-      ? draft[collectionKey]
-      : [...draft[collectionKey], normalizedTag]
-  };
-}
-
-function normalizeUrlInput(value: string): string | null {
-  const normalizedValue = normalizeDisplayValue(value).trim();
-  if (isBlank(normalizedValue)) {
-    return null;
-  }
-
-  return normalizedValue.includes("://") ? normalizedValue : `https://${normalizedValue}`;
-}
-
 function normalizeDisplayValue(value: string): string {
   return value.normalize("NFC");
 }
 
 function normalizeSearchValue(value: string): string {
   return normalizeDisplayValue(value).trim().toLowerCase();
-}
-
-function readImageSize(previewUrl: string): Promise<{ height: number; width: number }> {
-  return new Promise((resolve) => {
-    const image = new Image();
-    image.onload = () => {
-      resolve({
-        height: image.naturalHeight,
-        width: image.naturalWidth
-      });
-    };
-    image.onerror = () => {
-      resolve({
-        height: 0,
-        width: 0
-      });
-    };
-    image.src = previewUrl;
-  });
-}
-
-function extractLinkHost(url: string): string {
-  try {
-    return new URL(url).host.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
-
-function inferLinkType(url: string): string {
-  const host = extractLinkHost(url).toLowerCase();
-
-  if (host.includes("drive.google.com") || host.includes("docs.google.com")) {
-    return "Google Drive";
-  }
-  if (host.includes("youtube.com") || host.includes("youtu.be")) {
-    return "YouTube";
-  }
-  if (host.includes("notion.so") || host.includes("notion.site")) {
-    return "Notion";
-  }
-
-  return extractLinkHost(url);
 }
 
 const assetTypeOptions: AssetSummaryView["type"][] = [
