@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { createDashboardApi } from "../../api/client";
 import {
@@ -8,6 +8,7 @@ import {
 } from "../../api/auth";
 import type {
   AssetDetailView,
+  AssetFileAccessUrlView,
   AssetSummaryView,
   AssetUpdateInput,
   AuthSessionView,
@@ -25,7 +26,10 @@ interface AssetDetailPageState {
   isDeleting: boolean;
   isDownloading: boolean;
   isLoading: boolean;
+  isLoadingPlayback: boolean;
   isSaving: boolean;
+  playbackErrorMessage: string | null;
+  playbackUrl: string | null;
   session: AuthSessionView;
 }
 
@@ -56,9 +60,13 @@ export function AssetDetailPageContainer({
     isDeleting: false,
     isDownloading: false,
     isLoading: true,
+    isLoadingPlayback: false,
     isSaving: false,
+    playbackErrorMessage: null,
+    playbackUrl: null,
     session: initialSession
   });
+  const playbackRequestSequenceRef = useRef(0);
 
   useEffect(() => {
     let isActive = true;
@@ -66,11 +74,14 @@ export function AssetDetailPageContainer({
 
     async function loadPage(): Promise<void> {
       setState((currentState) => ({
-        ...currentState,
-        authErrorMessage: null,
-        authSuccessMessage: null,
-        isLoading: true
-      }));
+          ...currentState,
+          authErrorMessage: null,
+          authSuccessMessage: null,
+          isLoading: true,
+          isLoadingPlayback: false,
+          playbackErrorMessage: null,
+          playbackUrl: null
+        }));
 
       try {
         const [asset, assets, characterOptions] = initialSession.authenticated
@@ -93,8 +104,15 @@ export function AssetDetailPageContainer({
           authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
           characterOptions,
           isLoading: false,
+          isLoadingPlayback: shouldLoadPlaybackUrl(asset),
+          playbackErrorMessage: null,
+          playbackUrl: null,
           session: initialSession
         }));
+
+        if (asset && shouldLoadPlaybackUrl(asset)) {
+          void loadPlaybackUrl(asset.id);
+        }
       } catch (error: unknown) {
         if (!isActive) {
           return;
@@ -120,6 +138,45 @@ export function AssetDetailPageContainer({
       isActive = false;
     };
   }, [assetId]);
+
+  async function loadPlaybackUrl(targetAssetId: number): Promise<void> {
+    const requestSequence = playbackRequestSequenceRef.current + 1;
+    playbackRequestSequenceRef.current = requestSequence;
+
+    setState((currentState) =>
+      currentState.asset?.id === targetAssetId
+        ? {
+            ...currentState,
+            isLoadingPlayback: true,
+            playbackErrorMessage: null
+          }
+        : currentState
+    );
+
+    try {
+      const playbackAccess = await dashboardApi.getAssetFileAccessUrl(targetAssetId, "PLAYBACK");
+      applyPlaybackUrlResult(targetAssetId, requestSequence, playbackAccess);
+    } catch (error: unknown) {
+      if (!isLatestPlaybackRequest(requestSequence)) {
+        return;
+      }
+
+      setState((currentState) =>
+        currentState.asset?.id === targetAssetId
+          ? {
+              ...currentState,
+              isLoadingPlayback: false,
+              playbackErrorMessage: getAssetApiErrorMessage(error, {
+                denied: "현재 권한으로는 이 영상을 재생할 수 없습니다.",
+                fallback: "영상 재생 URL을 불러오지 못했습니다.",
+                notFound: "재생할 영상을 찾을 수 없습니다."
+              }),
+              playbackUrl: null
+            }
+          : currentState
+      );
+    }
+  }
 
   async function handleSave(input: AssetUpdateInput): Promise<void> {
     setState((currentState) => ({
@@ -210,6 +267,14 @@ export function AssetDetailPageContainer({
     }
   }
 
+  async function handleRefreshPlaybackUrl(): Promise<void> {
+    if (!state.asset || !shouldLoadPlaybackUrl(state.asset)) {
+      return;
+    }
+
+    await loadPlaybackUrl(state.asset.id);
+  }
+
   const relatedAssets = useMemo(() => {
     const currentAsset = state.asset;
 
@@ -240,14 +305,47 @@ export function AssetDetailPageContainer({
       isDeleting={state.isDeleting}
       isDownloading={state.isDownloading}
       isLoading={state.isLoading}
+      isLoadingPlayback={state.isLoadingPlayback}
       isSaving={state.isSaving}
       onBack={onBack}
       onDelete={handleDelete}
       onDownload={handleDownload}
       onOpenRelatedAsset={onOpenRelatedAsset}
+      onRefreshPlaybackUrl={handleRefreshPlaybackUrl}
       onSave={handleSave}
+      playbackErrorMessage={state.playbackErrorMessage}
+      playbackUrl={state.playbackUrl}
       relatedAssets={relatedAssets}
       session={state.session}
     />
   );
+
+  function applyPlaybackUrlResult(
+    targetAssetId: number,
+    requestSequence: number,
+    playbackAccess: AssetFileAccessUrlView
+  ): void {
+    if (!isLatestPlaybackRequest(requestSequence)) {
+      return;
+    }
+
+    setState((currentState) =>
+      currentState.asset?.id === targetAssetId
+        ? {
+            ...currentState,
+            isLoadingPlayback: false,
+            playbackErrorMessage: null,
+            playbackUrl: playbackAccess.url
+          }
+        : currentState
+    );
+  }
+
+  function isLatestPlaybackRequest(requestSequence: number): boolean {
+    return requestSequence === playbackRequestSequenceRef.current;
+  }
+}
+
+function shouldLoadPlaybackUrl(asset: AssetDetailView | null): boolean {
+  return asset?.sourceKind === "FILE" && asset.type === "VIDEO";
 }

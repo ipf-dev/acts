@@ -41,6 +41,7 @@ import {
 } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
 import { AssetTagEditor } from "./asset-tag-editor-section";
+import { AssetVideoPlayerPanel } from "./asset-video-player-panel";
 import {
   commitPendingTagInputs,
   findSelectedCharacterTagIds,
@@ -58,12 +59,16 @@ interface AssetDetailPageProps {
   isDeleting: boolean;
   isDownloading: boolean;
   isLoading: boolean;
+  isLoadingPlayback: boolean;
   isSaving: boolean;
   onBack: () => void;
   onDelete: () => Promise<void>;
   onDownload: () => Promise<void>;
   onOpenRelatedAsset: (assetId: number) => void;
+  onRefreshPlaybackUrl: () => Promise<void>;
   onSave: (input: AssetUpdateInput) => Promise<void>;
+  playbackErrorMessage: string | null;
+  playbackUrl: string | null;
   relatedAssets: AssetSummaryView[];
   session: AuthSessionView;
 }
@@ -76,12 +81,16 @@ export function AssetDetailPage({
   isDeleting,
   isDownloading,
   isLoading,
+  isLoadingPlayback,
   isSaving,
   onBack,
   onDelete,
   onDownload,
   onOpenRelatedAsset,
+  onRefreshPlaybackUrl,
   onSave,
+  playbackErrorMessage,
+  playbackUrl,
   relatedAssets,
   session
 }: AssetDetailPageProps): React.JSX.Element {
@@ -96,6 +105,7 @@ export function AssetDetailPage({
   const canEdit = asset?.canEdit ?? false;
   const canDownload = asset?.canDownload ?? false;
   const isLinkAsset = asset?.sourceKind === "LINK";
+  const isVideoAsset = asset?.sourceKind === "FILE" && asset.type === "VIDEO";
 
   useEffect(() => {
     if (!asset) {
@@ -287,16 +297,28 @@ export function AssetDetailPage({
                 </TabsList>
 
                 <TabsContent value="summary">
-                  <Card className="rounded-[24px] border-border shadow-none">
+                    <Card className="rounded-[24px] border-border shadow-none">
                     <CardContent className="space-y-6 p-6">
-                      <AssetPreviewPanel
-                        assetId={asset.id}
-                        sourceKind={asset.sourceKind}
-                        assetType={asset.type}
-                        cacheKey={asset.updatedAt}
-                        className="aspect-[16/9] w-full rounded-[20px]"
-                        title={asset.title}
-                      />
+                      {isVideoAsset ? (
+                        <AssetVideoPlayerPanel
+                          assetId={asset.id}
+                          cacheKey={asset.updatedAt}
+                          errorMessage={playbackErrorMessage}
+                          isLoading={isLoadingPlayback}
+                          onRefreshPlaybackUrl={onRefreshPlaybackUrl}
+                          playbackUrl={playbackUrl}
+                          title={asset.title}
+                        />
+                      ) : (
+                        <AssetPreviewPanel
+                          assetId={asset.id}
+                          sourceKind={asset.sourceKind}
+                          assetType={asset.type}
+                          cacheKey={asset.updatedAt}
+                          className="aspect-[16/9] w-full rounded-[20px]"
+                          title={asset.title}
+                        />
+                      )}
 
                       <section className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">설명</p>
