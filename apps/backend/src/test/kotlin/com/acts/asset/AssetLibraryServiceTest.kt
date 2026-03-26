@@ -10,6 +10,8 @@ import com.acts.asset.tag.CharacterTagAliasEntity
 import com.acts.asset.tag.CharacterTagAliasRepository
 import com.acts.asset.tag.CharacterTagEntity
 import com.acts.asset.tag.CharacterTagRepository
+import com.acts.asset.tag.AssetTagManagementService
+import com.acts.asset.tag.CharacterTagUpsertRequest
 import com.acts.auth.feature.UserFeatureAccessService
 import com.acts.auth.org.OrganizationRepository
 import com.acts.auth.user.UserDirectoryService
@@ -36,6 +38,7 @@ import java.text.Normalizer
 @Transactional
 class AssetLibraryServiceTest @Autowired constructor(
     private val assetLibraryService: AssetLibraryService,
+    private val assetTagManagementService: AssetTagManagementService,
     private val characterTagAliasRepository: CharacterTagAliasRepository,
     private val characterTagRepository: CharacterTagRepository,
     private val organizationRepository: OrganizationRepository,
@@ -281,6 +284,101 @@ class AssetLibraryServiceTest @Autowired constructor(
         val searchedAssets = assetLibraryService.listAssets(
             actorEmail = "coco@iportfolio.co.kr",
             query = AssetListQuery(search = "cocohero"),
+        )
+
+        assertThat(searchedAssets).extracting("id").contains(uploadedAsset.id)
+    }
+
+    @Test
+    fun `updates unused character metadata without requiring existing asset tags`() {
+        val createdCharacter = assetTagManagementService.createCharacterTag(
+            actorEmail = "bson@iportfolio.co.kr",
+            request = CharacterTagUpsertRequest(
+                name = "베키",
+                aliases = listOf("beki"),
+            ),
+        )
+
+        val updatedCharacter = assetTagManagementService.updateCharacterTag(
+            actorEmail = "bson@iportfolio.co.kr",
+            characterId = createdCharacter.id,
+            request = CharacterTagUpsertRequest(
+                name = "베키 리뉴얼",
+                aliases = listOf("becky"),
+            ),
+        )
+
+        assertThat(updatedCharacter.name).isEqualTo("베키 리뉴얼")
+        assertThat(updatedCharacter.aliases).containsExactly("becky")
+    }
+
+    @Test
+    fun `updates character while retaining existing alias values`() {
+        val createdCharacter = assetTagManagementService.createCharacterTag(
+            actorEmail = "bson@iportfolio.co.kr",
+            request = CharacterTagUpsertRequest(
+                name = "베키",
+                aliases = listOf("becky", "beki"),
+            ),
+        )
+
+        val updatedCharacter = assetTagManagementService.updateCharacterTag(
+            actorEmail = "bson@iportfolio.co.kr",
+            characterId = createdCharacter.id,
+            request = CharacterTagUpsertRequest(
+                name = "베키",
+                aliases = listOf("becky", "bk"),
+            ),
+        )
+
+        assertThat(updatedCharacter.aliases).containsExactly("becky", "bk")
+    }
+
+    @Test
+    fun `refreshes asset search text when character aliases change without renaming character`() {
+        val createdCharacter = assetTagManagementService.createCharacterTag(
+            actorEmail = "bson@iportfolio.co.kr",
+            request = CharacterTagUpsertRequest(
+                name = "베키",
+                aliases = listOf("beki"),
+            ),
+        )
+
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
+                fileName = "becky-reference.txt",
+                contentType = "text/plain",
+                fileSizeBytes = 5L,
+                title = "베키 레퍼런스",
+                description = "캐릭터 alias 갱신 테스트",
+                tags = AssetStructuredTagsRequest(
+                    characterTagIds = listOf(createdCharacter.id),
+                ),
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+        val uploadedAsset = assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+        )
+
+        assetTagManagementService.updateCharacterTag(
+            actorEmail = "bson@iportfolio.co.kr",
+            characterId = createdCharacter.id,
+            request = CharacterTagUpsertRequest(
+                name = "베키",
+                aliases = listOf("becky"),
+            ),
+        )
+
+        val searchedAssets = assetLibraryService.listAssets(
+            actorEmail = "coco@iportfolio.co.kr",
+            query = AssetListQuery(search = "becky"),
         )
 
         assertThat(searchedAssets).extracting("id").contains(uploadedAsset.id)

@@ -85,9 +85,11 @@ class AssetTagManagementService(
         val character = characterTagRepository.findById(characterId)
             .orElseThrow { IllegalArgumentException("캐릭터 태그를 찾을 수 없습니다.") }
         val previousNormalizedName = character.normalizedName
+        val previousAliases = characterTagAliasRepository.findAllByCharacterTag_IdOrderByIdAsc(characterId)
         val resolvedName = request.name.normalizedTagOrThrow("캐릭터 이름은 비어 있을 수 없습니다.")
         val normalizedName = normalizedTagValue(resolvedName)
         val resolvedAliases = normalizeAliases(request.aliases)
+        val aliasesChanged = previousAliases.map { alias -> alias.normalizedValue } != resolvedAliases.map(::normalizedTagValue)
 
         validateCharacterNameAvailability(normalizedName, excludeCharacterId = characterId)
         validateCharacterAliasAvailability(
@@ -101,15 +103,25 @@ class AssetTagManagementService(
         character.updatedByEmail = actorEmail
         characterTagRepository.save(character)
 
-        characterTagAliasRepository.deleteAll(
-            characterTagAliasRepository.findAllByCharacterTag_IdOrderByIdAsc(characterId),
-        )
-        saveCharacterAliases(character, resolvedAliases)
-        renameTagValue(
-            tagType = AssetTagType.CHARACTER,
-            currentNormalizedValue = previousNormalizedName,
-            nextValue = resolvedName,
-        )
+        if (aliasesChanged) {
+            characterTagAliasRepository.deleteAll(previousAliases)
+            characterTagAliasRepository.flush()
+            saveCharacterAliases(character, resolvedAliases)
+        }
+
+        when {
+            previousNormalizedName != normalizedName -> {
+                renameTagValue(
+                    tagType = AssetTagType.CHARACTER,
+                    currentNormalizedValue = previousNormalizedName,
+                    nextValue = resolvedName,
+                    failIfMissing = false,
+                )
+            }
+            aliasesChanged -> {
+                refreshSearchText(assetIdsByTagValue(AssetTagType.CHARACTER, previousNormalizedName))
+            }
+        }
 
         return loadAdminCatalog().characters.first { it.id == characterId }
     }
@@ -267,13 +279,17 @@ class AssetTagManagementService(
         tagType: AssetTagType,
         currentNormalizedValue: String,
         nextValue: String,
+        failIfMissing: Boolean = true,
     ) {
         val nextNormalizedValue = normalizedTagValue(nextValue)
         require(currentNormalizedValue != nextNormalizedValue) { "같은 태그 값으로는 수정할 수 없습니다." }
 
         val tags = assetTagRepository.findAllByTagTypeAndNormalizedValue(tagType, currentNormalizedValue)
         if (tags.isEmpty()) {
-            throw IllegalArgumentException("수정할 태그를 찾을 수 없습니다.")
+            if (failIfMissing) {
+                throw IllegalArgumentException("수정할 태그를 찾을 수 없습니다.")
+            }
+            return
         }
 
         val assetIds = tags.mapNotNull { tag -> tag.asset.id }.toSet()
@@ -380,6 +396,11 @@ class AssetTagManagementService(
 
         assetRepository.saveAll(assetsById.values)
     }
+
+    private fun assetIdsByTagValue(tagType: AssetTagType, normalizedValue: String): Set<Long> = assetTagRepository
+        .findAllByTagTypeAndNormalizedValue(tagType, normalizedValue)
+        .mapNotNull { tag -> tag.asset.id }
+        .toSet()
 
     private fun requireActor(actorEmail: String) = userAccountRepository.findById(actorEmail.lowercase())
         .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
