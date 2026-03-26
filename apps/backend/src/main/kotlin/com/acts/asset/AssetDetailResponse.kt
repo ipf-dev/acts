@@ -8,7 +8,6 @@ data class AssetDetailResponse(
     val title: String,
     val type: AssetType,
     val sourceKind: AssetSourceKind,
-    val status: AssetStatus,
     val description: String?,
     val originalFileName: String,
     val mimeType: String,

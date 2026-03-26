@@ -36,7 +36,6 @@ import {
 } from "./asset-detail-model";
 import {
   AssetDataField,
-  AssetStatusChip,
   AssetTagChip,
   AssetTypeIcon
 } from "./asset-detail-section";
@@ -223,7 +222,6 @@ export function AssetDetailPage({
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-3">
                   <h1 className="text-[34px] font-semibold tracking-tight">{asset.title}</h1>
-                  <AssetStatusChip status={asset.status} />
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {typeLabelMap[asset.type]} · v{asset.versionNumber} · {asset.organizationName ?? "조직 미지정"}
@@ -552,14 +550,9 @@ export function AssetDetailPage({
             <div className="space-y-4">
               <Card className="rounded-[24px] border-border shadow-none">
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-sm">상태 정보</CardTitle>
+                  <CardTitle className="text-sm">기본 정보</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <SidebarField
-                    label="상태"
-                    value={<AssetStatusChip status={asset.status} />}
-                  />
-                  <SidebarDivider />
                   <SidebarField label="버전" value={`v${asset.versionNumber}`} />
                   <SidebarDivider />
                   <SidebarField label="유형" value={typeLabelMap[asset.type]} />

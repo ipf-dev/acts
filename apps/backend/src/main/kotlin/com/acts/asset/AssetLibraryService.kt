@@ -70,7 +70,6 @@ class AssetLibraryService(
             title = resolvedTitle,
             assetType = assetType,
             sourceKind = AssetSourceKind.FILE,
-            assetStatus = AssetStatus.UPLOADING,
             description = resolvedDescription,
             originalFileName = resolvedFileName,
             mimeType = contentType,
@@ -152,7 +151,6 @@ class AssetLibraryService(
                 title = resolvedTitle,
                 assetType = assetType,
                 sourceKind = AssetSourceKind.LINK,
-                assetStatus = AssetStatus.READY,
                 description = null,
                 originalFileName = resolvedHost,
                 mimeType = LINK_MIME_TYPE,
@@ -207,14 +205,16 @@ class AssetLibraryService(
         val asset = assetRepository.findById(assetId)
             .orElseThrow { IllegalArgumentException("자산을 찾을 수 없습니다.") }
 
-        require(asset.assetStatus == AssetStatus.UPLOADING) { "업로드 진행 중인 자산이 아닙니다." }
+        require(asset.sourceKind == AssetSourceKind.FILE) { "파일 업로드 자산이 아닙니다." }
         require(asset.ownerEmail == actor.email) { "자산 소유자만 업로드를 완료할 수 있습니다." }
 
         val pendingFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("업로드 대상 파일 정보를 찾을 수 없습니다.")
         require(pendingFile.objectKey == request.objectKey) { "업로드 대상 파일이 일치하지 않습니다." }
+        require(!assetEventRepository.existsByAsset_IdAndEventType(assetId, AssetEventType.CREATED)) {
+            "이미 업로드 완료 처리된 자산입니다."
+        }
 
-        asset.assetStatus = AssetStatus.READY
         asset.fileSizeBytes = request.fileSizeBytes
         asset.widthPx = request.widthPx
         asset.heightPx = request.heightPx
@@ -557,7 +557,6 @@ class AssetLibraryService(
         title = title,
         type = assetType,
         sourceKind = sourceKind,
-        status = assetStatus,
         description = description,
         originalFileName = originalFileName,
         mimeType = mimeType,
@@ -592,7 +591,6 @@ class AssetLibraryService(
         title = title,
         type = assetType,
         sourceKind = sourceKind,
-        status = assetStatus,
         description = description,
         originalFileName = originalFileName,
         mimeType = mimeType,

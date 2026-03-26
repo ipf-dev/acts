@@ -161,13 +161,11 @@ export interface UserFeatureAccessInput {
 
 export type AssetTypeView = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" | "SCENARIO" | "OTHER";
 export type AssetSourceKindView = "FILE" | "LINK";
-export type AssetStatusView = "READY";
 export interface AssetSummaryView {
   id: number;
   title: string;
   type: AssetTypeView;
   sourceKind: AssetSourceKindView;
-  status: AssetStatusView;
   description: string | null;
   originalFileName: string;
   mimeType: string;

@@ -7,9 +7,8 @@ import {
   Sparkles,
   Tag
 } from "lucide-react";
-import type { AssetDetailView, AssetSummaryView } from "../../api/types";
+import type { AssetSummaryView } from "../../api/types";
 import { cn } from "../../lib/utils";
-import { statusLabelMap } from "./asset-detail-model";
 
 export function AssetTypeIcon({
   assetType,
@@ -33,25 +32,6 @@ export function AssetTypeIcon({
     default:
       return <Sparkles className={iconClassName} />;
   }
-}
-
-export function AssetStatusChip({
-  status,
-  className
-}: {
-  status: AssetDetailView["status"];
-  className?: string;
-}): React.JSX.Element {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-medium text-blue-700",
-        className
-      )}
-    >
-      {statusLabelMap[status]}
-    </span>
-  );
 }
 
 export function AssetTagChip({
@@ -94,4 +74,3 @@ export function AssetDataField({
     </div>
   );
 }
-

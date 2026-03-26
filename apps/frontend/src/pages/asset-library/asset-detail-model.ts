@@ -1,4 +1,4 @@
-import type { AssetDetailView, AssetSummaryView } from "../../api/types";
+import type { AssetSummaryView } from "../../api/types";
 
 export const detailDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "short"
@@ -9,10 +9,6 @@ export const historyLabelMap: Record<string, string> = {
   DELETED: "삭제",
   METADATA_UPDATED: "수정",
   RESTORED: "복구"
-};
-
-export const statusLabelMap: Record<AssetDetailView["status"], string> = {
-  READY: "리뷰 중"
 };
 
 export const typeLabelMap: Record<AssetSummaryView["type"], string> = {

@@ -98,7 +98,6 @@ export function AssetLibraryPage({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<AssetLibraryLayoutMode>("grid");
   const [organizationFilter, setOrganizationFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
@@ -124,10 +123,6 @@ export function AssetLibraryPage({
       return false;
     }
 
-    if (statusFilter !== "ALL" && asset.status !== statusFilter) {
-      return false;
-    }
-
     if (organizationFilter !== "ALL" && asset.organizationName !== organizationFilter) {
       return false;
     }
@@ -141,14 +136,12 @@ export function AssetLibraryPage({
   const hasActiveFilters =
     !isBlank(searchQuery) ||
     typeFilter !== "ALL" ||
-    statusFilter !== "ALL" ||
     organizationFilter !== "ALL" ||
     creatorFilter !== "ALL";
 
   function resetFilters(): void {
     onSearchQueryChange("");
     setTypeFilter("ALL");
-    setStatusFilter("ALL");
     setOrganizationFilter("ALL");
     setCreatorFilter("ALL");
   }
@@ -220,7 +213,7 @@ export function AssetLibraryPage({
         <>
           <Card className="rounded-[24px] border-border shadow-none">
             <CardContent className="space-y-4 p-4">
-              <div className="grid gap-3 xl:grid-cols-[minmax(0,1.8fr)_repeat(4,minmax(0,0.36fr))_auto]">
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1.8fr)_repeat(3,minmax(0,0.36fr))_auto]">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -242,16 +235,6 @@ export function AssetLibraryPage({
                         {typeLabelMap[assetType]}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-
-                <Select onValueChange={setStatusFilter} value={statusFilter}>
-                  <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
-                    <SelectValue placeholder="전체 상태" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">전체 상태</SelectItem>
-                    <SelectItem value="READY">리뷰</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -391,14 +374,9 @@ export function AssetLibraryPage({
                             {cardDateFormatter.format(new Date(asset.updatedAt))}
                           </span>
                         </div>
-                        <div className="mt-2 flex items-center justify-between">
-                          <Badge className="rounded-full bg-emerald-100 text-emerald-700" variant="secondary">
-                            {statusLabelMap[asset.status]}
-                          </Badge>
-                          <span className="text-[12px] text-muted-foreground">
-                            {asset.organizationName ?? "조직 미지정"}
-                          </span>
-                        </div>
+                        <p className="mt-2 text-[12px] text-muted-foreground">
+                          {asset.organizationName ?? "조직 미지정"}
+                        </p>
                       </div>
                     </button>
                   </article>
@@ -546,7 +524,3 @@ const assetTypeOptions: AssetSummaryView["type"][] = [
   "SCENARIO",
   "OTHER"
 ];
-
-const statusLabelMap: Record<AssetSummaryView["status"], string> = {
-  READY: "리뷰"
-};

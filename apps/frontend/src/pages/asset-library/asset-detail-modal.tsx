@@ -20,7 +20,6 @@ import {
 } from "./asset-detail-model";
 import {
   AssetDataField,
-  AssetStatusChip,
   AssetTagChip,
   AssetTypeIcon
 } from "./asset-detail-section";
@@ -193,7 +192,6 @@ function AssetSummaryPanel({
           <AssetDataField label="부서" value={asset.organizationName ?? "조직 미지정"} />
           <AssetDataField label="생성일" value={detailDateFormatter.format(new Date(asset.createdAt))} />
           <AssetDataField label="최종 수정일" value={detailDateFormatter.format(new Date(asset.updatedAt))} />
-          <AssetDataField label="상태" value={<AssetStatusChip status={asset.status} />} />
           {asset.sourceKind === "FILE" ? (
             <AssetDataField label="파일 크기" value={formatFileSize(asset.fileSizeBytes)} />
           ) : (

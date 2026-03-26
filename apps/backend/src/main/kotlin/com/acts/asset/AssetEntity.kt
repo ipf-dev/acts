@@ -30,9 +30,6 @@ class AssetEntity(
     @Enumerated(EnumType.STRING)
     @Column(name = "source_kind", nullable = false)
     var sourceKind: AssetSourceKind = AssetSourceKind.FILE,
-    @Enumerated(EnumType.STRING)
-    @Column(name = "asset_status", nullable = false)
-    var assetStatus: AssetStatus,
     @Column(columnDefinition = "text")
     var description: String? = null,
     @Column(name = "original_file_name", nullable = false)

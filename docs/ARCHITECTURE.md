@@ -50,7 +50,7 @@ Expected first-slice backend capabilities:
 - asset metadata in PostgreSQL with binary files stored in object storage or external links stored as metadata-only records
 - LocalStack S3-backed file upload endpoint plus metadata-only link registration endpoint for the first asset slice
 - asset catalog tables for `assets`, `asset_files`, `asset_tags`, `asset_events`, plus character taxonomy tables `character_tags`, `character_tag_aliases`
-- structured asset tags for `CHARACTER` / `LOCATION` / `KEYWORD`, character alias-aware search indexing, description capture, image metadata extraction, video thumbnail generation, and creator/org stamping
+- structured asset tags for `CHARACTER` / `LOCATION` / `KEYWORD`, character alias-aware search indexing, description capture, image metadata extraction, video thumbnail generation, creator/org stamping, and no user-facing asset status field
 - centralized asset authorization for list/detail/download/update/delete/export
 - shared asset visibility for all authenticated users, with owner/Admin management rules and company-wide export privileges
 - asset detail lookup for both modal and page, image/video preview endpoint, metadata update, owner/admin soft delete, backend download endpoint, and ZIP export endpoint
@@ -78,7 +78,7 @@ Expected first-slice frontend surfaces:
 - admin feature authorization tab with searchable user selection, per-feature allow/deny matrix, and save flow for the currently implemented asset library feature
 - admin tag management tab with character create/edit/delete + alias support and location/keyword search, usage-sorted pagination, and unified rename/merge/delete dialogs
 - admin policy tab for retention settings and deleted asset restore status/actions
-- asset library page with file/link split upload modal, character dropdown + location/keyword tag suggestion search, grouped tag display, search, org/creator filters, and company-wide viewer export action
+- asset library page with file/link split upload modal, character dropdown + location/keyword tag suggestion search, grouped tag display, search, org/creator filters, and company-wide viewer export action without a separate asset status filter
 - shell-level feature gating so denied users cannot enter the implemented asset library surface
 - asset detail modal plus detail page with image/video preview or external link summary, history, editable metadata, download/open-link action, and owner/admin delete action
 - generation request forms and result views
