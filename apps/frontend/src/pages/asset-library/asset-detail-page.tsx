@@ -6,8 +6,7 @@ import {
   ExternalLink,
   MoreHorizontal,
   Save,
-  Trash2,
-  X
+  Trash2
 } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -25,7 +24,8 @@ import type {
   AssetDetailView,
   AssetSummaryView,
   AssetUpdateInput,
-  AuthSessionView
+  AuthSessionView,
+  CharacterTagOptionView
 } from "../../api/types";
 import { GOOGLE_LOGIN_PATH } from "../../api/auth";
 import {
@@ -41,12 +41,21 @@ import {
   AssetTypeIcon
 } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
-import { getAssetPrimaryText, openAssetExternalLink } from "./asset-library-utils";
+import { AssetTagEditor } from "./asset-tag-editor-section";
+import {
+  commitPendingTagInputs,
+  findSelectedCharacterTagIds,
+  flattenAssetTags,
+  getAssetPrimaryText,
+  normalizeTagValue,
+  openAssetExternalLink
+} from "./asset-library-utils";
 
 interface AssetDetailPageProps {
   asset: AssetDetailView | null;
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  characterOptions: CharacterTagOptionView[];
   isDeleting: boolean;
   isDownloading: boolean;
   isLoading: boolean;
@@ -64,6 +73,7 @@ export function AssetDetailPage({
   asset,
   authErrorMessage,
   authSuccessMessage,
+  characterOptions,
   isDeleting,
   isDownloading,
   isLoading,
@@ -76,9 +86,12 @@ export function AssetDetailPage({
   relatedAssets,
   session
 }: AssetDetailPageProps): React.JSX.Element {
+  const [characterTagIdsDraft, setCharacterTagIdsDraft] = useState<number[]>([]);
   const [descriptionDraft, setDescriptionDraft] = useState("");
-  const [tagInput, setTagInput] = useState("");
-  const [tagsDraft, setTagsDraft] = useState<string[]>([]);
+  const [keywordInput, setKeywordInput] = useState("");
+  const [keywordsDraft, setKeywordsDraft] = useState<string[]>([]);
+  const [locationInput, setLocationInput] = useState("");
+  const [locationsDraft, setLocationsDraft] = useState<string[]>([]);
   const [titleDraft, setTitleDraft] = useState("");
   const canDelete = asset?.canDelete ?? false;
   const canEdit = asset?.canEdit ?? false;
@@ -92,19 +105,39 @@ export function AssetDetailPage({
 
     setTitleDraft(asset.title);
     setDescriptionDraft(asset.description ?? "");
-    setTagsDraft(asset.tags);
-    setTagInput("");
-  }, [asset]);
+    setCharacterTagIdsDraft(findSelectedCharacterTagIds(asset.tags, characterOptions));
+    setLocationsDraft(asset.tags.locations);
+    setKeywordsDraft(asset.tags.keywords);
+    setLocationInput("");
+    setKeywordInput("");
+  }, [asset, characterOptions]);
 
   async function handleSave(): Promise<void> {
     if (!asset) {
       return;
     }
 
+    const resolvedTags = commitPendingTagInputs({
+      characterTagIds: characterTagIdsDraft,
+      keywordInput,
+      keywords: keywordsDraft,
+      locationInput,
+      locations: locationsDraft
+    });
+
+    setKeywordInput(resolvedTags.keywordInput);
+    setKeywordsDraft(resolvedTags.keywords);
+    setLocationInput(resolvedTags.locationInput);
+    setLocationsDraft(resolvedTags.locations);
+
     await onSave({
       title: titleDraft,
       description: descriptionDraft,
-      tags: tagsDraft
+      tags: {
+        characterTagIds: resolvedTags.characterTagIds,
+        locations: resolvedTags.locations,
+        keywords: resolvedTags.keywords
+      }
     });
   }
 
@@ -297,9 +330,7 @@ export function AssetDetailPage({
 
                       <section className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">태그</p>
-                        <div className="flex flex-wrap gap-2">
-                          {asset.tags.map((tag) => <AssetTagChip key={tag} tag={tag} />)}
-                        </div>
+                        <AssetTagGroupList tags={asset.tags} />
                       </section>
                     </CardContent>
                   </Card>
@@ -420,65 +451,65 @@ export function AssetDetailPage({
                               />
                             </div>
 
-                            <div className="space-y-2">
-                              <p className="text-xs font-medium text-muted-foreground">태그</p>
-                              <div className="flex flex-wrap gap-2">
-                                {tagsDraft.map((tag) => (
-                                  <button
-                                    className="inline-flex items-center gap-1 rounded-full bg-[#efe7ff] px-3 py-1 text-xs font-medium text-[#6d4ae2]"
-                                    key={tag}
-                                    onClick={() =>
-                                      setTagsDraft((currentTags) => currentTags.filter((value) => value !== tag))
-                                    }
-                                    type="button"
-                                  >
-                                    {tag}
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                ))}
-                              </div>
-                              <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-none">
-                                <Input
-                                  className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                                  onChange={(event) => setTagInput(event.target.value)}
-                                  onKeyDown={(event) => {
-                                    if (event.key === "Enter") {
-                                      event.preventDefault();
-                                      const normalizedTag = normalizeTag(tagInput);
-                                      if (!normalizedTag) {
-                                        return;
-                                      }
-                                      setTagsDraft((currentTags) =>
-                                        currentTags.includes(normalizedTag)
-                                          ? currentTags
-                                          : [...currentTags, normalizedTag]
-                                      );
-                                      setTagInput("");
-                                    }
-                                  }}
-                                  placeholder="태그 추가"
-                                  value={tagInput}
-                                />
-                                <button
-                                  className="text-xs font-medium text-primary"
-                                  onClick={() => {
-                                    const normalizedTag = normalizeTag(tagInput);
-                                    if (!normalizedTag) {
-                                      return;
-                                    }
-                                    setTagsDraft((currentTags) =>
-                                      currentTags.includes(normalizedTag)
-                                        ? currentTags
-                                        : [...currentTags, normalizedTag]
-                                    );
-                                    setTagInput("");
-                                  }}
-                                  type="button"
-                                >
-                                  추가
-                                </button>
-                              </div>
-                            </div>
+                            <AssetTagEditor
+                              characterOptions={characterOptions}
+                              onAddTag={(collectionKey) => {
+                                if (collectionKey === "locations") {
+                                  const normalizedValue = normalizeTagValue(locationInput);
+                                  if (!normalizedValue) {
+                                    return;
+                                  }
+                                  setLocationsDraft((currentTags) =>
+                                    currentTags.includes(normalizedValue)
+                                      ? currentTags
+                                      : [...currentTags, normalizedValue]
+                                  );
+                                  setLocationInput("");
+                                  return;
+                                }
+
+                                const normalizedValue = normalizeTagValue(keywordInput);
+                                if (!normalizedValue) {
+                                  return;
+                                }
+                                setKeywordsDraft((currentTags) =>
+                                  currentTags.includes(normalizedValue)
+                                    ? currentTags
+                                    : [...currentTags, normalizedValue]
+                                );
+                                setKeywordInput("");
+                              }}
+                              onCharacterToggle={(characterTagId) =>
+                                setCharacterTagIdsDraft((currentIds) =>
+                                  currentIds.includes(characterTagId)
+                                    ? currentIds.filter((currentId) => currentId !== characterTagId)
+                                    : [...currentIds, characterTagId]
+                                )
+                              }
+                              onRemoveTag={(collectionKey, value) => {
+                                if (collectionKey === "locations") {
+                                  setLocationsDraft((currentTags) => currentTags.filter((tag) => tag !== value));
+                                  return;
+                                }
+
+                                setKeywordsDraft((currentTags) => currentTags.filter((tag) => tag !== value));
+                              }}
+                              onTagInputChange={(key, value) => {
+                                if (key === "locationInput") {
+                                  setLocationInput(value);
+                                  return;
+                                }
+
+                                setKeywordInput(value);
+                              }}
+                              value={{
+                                characterTagIds: characterTagIdsDraft,
+                                keywordInput,
+                                keywords: keywordsDraft,
+                                locationInput,
+                                locations: locationsDraft
+                              }}
+                            />
 
                             <div className="flex justify-end">
                               <Button
@@ -612,7 +643,31 @@ function SidebarDivider(): React.JSX.Element {
   return <div className="h-px w-full bg-border" />;
 }
 
-function normalizeTag(value: string): string | null {
-  const normalizedValue = value.trim();
-  return normalizedValue.length > 0 ? normalizedValue : null;
+function AssetTagGroupList({
+  tags
+}: {
+  tags: AssetDetailView["tags"];
+}): React.JSX.Element {
+  const groups = [
+    { label: "캐릭터", values: tags.characters },
+    { label: "장소", values: tags.locations },
+    { label: "키워드", values: tags.keywords }
+  ];
+
+  if (flattenAssetTags(tags).length === 0) {
+    return <p className="text-sm text-muted-foreground">등록된 태그가 없습니다.</p>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {groups.filter((group) => group.values.length > 0).map((group) => (
+        <div className="space-y-2" key={group.label}>
+          <p className="text-xs font-medium text-muted-foreground">{group.label}</p>
+          <div className="flex flex-wrap gap-2">
+            {group.values.map((tag) => <AssetTagChip key={`${group.label}-${tag}`} tag={tag} />)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }

@@ -1,82 +1,81 @@
 package com.acts.asset.tag
 
-import com.acts.asset.AssetType
 import org.springframework.stereotype.Component
 import java.util.LinkedHashMap
 
 @Component
-class AssetTagSuggestionService {
+class AssetTagSuggestionService(
+    private val characterTagRepository: CharacterTagRepository,
+) {
     fun buildTags(
-        fileName: String,
-        title: String,
-        assetType: AssetType,
-        requestedTags: List<String>,
+        requestedTags: com.acts.asset.AssetStructuredTagsRequest,
     ): List<AssetTagCandidate> {
         val tagsByNormalizedValue = LinkedHashMap<String, AssetTagCandidate>()
 
-        requestedTags.mapNotNull { manualTag ->
-            normalizeTag(manualTag)?.let { normalizedValue ->
+        val characterIds = requestedTags.characterTagIds.distinct()
+        val charactersById = if (characterIds.isEmpty()) {
+            emptyMap()
+        } else {
+            characterTagRepository.findAllById(characterIds)
+                .associateBy { character -> requireNotNull(character.id) }
+                .also { characters ->
+                    require(characters.size == characterIds.size) { "존재하지 않는 캐릭터 태그가 포함되어 있습니다." }
+                }
+        }
+
+        characterIds.forEach { characterId ->
+            val character = charactersById[characterId]
+                ?: throw IllegalArgumentException("존재하지 않는 캐릭터 태그가 포함되어 있습니다.")
+            val candidate = AssetTagCandidate(
+                value = character.name,
+                normalizedValue = character.normalizedName,
+                tagType = AssetTagType.CHARACTER,
+                source = AssetTagSource.MANUAL,
+            )
+            tagsByNormalizedValue.putIfAbsent(candidate.key(), candidate)
+        }
+
+        requestedTags.locations.mapNotNull { location ->
+            normalizeTag(location)?.let { normalizedValue ->
                 AssetTagCandidate(
-                    value = manualTag.trim(),
+                    value = location.trim(),
                     normalizedValue = normalizedValue,
+                    tagType = AssetTagType.LOCATION,
                     source = AssetTagSource.MANUAL,
                 )
             }
         }.forEach { candidate ->
-            tagsByNormalizedValue.putIfAbsent(candidate.normalizedValue, candidate)
+            tagsByNormalizedValue.putIfAbsent(candidate.key(), candidate)
         }
 
-        val autoCandidates = sequenceOf(
-            assetType.labelTag(),
-            *extractKeywordTokens(fileName.removeFileExtension()).toList().toTypedArray(),
-            *extractKeywordTokens(title).toList().toTypedArray(),
-        ).mapNotNull { autoTag ->
-            normalizeTag(autoTag)?.let { normalizedValue ->
+        requestedTags.keywords.mapNotNull { keyword ->
+            normalizeTag(keyword)?.let { normalizedValue ->
                 AssetTagCandidate(
-                    value = autoTag.trim(),
+                    value = keyword.trim(),
                     normalizedValue = normalizedValue,
-                    source = AssetTagSource.AUTO,
+                    tagType = AssetTagType.KEYWORD,
+                    source = AssetTagSource.MANUAL,
                 )
             }
-        }
-
-        autoCandidates.forEach { candidate ->
-            tagsByNormalizedValue.putIfAbsent(candidate.normalizedValue, candidate)
+        }.forEach { candidate ->
+            tagsByNormalizedValue.putIfAbsent(candidate.key(), candidate)
         }
 
         return tagsByNormalizedValue.values.toList()
     }
-
-    private fun extractKeywordTokens(value: String): Sequence<String> = value
-        .split(Regex("[^\\p{L}\\p{N}]+"))
-        .asSequence()
-        .map { token -> token.trim() }
-        .filter { token -> token.length >= 2 }
-        .filterNot { token ->
-            token.lowercase() in setOf("final", "edit", "file", "asset", "ver", "version", "jpeg", "jpg", "png", "gif", "webp", "mp4", "mov", "mp3", "wav", "pdf", "zip")
-        }
-        .take(4)
 
     private fun normalizeTag(value: String): String? = value.trim()
         .lowercase()
         .replace(Regex("\\s+"), " ")
         .takeIf { normalizedValue -> normalizedValue.isNotBlank() }
         ?.take(80)
-
-    private fun String.removeFileExtension(): String = substringBeforeLast(".", this)
-
-    private fun AssetType.labelTag(): String = when (this) {
-        AssetType.IMAGE -> "이미지"
-        AssetType.VIDEO -> "영상"
-        AssetType.AUDIO -> "오디오"
-        AssetType.DOCUMENT -> "문서"
-        AssetType.SCENARIO -> "시나리오"
-        AssetType.OTHER -> "기타"
-    }
 }
 
 data class AssetTagCandidate(
     val value: String,
     val normalizedValue: String,
+    val tagType: AssetTagType,
     val source: AssetTagSource,
-)
+) {
+    fun key(): String = "${tagType.name}:$normalizedValue"
+}

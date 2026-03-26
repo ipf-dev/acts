@@ -1,5 +1,11 @@
 import { ApiError, type DownloadedFile } from "../../api/client";
-import type { AssetSummaryView } from "../../api/types";
+import type {
+  AssetStructuredTagsInput,
+  AssetStructuredTagsView,
+  AssetSummaryView,
+  CharacterTagOptionView
+} from "../../api/types";
+import type { AssetTagDraftView } from "./asset-library-page-model";
 
 interface AssetApiErrorMessages {
   badRequest?: string;
@@ -67,4 +73,64 @@ export function getAssetPrimaryText(asset: Pick<AssetSummaryView, "description" 
 
 export function openAssetExternalLink(linkUrl: string): void {
   window.open(linkUrl, "_blank", "noopener,noreferrer");
+}
+
+export function flattenAssetTags(tags: AssetStructuredTagsView): string[] {
+  return [...tags.characters, ...tags.locations, ...tags.keywords];
+}
+
+export function normalizeTagValue(value: string): string | null {
+  const normalizedValue = value.normalize("NFC").trim();
+  return normalizedValue.length > 0 ? normalizedValue : null;
+}
+
+export function commitPendingTagInputs<T extends AssetTagDraftView>(draft: T): T {
+  const nextLocations = appendPendingTagValue(draft.locations, draft.locationInput);
+  const nextKeywords = appendPendingTagValue(draft.keywords, draft.keywordInput);
+
+  return {
+    ...draft,
+    keywordInput: "",
+    keywords: nextKeywords,
+    locationInput: "",
+    locations: nextLocations
+  };
+}
+
+export function toggleCharacterTagId(
+  currentCharacterTagIds: number[],
+  characterTagId: number
+): number[] {
+  return currentCharacterTagIds.includes(characterTagId)
+    ? currentCharacterTagIds.filter((currentId) => currentId !== characterTagId)
+    : [...currentCharacterTagIds, characterTagId];
+}
+
+export function assetTagDraftToInput(draft: AssetTagDraftView): AssetStructuredTagsInput {
+  const resolvedDraft = commitPendingTagInputs(draft);
+
+  return {
+    characterTagIds: resolvedDraft.characterTagIds,
+    locations: resolvedDraft.locations,
+    keywords: resolvedDraft.keywords
+  };
+}
+
+export function findSelectedCharacterTagIds(
+  tags: AssetStructuredTagsView,
+  characterOptions: CharacterTagOptionView[]
+): number[] {
+  const normalizedNames = new Set(tags.characters.map((characterName) => characterName.normalize("NFC").trim()));
+  return characterOptions
+    .filter((option) => normalizedNames.has(option.name.normalize("NFC").trim()))
+    .map((option) => option.id);
+}
+
+function appendPendingTagValue(values: string[], inputValue: string): string[] {
+  const normalizedValue = normalizeTagValue(inputValue);
+  if (!normalizedValue || values.includes(normalizedValue)) {
+    return values;
+  }
+
+  return [...values, normalizedValue];
 }

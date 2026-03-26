@@ -10,6 +10,8 @@ import com.acts.asset.storage.AssetStorageProperties
 import com.acts.asset.storage.LoadedAssetObject
 import com.acts.asset.tag.AssetTagEntity
 import com.acts.asset.tag.AssetTagRepository
+import com.acts.asset.tag.AssetTagType
+import com.acts.asset.tag.AssetSearchTextBuilder
 import com.acts.asset.tag.AssetTagSuggestionService
 import com.acts.auth.audit.AdminAuditLogService
 import com.acts.auth.user.UserAccountRepository
@@ -36,6 +38,7 @@ class AssetLibraryService(
     private val assetMetadataExtractor: AssetMetadataExtractor,
     private val assetPreviewGenerator: AssetPreviewGenerator,
     private val assetRepository: AssetRepository,
+    private val assetSearchTextBuilder: AssetSearchTextBuilder,
     private val assetStorageProperties: AssetStorageProperties,
     private val assetTagRepository: AssetTagRepository,
     private val assetTagSuggestionService: AssetTagSuggestionService,
@@ -56,57 +59,44 @@ class AssetLibraryService(
         val resolvedTitle = request.title.normalizedOrNull() ?: resolvedFileName.substringBeforeLast(".", resolvedFileName)
         val resolvedDescription = request.description.normalizedOrNull()
         val assetType = assetTypeClassifier.classify(fileName = resolvedFileName, contentType = contentType)
-        val tags = assetTagSuggestionService.buildTags(
-            fileName = resolvedFileName,
-            title = resolvedTitle,
-            assetType = assetType,
-            requestedTags = request.tags,
-        )
+        val tags = assetTagSuggestionService.buildTags(request.tags)
         val objectKey = createObjectKey(resolvedFileName)
         val presignedUrl = assetBinaryStorage.presignUploadUrl(
             objectKey = objectKey,
             contentType = contentType,
         )
 
-        val asset = assetRepository.save(
-            AssetEntity(
-                title = resolvedTitle,
-                assetType = assetType,
-                sourceKind = AssetSourceKind.FILE,
-                assetStatus = AssetStatus.UPLOADING,
-                description = resolvedDescription,
-                originalFileName = resolvedFileName,
-                mimeType = contentType,
-                fileSizeBytes = request.fileSizeBytes,
-                fileExtension = resolvedFileName.substringAfterLast(".", "").normalizedOrNull(),
-                linkUrl = null,
-                linkType = null,
-                ownerEmail = actor.email,
-                ownerName = actor.displayName,
-                organization = actor.organization,
-                currentVersionNumber = 1,
-                searchText = buildSearchText(
-                    title = resolvedTitle,
-                    description = resolvedDescription,
-                    fileName = resolvedFileName,
-                    ownerName = actor.displayName,
-                    organizationName = actor.organization?.name,
-                    tags = tags.map { tag -> tag.value },
-                    linkUrl = null,
-                    linkType = null,
-                ),
-                widthPx = null,
-                heightPx = null,
-                durationMs = null,
-            ),
+        val asset = AssetEntity(
+            title = resolvedTitle,
+            assetType = assetType,
+            sourceKind = AssetSourceKind.FILE,
+            assetStatus = AssetStatus.UPLOADING,
+            description = resolvedDescription,
+            originalFileName = resolvedFileName,
+            mimeType = contentType,
+            fileSizeBytes = request.fileSizeBytes,
+            fileExtension = resolvedFileName.substringAfterLast(".", "").normalizedOrNull(),
+            linkUrl = null,
+            linkType = null,
+            ownerEmail = actor.email,
+            ownerName = actor.displayName,
+            organization = actor.organization,
+            currentVersionNumber = 1,
+            searchText = "",
+            widthPx = null,
+            heightPx = null,
+            durationMs = null,
         )
+        asset.searchText = assetSearchTextBuilder.buildFromCandidates(asset, tags)
+        val savedAsset = assetRepository.save(asset)
 
         assetTagRepository.saveAll(
             tags.map { tagCandidate ->
                 AssetTagEntity(
-                    asset = asset,
+                    asset = savedAsset,
                     value = tagCandidate.value,
                     normalizedValue = tagCandidate.normalizedValue,
+                    tagType = tagCandidate.tagType,
                     source = tagCandidate.source,
                 )
             },
@@ -114,7 +104,7 @@ class AssetLibraryService(
 
         assetFileRepository.save(
             AssetFileEntity(
-                asset = asset,
+                asset = savedAsset,
                 versionNumber = 1,
                 bucketName = assetStorageProperties.bucket,
                 objectKey = objectKey,
@@ -128,7 +118,7 @@ class AssetLibraryService(
         )
 
         return AssetUploadIntentResponse(
-            assetId = requireNotNull(asset.id),
+            assetId = requireNotNull(savedAsset.id),
             presignedUrl = presignedUrl,
             objectKey = objectKey,
         )
@@ -156,52 +146,39 @@ class AssetLibraryService(
                 linkType = resolvedLinkType,
             )
             val resolvedTitle = linkRequest.title.normalizedOrNull() ?: resolvedHost
-            val tags = assetTagSuggestionService.buildTags(
-                fileName = resolvedHost,
+            val tags = assetTagSuggestionService.buildTags(linkRequest.tags)
+
+            val asset = AssetEntity(
                 title = resolvedTitle,
                 assetType = assetType,
-                requestedTags = linkRequest.tags,
+                sourceKind = AssetSourceKind.LINK,
+                assetStatus = AssetStatus.READY,
+                description = null,
+                originalFileName = resolvedHost,
+                mimeType = LINK_MIME_TYPE,
+                fileSizeBytes = 0,
+                fileExtension = null,
+                linkUrl = resolvedUrl,
+                linkType = resolvedLinkType,
+                ownerEmail = actor.email,
+                ownerName = actor.displayName,
+                organization = actor.organization,
+                currentVersionNumber = 1,
+                searchText = "",
+                widthPx = null,
+                heightPx = null,
+                durationMs = null,
             )
+            asset.searchText = assetSearchTextBuilder.buildFromCandidates(asset, tags)
+            val savedAsset = assetRepository.save(asset)
 
-            val asset = assetRepository.save(
-                AssetEntity(
-                    title = resolvedTitle,
-                    assetType = assetType,
-                    sourceKind = AssetSourceKind.LINK,
-                    assetStatus = AssetStatus.READY,
-                    description = null,
-                    originalFileName = resolvedHost,
-                    mimeType = LINK_MIME_TYPE,
-                    fileSizeBytes = 0,
-                    fileExtension = null,
-                    linkUrl = resolvedUrl,
-                    linkType = resolvedLinkType,
-                    ownerEmail = actor.email,
-                    ownerName = actor.displayName,
-                    organization = actor.organization,
-                    currentVersionNumber = 1,
-                    searchText = buildSearchText(
-                        title = resolvedTitle,
-                        description = null,
-                        fileName = resolvedHost,
-                        ownerName = actor.displayName,
-                        organizationName = actor.organization?.name,
-                        tags = tags.map { tag -> tag.value },
-                        linkUrl = resolvedUrl,
-                        linkType = resolvedLinkType,
-                    ),
-                    widthPx = null,
-                    heightPx = null,
-                    durationMs = null,
-                ),
-            )
-
-            assetTagRepository.saveAll(
+            val savedTags = assetTagRepository.saveAll(
                 tags.map { tagCandidate ->
                     AssetTagEntity(
-                        asset = asset,
+                        asset = savedAsset,
                         value = tagCandidate.value,
                         normalizedValue = tagCandidate.normalizedValue,
+                        tagType = tagCandidate.tagType,
                         source = tagCandidate.source,
                     )
                 },
@@ -209,7 +186,7 @@ class AssetLibraryService(
 
             assetEventRepository.save(
                 AssetEventEntity(
-                    asset = asset,
+                    asset = savedAsset,
                     eventType = AssetEventType.CREATED,
                     actorEmail = actor.email,
                     actorName = actorName ?: actor.displayName,
@@ -217,9 +194,9 @@ class AssetLibraryService(
                 ),
             )
 
-            asset.toSummaryResponse(
-                tags = tags.map { tag -> tag.value },
-                permissions = assetAuthorizationService.permissionsFor(actor, asset),
+            savedAsset.toSummaryResponse(
+                tags = savedTags.toStructuredTagsResponse(),
+                permissions = assetAuthorizationService.permissionsFor(actor, savedAsset),
             )
         }
     }
@@ -241,16 +218,6 @@ class AssetLibraryService(
         asset.fileSizeBytes = request.fileSizeBytes
         asset.widthPx = request.widthPx
         asset.heightPx = request.heightPx
-        asset.searchText = buildSearchText(
-            title = asset.title,
-            description = asset.description,
-            fileName = asset.originalFileName,
-            ownerName = actor.displayName,
-            organizationName = asset.organization?.name,
-            tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId).map { it.value },
-            linkUrl = asset.linkUrl,
-            linkType = asset.linkType,
-        )
         assetRepository.save(asset)
 
         pendingFile.fileSizeBytes = request.fileSizeBytes
@@ -266,7 +233,11 @@ class AssetLibraryService(
             ),
         )
 
-        return listAssets(actor.email).first { assetSummary -> assetSummary.id == assetId }
+        val tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId)
+        return asset.toSummaryResponse(
+            tags = tags.toStructuredTagsResponse(),
+            permissions = assetAuthorizationService.permissionsFor(actor, asset),
+        )
     }
 
     @Transactional
@@ -283,21 +254,22 @@ class AssetLibraryService(
             return emptyList()
         }
 
-        val assetIds = assets.mapNotNull { asset -> asset.id }
-        val tagsByAssetId = assetTagRepository.findAllByAssetIds(assetIds)
-            .groupBy(
-                keySelector = { assetTag -> requireNotNull(assetTag.asset.id) },
-                valueTransform = { assetTag -> assetTag.value },
-            )
+        val visibleAssets = assets.filter { asset -> asset.matches(query) }
+        if (visibleAssets.isEmpty()) {
+            return emptyList()
+        }
 
-        return assets
+        val assetIds = visibleAssets.mapNotNull { asset -> asset.id }
+        val tagsByAssetId = assetTagRepository.findAllByAssetIds(assetIds)
+            .groupBy { assetTag -> requireNotNull(assetTag.asset.id) }
+
+        return visibleAssets
             .map { asset ->
                 asset.toSummaryResponse(
-                    tags = tagsByAssetId[asset.id].orEmpty(),
+                    tags = tagsByAssetId[asset.id].orEmpty().toStructuredTagsResponse(),
                     permissions = assetAuthorizationService.permissionsFor(actor, asset),
                 )
             }
-            .filter { summary -> summary.matches(query) }
     }
 
     @Transactional
@@ -318,7 +290,6 @@ class AssetLibraryService(
             AssetSourceKind.LINK -> null
         }
         val tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId)
-            .map { assetTag -> assetTag.value }
         val events = assetEventRepository.findAllByAsset_IdOrderByCreatedAtDescIdDesc(assetId)
             .map { assetEvent ->
                 AssetEventResponse(
@@ -331,7 +302,7 @@ class AssetLibraryService(
             }
 
         return asset.toDetailResponse(
-            tags = tags,
+            tags = tags.toStructuredTagsResponse(),
             currentFile = currentFile,
             events = events,
             permissions = assetAuthorizationService.permissionsFor(actor, asset),
@@ -343,7 +314,7 @@ class AssetLibraryService(
         assetId: Long,
         title: String,
         description: String?,
-        requestedTags: List<String>,
+        requestedTags: AssetStructuredTagsRequest,
         actorEmail: String,
         actorName: String?,
     ): AssetDetailResponse {
@@ -353,40 +324,28 @@ class AssetLibraryService(
         val resolvedTitle = title.normalizedOrNull()
             ?: throw IllegalArgumentException("제목은 비어 있을 수 없습니다.")
         val resolvedDescription = description.normalizedOrNull()
-        val nextTags = assetTagSuggestionService.buildTags(
-            fileName = asset.originalFileName,
-            title = resolvedTitle,
-            assetType = asset.assetType,
-            requestedTags = requestedTags,
-        )
+        val nextTags = assetTagSuggestionService.buildTags(requestedTags)
+        val previousTags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId)
         val previousState = AssetMetadataSnapshot(
             title = asset.title,
             description = asset.description,
-            tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId).map { assetTag -> assetTag.value },
+            tags = previousTags.toStructuredTagsResponse(),
         )
 
         asset.title = resolvedTitle
         asset.description = resolvedDescription
-        asset.searchText = buildSearchText(
-            title = resolvedTitle,
-            description = resolvedDescription,
-            fileName = asset.originalFileName,
-            ownerName = asset.ownerName,
-            organizationName = asset.organization?.name,
-            tags = nextTags.map { tag -> tag.value },
-            linkUrl = asset.linkUrl,
-            linkType = asset.linkType,
-        )
+        asset.searchText = assetSearchTextBuilder.buildFromCandidates(asset, nextTags)
         val savedAsset = assetRepository.save(asset)
 
         assetTagRepository.deleteAllByAsset_Id(assetId)
         assetTagRepository.flush()
-        assetTagRepository.saveAll(
+        val savedTags = assetTagRepository.saveAll(
             nextTags.map { tagCandidate ->
                 AssetTagEntity(
                     asset = asset,
                     value = tagCandidate.value,
                     normalizedValue = tagCandidate.normalizedValue,
+                    tagType = tagCandidate.tagType,
                     source = tagCandidate.source,
                 )
             },
@@ -395,7 +354,7 @@ class AssetLibraryService(
         val nextState = AssetMetadataSnapshot(
             title = savedAsset.title,
             description = savedAsset.description,
-            tags = nextTags.map { tag -> tag.value },
+            tags = savedTags.toStructuredTagsResponse(),
         )
 
         if (previousState != nextState) {
@@ -563,31 +522,17 @@ class AssetLibraryService(
         )
     }
 
-    private fun AssetSummaryResponse.matches(query: AssetListQuery): Boolean {
+    private fun AssetEntity.matches(query: AssetListQuery): Boolean {
         val normalizedSearchTerms = query.search.normalizedSearchTerms()
-        if (normalizedSearchTerms.isNotEmpty()) {
-            val searchable = buildList {
-                add(title.normalizedSearchValue())
-                description?.normalizedSearchValue()?.let(::add)
-                add(originalFileName.normalizedSearchValue())
-                linkType?.normalizedSearchValue()?.let(::add)
-                linkUrl?.normalizedSearchValue()?.let(::add)
-                add(ownerName.normalizedSearchValue())
-                add(ownerEmail.normalizedSearchValue())
-                organizationName?.normalizedSearchValue()?.let(::add)
-                addAll(tags.map { tag -> tag.normalizedSearchValue() })
-            }.joinToString(" ")
-
-            if (normalizedSearchTerms.any { searchTerm -> !searchable.contains(searchTerm) }) {
-                return false
-            }
-        }
-
-        if (query.assetType != null && type != query.assetType) {
+        if (normalizedSearchTerms.any { searchTerm -> !searchText.contains(searchTerm) }) {
             return false
         }
 
-        if (query.organizationId != null && organizationId != query.organizationId) {
+        if (query.assetType != null && assetType != query.assetType) {
+            return false
+        }
+
+        if (query.organizationId != null && organization?.id != query.organizationId) {
             return false
         }
 
@@ -605,7 +550,7 @@ class AssetLibraryService(
         .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
 
     private fun AssetEntity.toSummaryResponse(
-        tags: List<String>,
+        tags: AssetStructuredTagsResponse,
         permissions: AssetPermissionSnapshot,
     ): AssetSummaryResponse = AssetSummaryResponse(
         id = requireNotNull(id),
@@ -629,6 +574,7 @@ class AssetLibraryService(
         heightPx = heightPx,
         durationMs = durationMs,
         tags = tags,
+        searchText = searchText,
         canEdit = permissions.canEdit,
         canDelete = permissions.canDelete,
         canDownload = permissions.canDownload,
@@ -637,7 +583,7 @@ class AssetLibraryService(
     )
 
     private fun AssetEntity.toDetailResponse(
-        tags: List<String>,
+        tags: AssetStructuredTagsResponse,
         currentFile: AssetFileEntity?,
         events: List<AssetEventResponse>,
         permissions: AssetPermissionSnapshot,
@@ -663,6 +609,7 @@ class AssetLibraryService(
         heightPx = heightPx,
         durationMs = durationMs,
         tags = tags,
+        searchText = searchText,
         canEdit = permissions.canEdit,
         canDelete = permissions.canDelete,
         canDownload = permissions.canDownload,
@@ -693,6 +640,12 @@ class AssetLibraryService(
         return "assets/$timestampPrefix/${UUID.randomUUID()}-${sanitizeFileName(fileName)}"
     }
 
+    private fun List<AssetTagEntity>.toStructuredTagsResponse(): AssetStructuredTagsResponse = AssetStructuredTagsResponse(
+        characters = filter { tag -> tag.tagType == AssetTagType.CHARACTER }.map { tag -> tag.value },
+        locations = filter { tag -> tag.tagType == AssetTagType.LOCATION }.map { tag -> tag.value },
+        keywords = filter { tag -> tag.tagType == AssetTagType.KEYWORD }.map { tag -> tag.value },
+    )
+
     private fun createPreviewObjectKey(objectKey: String): String = "$objectKey.preview.jpg"
 
     private fun sanitizeFileName(fileName: String): String = fileName
@@ -701,26 +654,6 @@ class AssetLibraryService(
         .replace(Regex("-+"), "-")
         .trim('-')
         .ifBlank { "asset" }
-
-    private fun buildSearchText(
-        title: String,
-        description: String?,
-        fileName: String,
-        ownerName: String,
-        organizationName: String?,
-        tags: List<String>,
-        linkUrl: String?,
-        linkType: String?,
-    ): String = buildList {
-        add(title)
-        add(fileName)
-        add(ownerName)
-        description?.let(::add)
-        organizationName?.let(::add)
-        linkType?.let(::add)
-        linkUrl?.let(::add)
-        addAll(tags)
-    }.joinToString(" ") { value -> value.normalizedSearchValue() }
 
     private fun buildMetadataUpdateDetail(
         previousState: AssetMetadataSnapshot,
@@ -863,13 +796,11 @@ class AssetLibraryService(
         ?.filter { searchTerm -> searchTerm.isNotBlank() }
         .orEmpty()
 
-    private fun String.normalizedSearchValue(): String = normalizeText(this).trim().lowercase()
-
     private fun normalizeText(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFC)
 }
 
 private data class AssetMetadataSnapshot(
     val title: String,
     val description: String?,
-    val tags: List<String>,
+    val tags: AssetStructuredTagsResponse,
 )

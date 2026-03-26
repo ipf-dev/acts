@@ -21,7 +21,12 @@ import {
   SelectValue
 } from "../../components/ui/select";
 import { GOOGLE_LOGIN_PATH } from "../../api/auth";
-import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../api/types";
+import type {
+  AssetDetailView,
+  AssetSummaryView,
+  AuthSessionView,
+  CharacterTagOptionView
+} from "../../api/types";
 import { cn, isBlank } from "../../lib/utils";
 import { AssetDetailModal } from "./asset-detail-modal";
 import { formatFileSize, typeLabelMap } from "./asset-detail-model";
@@ -29,7 +34,11 @@ import { AssetTypeIcon } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
 import { AssetUploadModal } from "./asset-upload-modal";
 import {
-  getAssetPrimaryText
+  commitPendingTagInputs,
+  flattenAssetTags,
+  getAssetPrimaryText,
+  normalizeTagValue,
+  toggleCharacterTagId
 } from "./asset-library-utils";
 import type {
   AssetFileUploadDraftView,
@@ -42,6 +51,7 @@ interface AssetLibraryPageProps {
   assets: AssetSummaryView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  characterOptions: CharacterTagOptionView[];
   isAssetDetailLoading: boolean;
   isDeleting: boolean;
   isDownloading: boolean;
@@ -73,6 +83,7 @@ export function AssetLibraryPage({
   assets,
   authErrorMessage,
   authSuccessMessage,
+  characterOptions,
   isAssetDetailLoading,
   isDeleting,
   isDownloading,
@@ -132,20 +143,7 @@ export function AssetLibraryPage({
     .split(/\s+/)
     .filter(Boolean);
   const visibleAssets = assets.filter((asset) => {
-    const searchable = [
-      asset.title,
-      asset.description ?? "",
-      asset.originalFileName,
-      asset.linkType ?? "",
-      asset.linkUrl ?? "",
-      asset.ownerName,
-      asset.organizationName ?? "",
-      ...asset.tags
-    ]
-      .map(normalizeSearchValue)
-      .join(" ");
-
-    if (normalizedTerms.some((term) => !searchable.includes(term))) {
+    if (normalizedTerms.some((term) => !asset.searchText.includes(term))) {
       return false;
     }
 
@@ -213,44 +211,61 @@ export function AssetLibraryPage({
     );
   }
 
-  function handleTagInputChange(draftId: string, value: string): void {
+  function handleDraftTagInputChange(
+    draftId: string,
+    key: "locationInput" | "keywordInput",
+    value: string
+  ): void {
     setFileDrafts((currentDrafts) =>
-      currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, tagInput: value } : draft))
+      currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, [key]: value } : draft))
     );
   }
 
-  function handleAddTag(draftId: string): void {
+  function handleToggleDraftCharacter(draftId: string, characterTagId: number): void {
     setFileDrafts((currentDrafts) =>
       currentDrafts.map((draft) => {
         if (draft.id !== draftId) {
           return draft;
         }
 
-        const normalizedTag = normalizeTag(draft.tagInput);
-        if (!normalizedTag) {
-          return draft;
-        }
-
         return {
           ...draft,
-          tagInput: "",
-          tags: draft.tags.includes(normalizedTag) ? draft.tags : [...draft.tags, normalizedTag]
+          characterTagIds: toggleCharacterTagId(draft.characterTagIds, characterTagId)
         };
       })
     );
   }
 
-  function handleRemoveTag(draftId: string, tag: string): void {
+  function handleAddDraftTag(
+    draftId: string,
+    collectionKey: "locations" | "keywords"
+  ): void {
     setFileDrafts((currentDrafts) =>
       currentDrafts.map((draft) =>
-        draft.id === draftId ? { ...draft, tags: draft.tags.filter((value) => value !== tag) } : draft
+        draft.id === draftId
+          ? addDraftTagValue(draft, collectionKey)
+          : draft
+      )
+    );
+  }
+
+  function handleRemoveDraftTag(
+    draftId: string,
+    collectionKey: "locations" | "keywords",
+    value: string
+  ): void {
+    setFileDrafts((currentDrafts) =>
+      currentDrafts.map((draft) =>
+        draft.id === draftId
+          ? { ...draft, [collectionKey]: draft[collectionKey].filter((currentValue) => currentValue !== value) }
+          : draft
       )
     );
   }
 
   function handleLinkComposerChange(
-    key: keyof AssetLinkComposerView,
-    value: string | string[]
+    key: "url" | "title" | "linkType",
+    value: string
   ): void {
     setLinkComposer((currentComposer) => ({
       ...currentComposer,
@@ -258,37 +273,44 @@ export function AssetLibraryPage({
     }));
   }
 
-  function handleAddLinkComposerTag(): void {
-    const normalizedTag = normalizeTag(linkComposer.tagInput);
-    if (!normalizedTag) {
-      return;
-    }
-
+  function handleLinkTagInputChange(
+    key: "locationInput" | "keywordInput",
+    value: string
+  ): void {
     setLinkComposer((currentComposer) => ({
       ...currentComposer,
-      tagInput: "",
-      tags: currentComposer.tags.includes(normalizedTag)
-        ? currentComposer.tags
-        : [...currentComposer.tags, normalizedTag]
+      [key]: value
     }));
   }
 
-  function handleRemoveLinkComposerTag(tag: string): void {
+  function handleToggleLinkCharacter(characterTagId: number): void {
     setLinkComposer((currentComposer) => ({
       ...currentComposer,
-      tags: currentComposer.tags.filter((value) => value !== tag)
+      characterTagIds: toggleCharacterTagId(currentComposer.characterTagIds, characterTagId)
+    }));
+  }
+
+  function handleAddLinkComposerTag(collectionKey: "locations" | "keywords"): void {
+    setLinkComposer((currentComposer) => addDraftTagValue(currentComposer, collectionKey));
+  }
+
+  function handleRemoveLinkComposerTag(collectionKey: "locations" | "keywords", value: string): void {
+    setLinkComposer((currentComposer) => ({
+      ...currentComposer,
+      [collectionKey]: currentComposer[collectionKey].filter((currentValue) => currentValue !== value)
     }));
   }
 
   function handleAddLinkDraft(): void {
-    const normalizedUrl = normalizeUrlInput(linkComposer.url);
+    const resolvedComposer = commitPendingTagInputs(linkComposer);
+    const normalizedUrl = normalizeUrlInput(resolvedComposer.url);
     if (!normalizedUrl) {
       return;
     }
 
     const host = extractLinkHost(normalizedUrl);
-    const resolvedTitle = normalizeDisplayValue(linkComposer.title).trim() || host;
-    const resolvedLinkType = normalizeDisplayValue(linkComposer.linkType).trim() || inferLinkType(normalizedUrl);
+    const resolvedTitle = normalizeDisplayValue(resolvedComposer.title).trim() || host;
+    const resolvedLinkType = normalizeDisplayValue(resolvedComposer.linkType).trim() || inferLinkType(normalizedUrl);
 
     setLinkDrafts((currentDrafts) => {
       if (currentDrafts.some((draft) => draft.url === normalizedUrl)) {
@@ -299,9 +321,12 @@ export function AssetLibraryPage({
         ...currentDrafts,
         {
           id: crypto.randomUUID(),
+          characterTagIds: resolvedComposer.characterTagIds,
+          keywordInput: "",
+          keywords: resolvedComposer.keywords,
           linkType: resolvedLinkType,
-          tagInput: "",
-          tags: linkComposer.tags,
+          locationInput: "",
+          locations: resolvedComposer.locations,
           title: resolvedTitle,
           url: normalizedUrl
         }
@@ -316,7 +341,9 @@ export function AssetLibraryPage({
 
   async function handleUploadSubmit(): Promise<void> {
     if (uploadMode === "FILE") {
-      await onUploadAssets(fileDrafts);
+      const resolvedDrafts = fileDrafts.map((draft) => commitPendingTagInputs(draft));
+      setFileDrafts(resolvedDrafts);
+      await onUploadAssets(resolvedDrafts);
       fileDrafts.forEach((draft) => {
         if (draft.previewUrl) {
           URL.revokeObjectURL(draft.previewUrl);
@@ -557,7 +584,7 @@ export function AssetLibraryPage({
                             {asset.linkType ?? "링크"}
                           </span>
                         ) : null}
-                        {asset.tags.slice(0, 3).map((tag) => (
+                        {flattenAssetTags(asset.tags).slice(0, 3).map((tag) => (
                           <span
                             className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground/80"
                             key={`${asset.id}-${tag}`}
@@ -565,9 +592,9 @@ export function AssetLibraryPage({
                             {tag}
                           </span>
                         ))}
-                        {asset.tags.length > 3 ? (
+                        {flattenAssetTags(asset.tags).length > 3 ? (
                           <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground/80">
-                            +{asset.tags.length - 3}
+                            +{flattenAssetTags(asset.tags).length - 3}
                           </span>
                         ) : null}
                       </div>
@@ -634,7 +661,7 @@ export function AssetLibraryPage({
                             <td className="px-4 py-4 text-muted-foreground">{typeLabelMap[asset.type]}</td>
                             <td className="px-4 py-4">
                               <div className="flex flex-wrap gap-1.5">
-                                {asset.tags.slice(0, 2).map((tag) => (
+                                {flattenAssetTags(asset.tags).slice(0, 2).map((tag) => (
                                   <span
                                     className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground/80"
                                     key={`${asset.id}-${tag}`}
@@ -642,9 +669,9 @@ export function AssetLibraryPage({
                                     {tag}
                                   </span>
                                 ))}
-                                {asset.tags.length > 2 ? (
+                                {flattenAssetTags(asset.tags).length > 2 ? (
                                   <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground/80">
-                                    +{asset.tags.length - 2}
+                                    +{flattenAssetTags(asset.tags).length - 2}
                                   </span>
                                 ) : null}
                               </div>
@@ -696,6 +723,7 @@ export function AssetLibraryPage({
       )}
 
       <AssetUploadModal
+        characterOptions={characterOptions}
         fileDrafts={fileDrafts}
         isOpen={isUploadModalOpen && session.authenticated}
         isUploading={isUploading}
@@ -703,18 +731,21 @@ export function AssetLibraryPage({
         linkDrafts={linkDrafts}
         onActiveTabChange={setUploadMode}
         onAddLinkDraft={handleAddLinkDraft}
-        onAddTag={handleAddTag}
+        onAddTag={handleAddDraftTag}
         onClose={() => setIsUploadModalOpen(false)}
+        onCharacterToggle={handleToggleDraftCharacter}
         onDescriptionChange={handleDescriptionChange}
         onFileDrop={handleFileDrop}
         onLinkComposerChange={handleLinkComposerChange}
         onLinkTagAdd={handleAddLinkComposerTag}
         onLinkTagRemove={handleRemoveLinkComposerTag}
+        onLinkCharacterToggle={handleToggleLinkCharacter}
+        onLinkTagInputChange={handleLinkTagInputChange}
         onRemoveLinkDraft={handleRemoveLinkDraft}
         onRemoveDraft={handleRemoveDraft}
-        onRemoveTag={handleRemoveTag}
+        onRemoveTag={handleRemoveDraftTag}
         onSubmit={handleUploadSubmit}
-        onTagInputChange={handleTagInputChange}
+        onTagInputChange={handleDraftTagInputChange}
         onTitleChange={handleTitleChange}
         uploadMode={uploadMode}
       />
@@ -740,16 +771,19 @@ async function createDraftFromFile(file: File): Promise<AssetFileUploadDraftView
   const normalizedFileName = normalizeDisplayValue(file.name);
 
   return {
+    characterTagIds: [],
     id: crypto.randomUUID(),
     file,
     formatLabel: file.type || file.name.split(".").pop()?.toUpperCase() || "UNKNOWN",
+    keywordInput: "",
+    keywords: createSuggestedKeywords(normalizedFileName, type),
+    locationInput: "",
+    locations: [],
     previewUrl,
     sizeLabel: formatFileSize(file.size),
     suggestedHeight: dimensions?.height ?? null,
     suggestedWidth: dimensions?.width ?? null,
     description: "",
-    tagInput: "",
-    tags: createSuggestedTags(normalizedFileName, type),
     title: normalizeDisplayValue(normalizedFileName.replace(/\.[^/.]+$/, "")),
     type
   };
@@ -757,15 +791,18 @@ async function createDraftFromFile(file: File): Promise<AssetFileUploadDraftView
 
 function createEmptyLinkComposer(): AssetLinkComposerView {
   return {
+    characterTagIds: [],
+    keywordInput: "",
+    keywords: [],
     linkType: "",
-    tagInput: "",
-    tags: [],
+    locationInput: "",
+    locations: [],
     title: "",
     url: ""
   };
 }
 
-function createSuggestedTags(fileName: string, type: AssetSummaryView["type"]): string[] {
+function createSuggestedKeywords(fileName: string, type: AssetSummaryView["type"]): string[] {
   const tokens = normalizeDisplayValue(fileName)
     .replace(/\.[^/.]+$/, "")
     .split(/[^0-9A-Za-z가-힣]+/)
@@ -797,9 +834,23 @@ function inferAssetType(file: File): AssetSummaryView["type"] {
   return "OTHER";
 }
 
-function normalizeTag(value: string): string | null {
-  const normalizedValue = normalizeDisplayValue(value).trim();
-  return isBlank(normalizedValue) ? null : normalizedValue;
+function addDraftTagValue<T extends AssetLinkComposerView | AssetFileUploadDraftView>(
+  draft: T,
+  collectionKey: "locations" | "keywords"
+): T {
+  const inputKey = collectionKey === "locations" ? "locationInput" : "keywordInput";
+  const normalizedTag = normalizeTagValue(draft[inputKey]);
+  if (!normalizedTag) {
+    return draft;
+  }
+
+  return {
+    ...draft,
+    [inputKey]: "",
+    [collectionKey]: draft[collectionKey].includes(normalizedTag)
+      ? draft[collectionKey]
+      : [...draft[collectionKey], normalizedTag]
+  };
 }
 
 function normalizeUrlInput(value: string): string | null {

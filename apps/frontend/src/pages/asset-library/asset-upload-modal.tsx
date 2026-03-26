@@ -12,14 +12,18 @@ import {
 import { Input } from "../../components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
+import type { CharacterTagOptionView } from "../../api/types";
 import { typeLabelMap } from "./asset-detail-model";
 import type {
   AssetFileUploadDraftView,
   AssetLinkComposerView,
-  AssetLinkDraftView
+  AssetLinkDraftView,
+  AssetTagDraftView
 } from "./asset-library-page-model";
+import { AssetTagEditor, type AssetTagCollectionKey, type AssetTagInputKey } from "./asset-tag-editor-section";
 
 interface AssetUploadModalProps {
+  characterOptions: CharacterTagOptionView[];
   fileDrafts: AssetFileUploadDraftView[];
   isOpen: boolean;
   isUploading: boolean;
@@ -27,23 +31,27 @@ interface AssetUploadModalProps {
   linkDrafts: AssetLinkDraftView[];
   onActiveTabChange: (value: "FILE" | "LINK") => void;
   onAddLinkDraft: () => void;
-  onAddTag: (draftId: string) => void;
+  onAddTag: (draftId: string, collectionKey: AssetTagCollectionKey) => void;
+  onCharacterToggle: (draftId: string, characterTagId: number) => void;
   onClose: () => void;
   onDescriptionChange: (draftId: string, value: string) => void;
   onFileDrop: (files: File[]) => Promise<void>;
-  onLinkComposerChange: (key: keyof AssetLinkComposerView, value: string | string[]) => void;
-  onLinkTagAdd: () => void;
-  onLinkTagRemove: (tag: string) => void;
+  onLinkCharacterToggle: (characterTagId: number) => void;
+  onLinkComposerChange: (key: "url" | "title" | "linkType", value: string) => void;
+  onLinkTagAdd: (collectionKey: AssetTagCollectionKey) => void;
+  onLinkTagInputChange: (key: AssetTagInputKey, value: string) => void;
+  onLinkTagRemove: (collectionKey: AssetTagCollectionKey, tag: string) => void;
   onRemoveLinkDraft: (draftId: string) => void;
   onRemoveDraft: (draftId: string) => void;
-  onRemoveTag: (draftId: string, tag: string) => void;
+  onRemoveTag: (draftId: string, collectionKey: AssetTagCollectionKey, tag: string) => void;
   onSubmit: () => Promise<void>;
-  onTagInputChange: (draftId: string, value: string) => void;
+  onTagInputChange: (draftId: string, key: AssetTagInputKey, value: string) => void;
   onTitleChange: (draftId: string, value: string) => void;
   uploadMode: "FILE" | "LINK";
 }
 
 export function AssetUploadModal({
+  characterOptions,
   fileDrafts,
   isOpen,
   isUploading,
@@ -52,11 +60,14 @@ export function AssetUploadModal({
   onActiveTabChange,
   onAddLinkDraft,
   onAddTag,
+  onCharacterToggle,
   onClose,
   onDescriptionChange,
   onFileDrop,
+  onLinkCharacterToggle,
   onLinkComposerChange,
   onLinkTagAdd,
+  onLinkTagInputChange,
   onLinkTagRemove,
   onRemoveLinkDraft,
   onRemoveDraft,
@@ -173,41 +184,14 @@ export function AssetUploadModal({
                           ) : null}
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
-                          {draft.tags.map((tag) => (
-                            <button
-                              className="inline-flex items-center gap-1 rounded-full bg-[#efe7ff] px-3 py-1 text-xs font-medium text-[#6d4ae2]"
-                              key={tag}
-                              onClick={() => onRemoveTag(draft.id, tag)}
-                              type="button"
-                            >
-                              {tag}
-                              <X className="h-3 w-3" />
-                            </button>
-                          ))}
-
-                          <div className="flex items-center gap-2 rounded-full border border-border bg-white px-3 py-1.5 shadow-sm">
-                            <Input
-                              className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                              onChange={(event) => onTagInputChange(draft.id, event.target.value)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  onAddTag(draft.id);
-                                }
-                              }}
-                              placeholder="태그 추가"
-                              value={draft.tagInput}
-                            />
-                            <button
-                              className="text-xs font-medium text-primary"
-                              onClick={() => onAddTag(draft.id)}
-                              type="button"
-                            >
-                              추가
-                            </button>
-                          </div>
-                        </div>
+                        <AssetTagEditor
+                          characterOptions={characterOptions}
+                          onAddTag={(collectionKey) => onAddTag(draft.id, collectionKey)}
+                          onCharacterToggle={(characterTagId) => onCharacterToggle(draft.id, characterTagId)}
+                          onRemoveTag={(collectionKey, tag) => onRemoveTag(draft.id, collectionKey, tag)}
+                          onTagInputChange={(key, value) => onTagInputChange(draft.id, key, value)}
+                          value={draft}
+                        />
                       </div>
                     </div>
 
@@ -253,39 +237,14 @@ export function AssetUploadModal({
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">태그</p>
-                    <div className="flex flex-wrap gap-2">
-                      {linkComposer.tags.map((tag) => (
-                        <button
-                          className="inline-flex items-center gap-1 rounded-full bg-[#efe7ff] px-3 py-1 text-xs font-medium text-[#6d4ae2]"
-                          key={tag}
-                          onClick={() => onLinkTagRemove(tag)}
-                          type="button"
-                        >
-                          {tag}
-                          <X className="h-3 w-3" />
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2 rounded-full border border-border bg-white px-3 py-1.5 shadow-sm">
-                      <Input
-                        className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                        onChange={(event) => onLinkComposerChange("tagInput", event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            onLinkTagAdd();
-                          }
-                        }}
-                        placeholder="태그 추가"
-                        value={linkComposer.tagInput}
-                      />
-                      <button className="text-xs font-medium text-primary" onClick={onLinkTagAdd} type="button">
-                        추가
-                      </button>
-                    </div>
-                  </div>
+                  <AssetTagEditor
+                    characterOptions={characterOptions}
+                    onAddTag={onLinkTagAdd}
+                    onCharacterToggle={onLinkCharacterToggle}
+                    onRemoveTag={onLinkTagRemove}
+                    onTagInputChange={onLinkTagInputChange}
+                    value={linkComposer}
+                  />
 
                   <div className="flex justify-end">
                     <Button className="rounded-xl px-4" onClick={onAddLinkDraft} type="button" variant="outline">
@@ -316,7 +275,7 @@ export function AssetUploadModal({
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <Badge variant="secondary">{draft.linkType}</Badge>
-                          {draft.tags.map((tag) => (
+                          {summarizeDraftTags(draft, characterOptions).map((tag) => (
                             <span className="rounded-full bg-background px-2 py-0.5 text-foreground/80" key={tag}>
                               {tag}
                             </span>
@@ -365,4 +324,15 @@ export function AssetUploadModal({
       </DialogContent>
     </Dialog>
   );
+}
+
+function summarizeDraftTags(
+  draft: AssetTagDraftView,
+  characterOptions: CharacterTagOptionView[]
+): string[] {
+  const characterNames = characterOptions
+    .filter((option) => draft.characterTagIds.includes(option.id))
+    .map((option) => option.name);
+
+  return [...characterNames, ...draft.locations, ...draft.keywords];
 }

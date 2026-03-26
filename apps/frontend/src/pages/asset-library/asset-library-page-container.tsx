@@ -6,8 +6,13 @@ import {
   getLoginFailureMessage,
   getLoginSuccessMessage
 } from "../../api/auth";
-import type { AssetDetailView, AssetSummaryView, AuthSessionView } from "../../api/types";
-import { getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
+import type {
+  AssetDetailView,
+  AssetSummaryView,
+  AuthSessionView,
+  CharacterTagOptionView
+} from "../../api/types";
+import { assetTagDraftToInput, getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
 import { AssetLibraryPage } from "./asset-library-page";
 import type {
   AssetFileUploadDraftView,
@@ -19,6 +24,7 @@ interface AssetLibraryPageState {
   assets: AssetSummaryView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  characterOptions: CharacterTagOptionView[];
   isAssetDetailLoading: boolean;
   isDeleting: boolean;
   isDownloading: boolean;
@@ -49,6 +55,7 @@ export function AssetLibraryPageContainer({
     assets: [],
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+    characterOptions: [],
     isAssetDetailLoading: false,
     isDeleting: false,
     isDownloading: false,
@@ -64,7 +71,12 @@ export function AssetLibraryPageContainer({
 
     async function loadPage(): Promise<void> {
       try {
-        const assets = initialSession.authenticated ? await dashboardApi.listAssets() : [];
+        const [assets, characterOptions] = initialSession.authenticated
+          ? await Promise.all([
+              dashboardApi.listAssets(),
+              dashboardApi.listCharacterTagOptions()
+            ])
+          : [[], []];
 
         if (!isActive) {
           return;
@@ -75,6 +87,7 @@ export function AssetLibraryPageContainer({
           assets,
           authErrorMessage: getLoginFailureMessage(initialLocationSearch),
           authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+          characterOptions,
           isLoading: false,
           session: initialSession
         }));
@@ -108,23 +121,22 @@ export function AssetLibraryPageContainer({
     }));
 
     try {
-      for (const draft of drafts) {
-        await dashboardApi.uploadAsset({
+      await runWithConcurrency(drafts, 3, (draft) =>
+        dashboardApi.uploadAsset({
           description: draft.description,
           file: draft.file,
-          tags: draft.tags,
+          tags: assetTagDraftToInput(draft),
           title: draft.title
-        });
-      }
+        }).then(() => undefined)
+      );
 
-      const [assets, session] = await Promise.all([dashboardApi.listAssets(), dashboardApi.getSession()]);
+      const assets = await dashboardApi.listAssets();
 
       setState((currentState) => ({
         ...currentState,
         assets,
         authSuccessMessage: `${drafts.length}개 애셋 업로드가 완료되었습니다.`,
-        isUploading: false,
-        session
+        isUploading: false
       }));
     } catch (error: unknown) {
       setState((currentState) => ({
@@ -149,20 +161,19 @@ export function AssetLibraryPageContainer({
       await dashboardApi.registerAssetLinks({
         links: drafts.map((draft) => ({
           linkType: draft.linkType,
-          tags: draft.tags,
+          tags: assetTagDraftToInput(draft),
           title: draft.title,
           url: draft.url
         }))
       });
 
-      const [assets, session] = await Promise.all([dashboardApi.listAssets(), dashboardApi.getSession()]);
+      const assets = await dashboardApi.listAssets();
 
       setState((currentState) => ({
         ...currentState,
         assets,
         authSuccessMessage: `${drafts.length}개 링크 등록이 완료되었습니다.`,
-        isUploading: false,
-        session
+        isUploading: false
       }));
     } catch (error: unknown) {
       setState((currentState) => ({
@@ -309,6 +320,7 @@ export function AssetLibraryPageContainer({
       assets={state.assets}
       authErrorMessage={state.authErrorMessage}
       authSuccessMessage={state.authSuccessMessage}
+      characterOptions={state.characterOptions}
       isAssetDetailLoading={state.isAssetDetailLoading}
       isDeleting={state.isDeleting}
       isDownloading={state.isDownloading}
@@ -327,5 +339,28 @@ export function AssetLibraryPageContainer({
       searchQuery={searchQuery}
       session={state.session}
     />
+  );
+}
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  if (items.length === 0) {
+    return;
+  }
+
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        await worker(items[currentIndex]);
+      }
+    })
   );
 }

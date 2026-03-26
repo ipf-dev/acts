@@ -18,5 +18,37 @@ interface AssetTagRepository : JpaRepository<AssetTagEntity, Long> {
 
     fun findAllByAsset_IdOrderByIdAsc(assetId: Long): List<AssetTagEntity>
 
+    @Query(
+        """
+        select assetTag
+        from AssetTagEntity assetTag
+        join fetch assetTag.asset asset
+        where assetTag.asset.id in :assetIds
+          and assetTag.tagType = :tagType
+          and assetTag.normalizedValue = :normalizedValue
+        order by assetTag.id asc
+        """,
+    )
+    fun findAllByAssetIdsAndTagTypeAndNormalizedValue(
+        @Param("assetIds") assetIds: Collection<Long>,
+        @Param("tagType") tagType: AssetTagType,
+        @Param("normalizedValue") normalizedValue: String,
+    ): List<AssetTagEntity>
+
+    @Query(
+        """
+        select assetTag
+        from AssetTagEntity assetTag
+        join fetch assetTag.asset asset
+        where assetTag.tagType = :tagType
+          and assetTag.normalizedValue = :normalizedValue
+        order by assetTag.id asc
+        """,
+    )
+    fun findAllByTagTypeAndNormalizedValue(
+        @Param("tagType") tagType: AssetTagType,
+        @Param("normalizedValue") normalizedValue: String,
+    ): List<AssetTagEntity>
+
     fun deleteAllByAsset_Id(assetId: Long)
 }

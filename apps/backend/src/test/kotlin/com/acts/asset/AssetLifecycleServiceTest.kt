@@ -144,8 +144,9 @@ class AssetLifecycleServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = title,
                 description = "설명",
-
-                tags = listOf("태그"),
+                tags = AssetStructuredTagsRequest(
+                    keywords = listOf("태그"),
+                ),
             ),
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",

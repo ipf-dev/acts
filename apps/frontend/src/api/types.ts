@@ -6,6 +6,61 @@ export interface AppHealthView {
 export type UserRole = "USER" | "ADMIN";
 export type UserMappingMode = "MANUAL" | "UNMAPPED";
 export type AppFeatureKeyView = "ASSET_LIBRARY";
+export type AssetTagTypeView = "CHARACTER" | "LOCATION" | "KEYWORD";
+
+export interface AssetStructuredTagsView {
+  characters: string[];
+  locations: string[];
+  keywords: string[];
+}
+
+export interface AssetStructuredTagsInput {
+  characterTagIds: number[];
+  locations: string[];
+  keywords: string[];
+}
+
+export interface CharacterTagOptionView {
+  id: number;
+  name: string;
+  aliases: string[];
+}
+
+export interface AdminCharacterTagView {
+  id: number;
+  name: string;
+  aliases: string[];
+  usageCount: number;
+}
+
+export interface AdminAssetTagValueView {
+  type: AssetTagTypeView;
+  value: string;
+  usageCount: number;
+}
+
+export interface AdminAssetTagCatalogView {
+  characters: AdminCharacterTagView[];
+  locations: AdminAssetTagValueView[];
+  keywords: AdminAssetTagValueView[];
+}
+
+export interface CharacterTagUpsertInput {
+  name: string;
+  aliases: string[];
+}
+
+export interface AssetTagRenameInput {
+  tagType: AssetTagTypeView;
+  currentValue: string;
+  nextValue: string;
+}
+
+export interface AssetTagMergeInput {
+  tagType: AssetTagTypeView;
+  sourceValue: string;
+  targetValue: string;
+}
 
 export interface OrganizationOptionView {
   id: number;
@@ -118,7 +173,8 @@ export interface AssetSummaryView {
   widthPx: number | null;
   heightPx: number | null;
   durationMs: number | null;
-  tags: string[];
+  tags: AssetStructuredTagsView;
+  searchText: string;
   canEdit: boolean;
   canDelete: boolean;
   canDownload: boolean;
@@ -130,7 +186,7 @@ export interface AssetUploadInput {
   file: File;
   title?: string;
   description?: string;
-  tags: string[];
+  tags: AssetStructuredTagsInput;
   widthPx?: number;
   heightPx?: number;
 }
@@ -139,7 +195,7 @@ export interface AssetLinkRegistrationItemInput {
   url: string;
   title?: string;
   linkType?: string;
-  tags: string[];
+  tags: AssetStructuredTagsInput;
 }
 
 export interface AssetLinkRegistrationInput {
@@ -164,7 +220,7 @@ export interface DeletedAssetView {
 export interface AssetUpdateInput {
   title: string;
   description?: string;
-  tags: string[];
+  tags: AssetStructuredTagsInput;
 }
 
 export interface AssetFileView {

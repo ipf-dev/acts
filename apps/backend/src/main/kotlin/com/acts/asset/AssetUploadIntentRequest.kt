@@ -1,10 +1,19 @@
 package com.acts.asset
 
-data class AssetUploadIntentRequest(
-    val fileName: String,
-    val contentType: String,
-    val fileSizeBytes: Long,
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
+
+data class AssetUploadIntentRequest @JsonCreator constructor(
+    @JsonProperty("fileName")
+    val fileName: String = "",
+    @JsonProperty("contentType")
+    val contentType: String = "",
+    @JsonProperty("fileSizeBytes")
+    val fileSizeBytes: Long = 0,
+    @JsonProperty("title")
     val title: String? = null,
+    @JsonProperty("description")
     val description: String? = null,
-    val tags: List<String> = emptyList(),
+    @JsonProperty("tags")
+    val tags: AssetStructuredTagsRequest = AssetStructuredTagsRequest(),
 )

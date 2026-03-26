@@ -8,6 +8,7 @@ import {
   Settings2,
   SlidersHorizontal,
   Shield,
+  Tags,
   Users
 } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
@@ -25,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { GOOGLE_LOGIN_PATH } from "../../api/auth";
 import { cn, isBlank } from "../../lib/utils";
 import type {
+  AdminAssetTagCatalogView,
   AssetRetentionPolicyView,
   DeletedAssetView,
   AppHealthView,
@@ -37,9 +39,11 @@ import type {
   UserFeatureAuthorizationView,
   ViewerAllowlistEntryView
 } from "../../api/types";
+import { AdminAssetTagManagement } from "./admin-asset-tag-management-panel";
 
 interface AdminPageProps {
   adminUsers: AuthUserView[];
+  assetTagCatalog: AdminAssetTagCatalogView | null;
   assetRetentionPolicy: AssetRetentionPolicyView | null;
   auditLogs: AuditLogView[];
   authErrorMessage: string | null;
@@ -51,12 +55,27 @@ interface AdminPageProps {
   isSavingPolicy: boolean;
   isSavingAssignment: boolean;
   isSavingAllowlist: boolean;
+  isSavingAssetTags: boolean;
   isSavingFeatureAccess: boolean;
+  onCreateCharacter: (name: { name: string; aliases: string[] }) => Promise<void>;
+  onDeleteAssetTagValue: (tagType: "CHARACTER" | "LOCATION" | "KEYWORD", value: string) => Promise<void>;
+  onDeleteCharacter: (characterId: number) => Promise<void>;
   onAddViewerAllowlist: (email: string) => Promise<void>;
+  onMergeAssetTags: (
+    tagType: "CHARACTER" | "LOCATION" | "KEYWORD",
+    sourceValue: string,
+    targetValue: string
+  ) => Promise<void>;
   onLogout: () => Promise<void>;
   onRemoveViewerAllowlist: (email: string) => Promise<void>;
+  onRenameAssetTag: (
+    tagType: "CHARACTER" | "LOCATION" | "KEYWORD",
+    currentValue: string,
+    nextValue: string
+  ) => Promise<void>;
   onRestoreDeletedAsset: (assetId: number) => Promise<void>;
   onSaveAssetRetentionPolicy: (policy: AssetRetentionPolicyView) => Promise<void>;
+  onUpdateCharacter: (characterId: number, input: { name: string; aliases: string[] }) => Promise<void>;
   onSaveUserFeatureAccess: (email: string, allowedFeatureKeys: AppFeatureKeyView[]) => Promise<void>;
   onSaveManualAssignment: (email: string, organizationId: number) => Promise<void>;
   organizations: OrganizationOptionView[];
@@ -102,6 +121,7 @@ const auditCategoryLabelMap: Record<string, string> = {
 
 export function AdminPage({
   adminUsers,
+  assetTagCatalog,
   assetRetentionPolicy,
   auditLogs,
   authErrorMessage,
@@ -113,12 +133,19 @@ export function AdminPage({
   isSavingPolicy,
   isSavingAssignment,
   isSavingAllowlist,
+  isSavingAssetTags,
   isSavingFeatureAccess,
+  onCreateCharacter,
+  onDeleteAssetTagValue,
+  onDeleteCharacter,
   onAddViewerAllowlist,
+  onMergeAssetTags,
   onLogout,
   onRemoveViewerAllowlist,
+  onRenameAssetTag,
   onRestoreDeletedAsset,
   onSaveAssetRetentionPolicy,
+  onUpdateCharacter,
   onSaveUserFeatureAccess,
   onSaveManualAssignment,
   organizations,
@@ -457,6 +484,13 @@ export function AdminPage({
           >
             <Settings2 className="mr-2 h-4 w-4" />
             정책 설정
+          </TabsTrigger>
+          <TabsTrigger
+            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+            value="asset-tags"
+          >
+            <Tags className="mr-2 h-4 w-4" />
+            태그 관리
           </TabsTrigger>
           <TabsTrigger
             className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
@@ -1249,6 +1283,19 @@ export function AdminPage({
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="asset-tags">
+          <AdminAssetTagManagement
+            catalog={assetTagCatalog}
+            isSaving={isSavingAssetTags}
+            onCreateCharacter={onCreateCharacter}
+            onDeleteCharacter={onDeleteCharacter}
+            onDeleteTagValue={onDeleteAssetTagValue}
+            onMergeTags={onMergeAssetTags}
+            onRenameTag={onRenameAssetTag}
+            onUpdateCharacter={onUpdateCharacter}
+          />
         </TabsContent>
 
         <TabsContent value="audit">

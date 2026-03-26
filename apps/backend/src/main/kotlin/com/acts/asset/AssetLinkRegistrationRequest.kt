@@ -16,5 +16,5 @@ data class AssetLinkRegistrationItemRequest @JsonCreator constructor(
     @JsonProperty("linkType")
     val linkType: String? = null,
     @JsonProperty("tags")
-    val tags: List<String> = emptyList(),
+    val tags: AssetStructuredTagsRequest = AssetStructuredTagsRequest(),
 )

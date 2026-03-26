@@ -25,7 +25,7 @@ import {
   AssetTypeIcon
 } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
-import { getAssetPrimaryText, openAssetExternalLink } from "./asset-library-utils";
+import { flattenAssetTags, getAssetPrimaryText, openAssetExternalLink } from "./asset-library-utils";
 
 interface AssetDetailModalProps {
   asset: AssetDetailView | null;
@@ -214,8 +214,8 @@ function AssetSummaryPanel({
         <div>
           <p className="text-[12px] text-muted-foreground">태그</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {asset.tags.length > 0 ? (
-              asset.tags.map((tag) => <AssetTagChip key={tag} tag={tag} />)
+            {flattenAssetTags(asset.tags).length > 0 ? (
+              flattenAssetTags(asset.tags).map((tag) => <AssetTagChip key={tag} tag={tag} />)
             ) : (
               <span className="text-[12px] text-muted-foreground">등록된 태그가 없습니다.</span>
             )}

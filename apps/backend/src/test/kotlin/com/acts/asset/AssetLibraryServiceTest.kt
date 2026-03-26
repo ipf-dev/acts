@@ -6,6 +6,10 @@ import com.acts.asset.preview.GeneratedAssetPreview
 import com.acts.asset.storage.AssetBinaryStorage
 import com.acts.asset.storage.LoadedAssetObject
 import com.acts.asset.storage.StoredAssetObject
+import com.acts.asset.tag.CharacterTagAliasEntity
+import com.acts.asset.tag.CharacterTagAliasRepository
+import com.acts.asset.tag.CharacterTagEntity
+import com.acts.asset.tag.CharacterTagRepository
 import com.acts.auth.feature.UserFeatureAccessService
 import com.acts.auth.org.OrganizationRepository
 import com.acts.auth.user.UserDirectoryService
@@ -32,6 +36,8 @@ import java.text.Normalizer
 @Transactional
 class AssetLibraryServiceTest @Autowired constructor(
     private val assetLibraryService: AssetLibraryService,
+    private val characterTagAliasRepository: CharacterTagAliasRepository,
+    private val characterTagRepository: CharacterTagRepository,
     private val organizationRepository: OrganizationRepository,
     private val userDirectoryService: UserDirectoryService,
     private val userFeatureAccessService: UserFeatureAccessService,
@@ -120,8 +126,9 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = "코코의 첫 모험 시나리오",
                 description = "축제에 가는 이야기 초안",
-
-                tags = listOf("코코", "축제"),
+                tags = AssetStructuredTagsRequest(
+                    keywords = listOf("코코", "축제"),
+                ),
             ),
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
@@ -143,12 +150,51 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThat(uploadedAsset.type).isEqualTo(AssetType.SCENARIO)
         assertThat(uploadedAsset.organizationName).isEqualTo("마케팅팀")
         assertThat(uploadedAsset.ownerEmail).isEqualTo("coco@iportfolio.co.kr")
-        assertThat(uploadedAsset.tags).contains("코코", "축제", "시나리오", "coco", "festival", "story")
+        assertThat(uploadedAsset.tags.keywords).contains("코코", "축제")
         assertThat(uploadedAsset.canEdit).isTrue()
         assertThat(uploadedAsset.canDelete).isTrue()
         assertThat(uploadedAsset.canDownload).isTrue()
         assertThat(listedAssets).hasSize(1)
         assertThat(listedAssets.single().id).isEqualTo(uploadedAsset.id)
+    }
+
+    @Test
+    fun `stores uploaded asset location tags and matches them in search`() {
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
+                fileName = "library_reference.txt",
+                contentType = "text/plain",
+                fileSizeBytes = 5L,
+                title = "도서관 레퍼런스",
+                description = "장소 태그 저장 테스트",
+                tags = AssetStructuredTagsRequest(
+                    locations = listOf("서울 도서관"),
+                ),
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+        val uploadedAsset = assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+        )
+
+        val assetDetail = assetLibraryService.getAsset(
+            assetId = uploadedAsset.id,
+            actorEmail = "coco@iportfolio.co.kr",
+        )
+        val searchedAssets = assetLibraryService.listAssets(
+            actorEmail = "coco@iportfolio.co.kr",
+            query = AssetListQuery(search = "서울 도서관"),
+        )
+
+        assertThat(uploadedAsset.tags.locations).containsExactly("서울 도서관")
+        assertThat(assetDetail.tags.locations).containsExactly("서울 도서관")
+        assertThat(searchedAssets).extracting("id").contains(uploadedAsset.id)
     }
 
     @Test
@@ -162,8 +208,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = "폴리17",
                 description = "한글 파일명 검색 테스트",
-
-                tags = emptyList(),
+                tags = AssetStructuredTagsRequest(),
             ),
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
@@ -191,6 +236,57 @@ class AssetLibraryServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `matches character alias terms in asset library search`() {
+        val character = characterTagRepository.save(
+            CharacterTagEntity(
+                name = "코코",
+                normalizedName = "코코",
+                createdByEmail = "minsungkim@iportfolio.co.kr",
+                updatedByEmail = "minsungkim@iportfolio.co.kr",
+            ),
+        )
+        characterTagAliasRepository.save(
+            CharacterTagAliasEntity(
+                characterTag = character,
+                value = "cocohero",
+                normalizedValue = "cocohero",
+            ),
+        )
+
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
+                fileName = "coco-hero-reference.pdf",
+                contentType = "application/pdf",
+                fileSizeBytes = 5L,
+                title = "코코 레퍼런스 문서",
+                description = "캐릭터 alias 검색 테스트",
+                tags = AssetStructuredTagsRequest(
+                    characterTagIds = listOf(requireNotNull(character.id)),
+                    keywords = listOf("레퍼런스"),
+                ),
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+
+        val uploadedAsset = assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+        )
+
+        val searchedAssets = assetLibraryService.listAssets(
+            actorEmail = "coco@iportfolio.co.kr",
+            query = AssetListQuery(search = "cocohero"),
+        )
+
+        assertThat(searchedAssets).extracting("id").contains(uploadedAsset.id)
+    }
+
+    @Test
     fun `registers link assets without S3 upload and exposes them in search detail`() {
         val registeredLinks = assetLibraryService.registerLinks(
             request = AssetLinkRegistrationRequest(
@@ -199,13 +295,17 @@ class AssetLibraryServiceTest @Autowired constructor(
                         url = "youtube.com/watch?v=demo",
                         title = "레퍼런스 영상",
                         linkType = "",
-                        tags = listOf("레퍼런스", "영상"),
+                        tags = AssetStructuredTagsRequest(
+                            keywords = listOf("레퍼런스", "영상"),
+                        ),
                     ),
                     AssetLinkRegistrationItemRequest(
                         url = "https://drive.google.com/file/d/abc123/view",
                         title = "",
                         linkType = "Google Drive",
-                        tags = listOf("시나리오", "최종본"),
+                        tags = AssetStructuredTagsRequest(
+                            keywords = listOf("시나리오", "최종본"),
+                        ),
                     ),
                 ),
             ),
@@ -245,8 +345,9 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = "코코의 첫 모험 시나리오",
                 description = "축제에 가는 이야기 초안",
-
-                tags = listOf("코코", "축제"),
+                tags = AssetStructuredTagsRequest(
+                    keywords = listOf("코코", "축제"),
+                ),
             ),
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
@@ -273,7 +374,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThat(assetDetail.currentFile?.originalFileName).isEqualTo("coco_festival_story.txt")
         assertThat(assetDetail.events).hasSize(1)
         assertThat(assetDetail.events.single().eventType).isEqualTo(AssetEventType.CREATED)
-        assertThat(assetDetail.tags).contains("코코", "축제")
+        assertThat(assetDetail.tags.keywords).contains("코코", "축제")
         assertThat(assetDetail.canEdit).isTrue()
         assertThat(assetDetail.canDelete).isTrue()
         assertThat(assetDetail.canDownload).isTrue()
@@ -298,8 +399,9 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = "이미지 프리뷰 테스트",
                 description = "프리뷰 설명",
-
-                tags = listOf("이미지"),
+                tags = AssetStructuredTagsRequest(
+                    keywords = listOf("이미지"),
+                ),
             ),
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
@@ -344,8 +446,9 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 12L,
                 title = "영상 프리뷰 테스트",
                 description = "썸네일 생성",
-
-                tags = listOf("영상"),
+                tags = AssetStructuredTagsRequest(
+                    keywords = listOf("영상"),
+                ),
             ),
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
@@ -382,8 +485,9 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = "코코의 첫 모험 시나리오",
                 description = "초기 설명",
-
-                tags = listOf("코코", "축제"),
+                tags = AssetStructuredTagsRequest(
+                    keywords = listOf("코코", "축제"),
+                ),
             ),
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
@@ -401,14 +505,16 @@ class AssetLibraryServiceTest @Autowired constructor(
             assetId = uploadedAsset.id,
             title = "코코와 친구들의 축제",
             description = "업데이트된 설명",
-            requestedTags = listOf("코코", "친구들", "축제"),
+            requestedTags = AssetStructuredTagsRequest(
+                keywords = listOf("코코", "친구들", "축제"),
+            ),
             actorEmail = "coco@iportfolio.co.kr",
             actorName = "Coco",
         )
 
         assertThat(updatedAsset.title).isEqualTo("코코와 친구들의 축제")
         assertThat(updatedAsset.description).isEqualTo("업데이트된 설명")
-        assertThat(updatedAsset.tags).contains("코코", "친구들", "축제")
+        assertThat(updatedAsset.tags.keywords).contains("코코", "친구들", "축제")
         assertThat(updatedAsset.events).hasSize(2)
         assertThat(updatedAsset.events.first().eventType).isEqualTo(AssetEventType.METADATA_UPDATED)
         assertThat(updatedAsset.events.first().detail).contains("제목", "설명", "태그")
@@ -525,7 +631,9 @@ class AssetLibraryServiceTest @Autowired constructor(
                     AssetLinkRegistrationItemRequest(
                         url = "https://www.notion.so/harmony/demo",
                         title = "노션 링크",
-                        tags = listOf("문서"),
+                        tags = AssetStructuredTagsRequest(
+                            keywords = listOf("문서"),
+                        ),
                     ),
                 ),
             ),
@@ -583,8 +691,9 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileSizeBytes = 5L,
                 title = title,
                 description = "설명",
-
-                tags = listOf("태그"),
+                tags = AssetStructuredTagsRequest(
+                    keywords = listOf("태그"),
+                ),
             ),
             actorEmail = actorEmail,
             actorName = actorName,

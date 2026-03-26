@@ -10,9 +10,10 @@ import type {
   AssetDetailView,
   AssetSummaryView,
   AssetUpdateInput,
-  AuthSessionView
+  AuthSessionView,
+  CharacterTagOptionView
 } from "../../api/types";
-import { getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
+import { flattenAssetTags, getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
 import { AssetDetailPage } from "./asset-detail-page";
 
 interface AssetDetailPageState {
@@ -20,6 +21,7 @@ interface AssetDetailPageState {
   assets: AssetSummaryView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  characterOptions: CharacterTagOptionView[];
   isDeleting: boolean;
   isDownloading: boolean;
   isLoading: boolean;
@@ -50,6 +52,7 @@ export function AssetDetailPageContainer({
     assets: [],
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+    characterOptions: [],
     isDeleting: false,
     isDownloading: false,
     isLoading: true,
@@ -70,12 +73,13 @@ export function AssetDetailPageContainer({
       }));
 
       try {
-        const [asset, assets] = initialSession.authenticated
+        const [asset, assets, characterOptions] = initialSession.authenticated
           ? await Promise.all([
               dashboardApi.getAsset(assetId),
-              dashboardApi.listAssets()
+              dashboardApi.listAssets(),
+              dashboardApi.listCharacterTagOptions()
             ])
-          : [null, []];
+          : [null, [], []];
 
         if (!isActive) {
           return;
@@ -87,6 +91,7 @@ export function AssetDetailPageContainer({
           assets,
           authErrorMessage: getLoginFailureMessage(initialLocationSearch),
           authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+          characterOptions,
           isLoading: false,
           session: initialSession
         }));
@@ -125,9 +130,10 @@ export function AssetDetailPageContainer({
     }));
 
     try {
-      const [asset, assets] = await Promise.all([
+      const [asset, assets, characterOptions] = await Promise.all([
         dashboardApi.updateAsset(assetId, input),
-        dashboardApi.listAssets()
+        dashboardApi.listAssets(),
+        dashboardApi.listCharacterTagOptions()
       ]);
 
       setState((currentState) => ({
@@ -135,6 +141,7 @@ export function AssetDetailPageContainer({
         asset,
         assets,
         authSuccessMessage: "애셋 정보가 업데이트되었습니다.",
+        characterOptions,
         isSaving: false
       }));
     } catch (error: unknown) {
@@ -215,7 +222,7 @@ export function AssetDetailPageContainer({
       .map((asset) => ({
         asset,
         score:
-          asset.tags.filter((tag) => currentAsset.tags.includes(tag)).length +
+          flattenAssetTags(asset.tags).filter((tag) => flattenAssetTags(currentAsset.tags).includes(tag)).length +
           (asset.organizationName === currentAsset.organizationName ? 1 : 0)
       }))
       .filter(({ score }) => score > 0)
@@ -229,6 +236,7 @@ export function AssetDetailPageContainer({
       asset={state.asset}
       authErrorMessage={state.authErrorMessage}
       authSuccessMessage={state.authSuccessMessage}
+      characterOptions={state.characterOptions}
       isDeleting={state.isDeleting}
       isDownloading={state.isDownloading}
       isLoading={state.isLoading}

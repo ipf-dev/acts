@@ -1,4 +1,7 @@
 import type {
+  AdminAssetTagCatalogView,
+  AssetTagMergeInput,
+  AssetTagRenameInput,
   AssetDetailView,
   AssetRetentionPolicyInput,
   AssetRetentionPolicyView,
@@ -11,6 +14,8 @@ import type {
   AppFeatureKeyView,
   AuthSessionView,
   AuthUserView,
+  CharacterTagOptionView,
+  CharacterTagUpsertInput,
   DeletedAssetView,
   ManualAssignmentInput,
   OrganizationOptionView,
@@ -21,17 +26,25 @@ import type {
 } from "./types";
 
 export interface DashboardApi {
+  createCharacterTag(input: CharacterTagUpsertInput): Promise<void>;
+  deleteAssetTagValue(tagType: string, value: string): Promise<void>;
+  deleteCharacterTag(characterId: number): Promise<void>;
   deleteAsset(assetId: number): Promise<void>;
   downloadAsset(assetId: number): Promise<DownloadedFile>;
   exportAssets(): Promise<DownloadedFile>;
   getAsset(assetId: number): Promise<AssetDetailView>;
+  getAdminAssetTagCatalog(): Promise<AdminAssetTagCatalogView>;
   getAssetRetentionPolicy(): Promise<AssetRetentionPolicyView>;
   listDeletedAssets(): Promise<DeletedAssetView[]>;
   listAssets(): Promise<AssetSummaryView[]>;
+  listCharacterTagOptions(): Promise<CharacterTagOptionView[]>;
   registerAssetLinks(input: AssetLinkRegistrationInput): Promise<AssetSummaryView[]>;
+  mergeAssetTags(input: AssetTagMergeInput): Promise<void>;
+  renameAssetTag(input: AssetTagRenameInput): Promise<void>;
   restoreAsset(assetId: number): Promise<void>;
   updateAsset(assetId: number, input: AssetUpdateInput): Promise<AssetDetailView>;
   updateAssetRetentionPolicy(input: AssetRetentionPolicyInput): Promise<AssetRetentionPolicyView>;
+  updateCharacterTag(characterId: number, input: CharacterTagUpsertInput): Promise<void>;
   uploadAsset(input: AssetUploadInput): Promise<AssetSummaryView>;
   health(): Promise<AppHealthView>;
   getSession(): Promise<AuthSessionView>;
@@ -91,6 +104,40 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
   }
 
   return {
+    async createCharacterTag(input) {
+      const response = await fetchFn("/api/auth/admin/asset-tags/characters", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
+    },
+    async deleteAssetTagValue(tagType, value) {
+      const response = await fetchFn(
+        `/api/auth/admin/asset-tags?tagType=${encodeURIComponent(tagType)}&value=${encodeURIComponent(value)}`,
+        {
+          method: "DELETE"
+        }
+      );
+
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
+    },
+    async deleteCharacterTag(characterId) {
+      const response = await fetchFn(`/api/auth/admin/asset-tags/characters/${characterId}`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
+    },
     async deleteAsset(assetId) {
       const response = await fetchFn(`/api/assets/${assetId}`, {
         method: "DELETE"
@@ -109,6 +156,9 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     async getAsset(assetId) {
       return readJson<AssetDetailView>(`/api/assets/${assetId}`);
     },
+    async getAdminAssetTagCatalog() {
+      return readJson<AdminAssetTagCatalogView>("/api/auth/admin/asset-tags");
+    },
     async getAssetRetentionPolicy() {
       return readJson<AssetRetentionPolicyView>("/api/assets/policy");
     },
@@ -118,6 +168,22 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     async listAssets() {
       return readJson<AssetSummaryView[]>("/api/assets");
     },
+    async listCharacterTagOptions() {
+      return readJson<CharacterTagOptionView[]>("/api/assets/tags/characters");
+    },
+    async mergeAssetTags(input) {
+      const response = await fetchFn("/api/auth/admin/asset-tags/merge", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
+    },
     async registerAssetLinks(input) {
       return readJson<AssetSummaryView[]>("/api/assets/links", {
         method: "POST",
@@ -126,6 +192,19 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
         },
         body: JSON.stringify(input)
       });
+    },
+    async renameAssetTag(input) {
+      const response = await fetchFn("/api/auth/admin/asset-tags/rename", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
     },
     async restoreAsset(assetId) {
       const response = await fetchFn(`/api/assets/${assetId}/restore`, {
@@ -193,6 +272,19 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
           heightPx: input.heightPx ?? null,
         }),
       });
+    },
+    async updateCharacterTag(characterId, input) {
+      const response = await fetchFn(`/api/auth/admin/asset-tags/characters/${characterId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
     },
     async health() {
       return readJson<AppHealthView>("/api/health");
