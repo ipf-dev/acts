@@ -30,8 +30,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.transaction.annotation.Transactional
-import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import java.text.Normalizer
 
 @SpringBootTest
@@ -50,12 +48,6 @@ class AssetLibraryServiceTest @Autowired constructor(
 
     @MockBean
     private lateinit var assetPreviewGenerator: AssetPreviewGenerator
-
-    @MockBean
-    private lateinit var s3Client: S3Client
-
-    @MockBean
-    private lateinit var s3Presigner: S3Presigner
 
     @BeforeEach
     fun prepareUser() {
@@ -104,6 +96,9 @@ class AssetLibraryServiceTest @Autowired constructor(
         whenever(assetBinaryStorage.presignUploadUrl(any(), any(), any())).thenReturn(
             "https://s3.example.com/presigned-url",
         )
+        whenever(assetBinaryStorage.presignDownloadUrl(any(), any(), any(), any(), any())).thenReturn(
+            "https://s3.example.com/presigned-download-url",
+        )
         whenever(assetBinaryStorage.store(any(), any(), any())).thenReturn(
             StoredAssetObject(
                 bucket = "acts-assets",
@@ -117,6 +112,7 @@ class AssetLibraryServiceTest @Autowired constructor(
             ),
         )
         whenever(assetBinaryStorage.loadOrNull(any(), any())).thenReturn(null)
+        whenever(assetBinaryStorage.exists(any(), any())).thenReturn(true)
         whenever(assetPreviewGenerator.generateVideoPreview(any(), any())).thenReturn(null)
     }
 
@@ -159,6 +155,35 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThat(uploadedAsset.canDownload).isTrue()
         assertThat(listedAssets).hasSize(1)
         assertThat(listedAssets.single().id).isEqualTo(uploadedAsset.id)
+    }
+
+    @Test
+    fun `does not expose file assets before upload completion`() {
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
+                fileName = "pending-video.mp4",
+                contentType = "video/mp4",
+                fileSizeBytes = 5L,
+                title = "업로드 중 영상",
+                description = "아직 완료되지 않은 자산",
+                tags = AssetStructuredTagsRequest(),
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+
+        val listedAssets = assetLibraryService.listAssets(
+            actorEmail = "coco@iportfolio.co.kr",
+            query = AssetListQuery(search = "업로드 중 영상"),
+        )
+
+        assertThat(listedAssets).isEmpty()
+        assertThatThrownBy {
+            assetLibraryService.getAsset(
+                assetId = intentResponse.assetId,
+                actorEmail = "coco@iportfolio.co.kr",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test
@@ -520,6 +545,47 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThat(downloadResult.fileName).isEqualTo("coco_festival_story.txt")
         assertThat(downloadResult.contentType).isEqualTo("text/plain")
         assertThat(downloadResult.content).containsExactly(*"story".toByteArray())
+    }
+
+    @Test
+    fun `issues presigned file access urls for download and playback`() {
+        val uploadedAsset = uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "파일 접근 URL 테스트",
+            fileName = "downloadable-video.mp4",
+        )
+
+        val downloadAccess = assetLibraryService.issueFileAccessUrl(
+            assetId = uploadedAsset.id,
+            actorEmail = "tony@iportfolio.co.kr",
+            mode = AssetFileAccessMode.DOWNLOAD,
+        )
+        val playbackAccess = assetLibraryService.issueFileAccessUrl(
+            assetId = uploadedAsset.id,
+            actorEmail = "tony@iportfolio.co.kr",
+            mode = AssetFileAccessMode.PLAYBACK,
+        )
+
+        assertThat(downloadAccess.url).isEqualTo("https://s3.example.com/presigned-download-url")
+        assertThat(downloadAccess.fileName).isEqualTo("downloadable-video.mp4")
+        assertThat(downloadAccess.mode).isEqualTo(AssetFileAccessMode.DOWNLOAD)
+        assertThat(playbackAccess.mode).isEqualTo(AssetFileAccessMode.PLAYBACK)
+
+        verify(assetBinaryStorage).presignDownloadUrl(
+            any(),
+            any(),
+            eq("text/plain"),
+            argThat { contains("attachment") },
+            any(),
+        )
+        verify(assetBinaryStorage).presignDownloadUrl(
+            any(),
+            any(),
+            eq("text/plain"),
+            argThat { contains("inline") },
+            any(),
+        )
     }
 
     @Test

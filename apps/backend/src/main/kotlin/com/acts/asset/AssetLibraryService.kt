@@ -16,10 +16,12 @@ import com.acts.asset.tag.AssetTagSuggestionService
 import com.acts.auth.audit.AdminAuditLogService
 import com.acts.auth.user.UserAccountRepository
 import jakarta.transaction.Transactional
+import org.springframework.http.ContentDisposition
 import org.springframework.stereotype.Service
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.text.Normalizer
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -214,6 +216,12 @@ class AssetLibraryService(
         require(!assetEventRepository.existsByAsset_IdAndEventType(assetId, AssetEventType.CREATED)) {
             "이미 업로드 완료 처리된 자산입니다."
         }
+        require(
+            assetBinaryStorage.exists(
+                bucket = pendingFile.bucketName,
+                objectKey = pendingFile.objectKey,
+            ),
+        ) { "업로드된 파일을 아직 확인할 수 없습니다." }
 
         asset.fileSizeBytes = request.fileSizeBytes
         asset.widthPx = request.widthPx
@@ -232,6 +240,7 @@ class AssetLibraryService(
                 detail = "파일 업로드로 자산이 등록되었습니다.",
             ),
         )
+        assetEventRepository.flush()
 
         val tags = assetTagRepository.findAllByAsset_IdOrderByIdAsc(assetId)
         return asset.toSummaryResponse(
@@ -254,7 +263,8 @@ class AssetLibraryService(
             return emptyList()
         }
 
-        val visibleAssets = assets.filter { asset -> asset.matches(query) }
+        val visibleAssets = filterReadyAssets(assets)
+            .filter { asset -> asset.matches(query) }
         if (visibleAssets.isEmpty()) {
             return emptyList()
         }
@@ -278,7 +288,7 @@ class AssetLibraryService(
         actorEmail: String,
     ): AssetDetailResponse {
         val actor = requireActor(actorEmail)
-        val asset = requireActiveAsset(assetId)
+        val asset = requireReadyAsset(assetId)
         assetAuthorizationService.requireViewAccess(
             actor = actor,
             asset = asset,
@@ -319,7 +329,7 @@ class AssetLibraryService(
         actorName: String?,
     ): AssetDetailResponse {
         val actor = requireActor(actorEmail)
-        val asset = requireActiveAsset(assetId)
+        val asset = requireReadyAsset(assetId)
         assetAuthorizationService.requireEditAccess(actor, asset)
         val resolvedTitle = title.normalizedOrNull()
             ?: throw IllegalArgumentException("제목은 비어 있을 수 없습니다.")
@@ -381,7 +391,7 @@ class AssetLibraryService(
         actorEmail: String,
     ): AssetPreviewResult {
         val actor = requireActor(actorEmail)
-        val asset = requireActiveAsset(assetId)
+        val asset = requireReadyAsset(assetId)
         assetAuthorizationService.requireViewAccess(
             actor = actor,
             asset = asset,
@@ -392,13 +402,22 @@ class AssetLibraryService(
             ?: throw IllegalArgumentException("프리뷰 대상 파일을 찾을 수 없습니다.")
 
         val previewObject = when (asset.assetType) {
-            AssetType.IMAGE -> assetBinaryStorage.load(
-                bucket = currentFile.bucketName,
-                objectKey = currentFile.objectKey,
-            )
+            AssetType.IMAGE -> if (
+                assetBinaryStorage.exists(
+                    bucket = currentFile.bucketName,
+                    objectKey = currentFile.objectKey,
+                )
+            ) {
+                assetBinaryStorage.load(
+                    bucket = currentFile.bucketName,
+                    objectKey = currentFile.objectKey,
+                )
+            } else {
+                null
+            }
             AssetType.VIDEO -> loadOrGenerateVideoPreview(currentFile)
             else -> null
-        } ?: throw IllegalStateException("프리뷰 생성에 실패했습니다.")
+        } ?: throw IllegalArgumentException("프리뷰 대상 파일을 찾을 수 없습니다.")
 
         return AssetPreviewResult(
             content = previewObject.content,
@@ -412,7 +431,7 @@ class AssetLibraryService(
         actorEmail: String,
     ): AssetDownloadResult {
         val actor = requireActor(actorEmail)
-        val asset = requireActiveAsset(assetId)
+        val asset = requireReadyAsset(assetId)
         assetAuthorizationService.requireViewAccess(
             actor = actor,
             asset = asset,
@@ -421,6 +440,12 @@ class AssetLibraryService(
         require(asset.sourceKind == AssetSourceKind.FILE) { "링크 자산은 다운로드할 수 없습니다." }
         val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("다운로드할 파일을 찾을 수 없습니다.")
+        require(
+            assetBinaryStorage.exists(
+                bucket = currentFile.bucketName,
+                objectKey = currentFile.objectKey,
+            ),
+        ) { "다운로드할 파일을 찾을 수 없습니다." }
         val loadedAssetObject = assetBinaryStorage.load(
             bucket = currentFile.bucketName,
             objectKey = currentFile.objectKey,
@@ -434,13 +459,60 @@ class AssetLibraryService(
     }
 
     @Transactional
+    fun issueFileAccessUrl(
+        assetId: Long,
+        actorEmail: String,
+        mode: AssetFileAccessMode,
+    ): AssetFileAccessUrlResponse {
+        val actor = requireActor(actorEmail)
+        val asset = requireReadyAsset(assetId)
+        assetAuthorizationService.requireViewAccess(
+            actor = actor,
+            asset = asset,
+            action = AssetAccessAction.DOWNLOAD,
+        )
+        require(asset.sourceKind == AssetSourceKind.FILE) { "링크 자산은 파일 접근 URL을 발급할 수 없습니다." }
+
+        val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
+            ?: throw IllegalArgumentException("다운로드할 파일을 찾을 수 없습니다.")
+        require(
+            assetBinaryStorage.exists(
+                bucket = currentFile.bucketName,
+                objectKey = currentFile.objectKey,
+            ),
+        ) { "다운로드할 파일을 찾을 수 없습니다." }
+        val expirationMinutes = assetStorageProperties.accessUrlExpirationMinutes
+        val contentDisposition = when (mode) {
+            AssetFileAccessMode.DOWNLOAD -> ContentDisposition.attachment()
+            AssetFileAccessMode.PLAYBACK -> ContentDisposition.inline()
+        }
+            .filename(currentFile.originalFileName, StandardCharsets.UTF_8)
+            .build()
+            .toString()
+
+        return AssetFileAccessUrlResponse(
+            url = assetBinaryStorage.presignDownloadUrl(
+                bucket = currentFile.bucketName,
+                objectKey = currentFile.objectKey,
+                contentType = currentFile.mimeType,
+                contentDisposition = contentDisposition,
+                expirationMinutes = expirationMinutes,
+            ),
+            fileName = currentFile.originalFileName,
+            contentType = currentFile.mimeType,
+            expiresAt = Instant.now().plusSeconds(expirationMinutes * 60),
+            mode = mode,
+        )
+    }
+
+    @Transactional
     fun deleteAsset(
         assetId: Long,
         actorEmail: String,
         actorName: String?,
     ) {
         val actor = requireActor(actorEmail)
-        val asset = requireActiveAsset(assetId)
+        val asset = requireReadyAsset(assetId)
         assetAuthorizationService.requireDeleteAccess(actor, asset)
 
         asset.deletedAt = Instant.now()
@@ -468,7 +540,8 @@ class AssetLibraryService(
             actor = actor,
             assets = assetRepository.findAllByDeletedAtIsNullOrderByCreatedAtDescIdDesc(),
         )
-        val assetIds = assets.mapNotNull { asset -> asset.id }
+        val readyAssets = filterReadyAssets(assets)
+        val assetIds = readyAssets.mapNotNull { asset -> asset.id }
         val currentFilesByAssetId = if (assetIds.isEmpty()) {
             emptyMap<Long, AssetFileEntity>()
         } else {
@@ -479,7 +552,7 @@ class AssetLibraryService(
 
         val zipContent = ByteArrayOutputStream().use { buffer ->
             ZipOutputStream(buffer).use { zipOutputStream ->
-                assets.forEach { asset ->
+                readyAssets.forEach { asset ->
                     if (asset.sourceKind == AssetSourceKind.LINK) {
                         zipOutputStream.putNextEntry(
                             ZipEntry(
@@ -497,6 +570,12 @@ class AssetLibraryService(
                     val assetId = requireNotNull(asset.id)
                     val currentFile = currentFilesByAssetId[assetId]
                         ?: throw IllegalArgumentException("내보낼 파일 정보를 찾을 수 없습니다.")
+                    require(
+                        assetBinaryStorage.exists(
+                            bucket = currentFile.bucketName,
+                            objectKey = currentFile.objectKey,
+                        ),
+                    ) { "내보낼 파일 정보를 찾을 수 없습니다." }
                     val loadedAssetObject = assetBinaryStorage.load(
                         bucket = currentFile.bucketName,
                         objectKey = currentFile.objectKey,
@@ -512,7 +591,7 @@ class AssetLibraryService(
         adminAuditLogService.recordAssetExported(
             actorEmail = actor.email,
             actorName = actor.displayName,
-            exportedAssetCount = assets.size,
+            exportedAssetCount = readyAssets.size,
         )
 
         return AssetDownloadResult(
@@ -545,6 +624,41 @@ class AssetLibraryService(
 
     private fun requireActiveAsset(assetId: Long): AssetEntity = assetRepository.findByIdAndDeletedAtIsNull(assetId)
         ?: throw IllegalArgumentException("자산을 찾을 수 없습니다.")
+
+    private fun requireReadyAsset(assetId: Long): AssetEntity {
+        val asset = requireActiveAsset(assetId)
+        require(isReadyAsset(asset)) { "자산을 찾을 수 없습니다." }
+        return asset
+    }
+
+    private fun filterReadyAssets(assets: List<AssetEntity>): List<AssetEntity> {
+        if (assets.isEmpty()) {
+            return emptyList()
+        }
+
+        val fileAssetIds = assets
+            .filter { asset -> asset.sourceKind == AssetSourceKind.FILE }
+            .mapNotNull { asset -> asset.id }
+        if (fileAssetIds.isEmpty()) {
+            return assets
+        }
+
+        val completedAssetIds = assetEventRepository.findAllByAsset_IdInAndEventType(fileAssetIds, AssetEventType.CREATED)
+            .mapNotNull { event -> event.asset.id }
+            .toSet()
+
+        return assets.filter { asset ->
+            asset.sourceKind == AssetSourceKind.LINK || asset.id in completedAssetIds
+        }
+    }
+
+    private fun isReadyAsset(asset: AssetEntity): Boolean = when (asset.sourceKind) {
+        AssetSourceKind.LINK -> true
+        AssetSourceKind.FILE -> assetEventRepository.existsByAsset_IdAndEventType(
+            requireNotNull(asset.id),
+            AssetEventType.CREATED,
+        )
+    }
 
     private fun requireActor(actorEmail: String) = userAccountRepository.findById(actorEmail.lowercase())
         .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
@@ -725,6 +839,15 @@ class AssetLibraryService(
         )
         if (cachedPreview != null) {
             return cachedPreview
+        }
+
+        if (
+            !assetBinaryStorage.exists(
+                bucket = currentFile.bucketName,
+                objectKey = currentFile.objectKey,
+            )
+        ) {
+            return null
         }
 
         val originalObject = assetBinaryStorage.load(

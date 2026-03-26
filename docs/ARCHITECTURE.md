@@ -48,12 +48,13 @@ Expected first-slice backend capabilities:
 - per-user feature allow/deny overrides with audit logging
 - audit logging for login success plus admin org, feature, and permission changes
 - asset metadata in PostgreSQL with binary files stored in object storage or external links stored as metadata-only records
-- LocalStack S3-backed file upload endpoint plus metadata-only link registration endpoint for the first asset slice
+- object-storage-backed file upload endpoint plus metadata-only link registration endpoint for the first asset slice
+- file asset download and playback URLs issued as short-lived presigned GET links after backend authorization, with S3 Transfer Acceleration auto-detected when available
 - asset catalog tables for `assets`, `asset_files`, `asset_tags`, `asset_events`, plus character taxonomy tables `character_tags`, `character_tag_aliases`
 - structured asset tags for `CHARACTER` / `LOCATION` / `KEYWORD`, character alias-aware search indexing, description capture, image metadata extraction, video thumbnail generation, creator/org stamping, and no user-facing asset status field
 - centralized asset authorization for list/detail/download/update/delete/export
 - shared asset visibility for all authenticated users, with owner/Admin management rules and company-wide export privileges
-- asset detail lookup for the dedicated detail page, image/video preview endpoint, metadata update, owner/admin soft delete, backend download endpoint, and ZIP export endpoint
+- asset detail lookup for the dedicated detail page, image/video preview endpoint, metadata update, owner/admin soft delete, presigned download redirect endpoint, and ZIP export endpoint
 - asset retention policy storage plus trash restore lifecycle endpoints
 - generation request orchestration
 - IP guide retrieval for AI workflows
@@ -78,7 +79,7 @@ Expected first-slice frontend surfaces:
 - admin feature authorization tab with searchable user selection, per-feature allow/deny matrix, and save flow for the currently implemented asset library feature
 - admin tag management tab with character create/edit/delete + alias support and location/keyword search, usage-sorted pagination, and unified rename/merge/delete dialogs
 - admin policy tab for retention settings and deleted asset restore status/actions
-- asset library page with file/link split upload modal, character dropdown + location/keyword tag suggestion search, grouped tag display, search, org/creator filters, and company-wide viewer export action without a separate asset status filter
+- asset library page with file/link split upload modal, a background upload progress toast panel updated independently from the main library list render and calculated from uploaded bytes instead of completed file counts, character dropdown + location/keyword tag suggestion search, grouped tag display, search, org/creator filters, and company-wide viewer export action without a separate asset status filter
 - shell-level feature gating so denied users cannot enter the implemented asset library surface
 - asset detail page with image/video preview or external link summary, history, editable metadata, download/open-link action, and owner/admin delete action
 - generation request forms and result views

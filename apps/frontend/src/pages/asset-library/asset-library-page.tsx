@@ -1,4 +1,4 @@
-import { useDeferredValue, useState } from "react";
+import { memo, useDeferredValue, useState } from "react";
 import type React from "react";
 import {
   Clock3,
@@ -33,7 +33,10 @@ import { AssetTypeIcon } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
 import { AssetUploadModal } from "./asset-upload-modal";
 import { flattenAssetTags, getAssetPrimaryText } from "./asset-library-utils";
-import type { AssetFileUploadDraftView, AssetLinkDraftView } from "./asset-library-page-model";
+import type {
+  AssetFileUploadDraftView,
+  AssetLinkDraftView
+} from "./asset-library-page-model";
 
 interface AssetLibraryPageProps {
   assets: AssetSummaryView[];
@@ -59,7 +62,7 @@ const cardDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "short"
 });
 
-export function AssetLibraryPage({
+function AssetLibraryPageComponent({
   assets,
   authErrorMessage,
   authSuccessMessage,
@@ -154,11 +157,12 @@ export function AssetLibraryPage({
             ) : null}
             <Button
               className="h-10 rounded-xl bg-primary px-4 text-sm font-medium hover:bg-primary/92"
+              disabled={isUploading}
               onClick={() => setIsUploadModalOpen(true)}
               type="button"
             >
               <Sparkles className="h-4 w-4" />
-              애셋 업로드
+              {isUploading ? "업로드 진행 중" : "애셋 업로드"}
             </Button>
           </div>
         ) : null}
@@ -465,7 +469,6 @@ export function AssetLibraryPage({
           )}
         </>
       )}
-
       <AssetUploadModal
         characterOptions={characterOptions}
         isOpen={isUploadModalOpen && session.authenticated}
@@ -478,6 +481,8 @@ export function AssetLibraryPage({
     </section>
   );
 }
+
+export const AssetLibraryPage = memo(AssetLibraryPageComponent, areAssetLibraryPagePropsEqual);
 
 function normalizeDisplayValue(value: string): string {
   return value.normalize("NFC");
@@ -495,3 +500,23 @@ const assetTypeOptions: AssetSummaryView["type"][] = [
   "SCENARIO",
   "OTHER"
 ];
+
+function areAssetLibraryPagePropsEqual(
+  previousProps: AssetLibraryPageProps,
+  nextProps: AssetLibraryPageProps
+): boolean {
+  return (
+    previousProps.assets === nextProps.assets &&
+    previousProps.authErrorMessage === nextProps.authErrorMessage &&
+    previousProps.authSuccessMessage === nextProps.authSuccessMessage &&
+    previousProps.characterOptions === nextProps.characterOptions &&
+    previousProps.tagOptions === nextProps.tagOptions &&
+    previousProps.isExporting === nextProps.isExporting &&
+    previousProps.isLoading === nextProps.isLoading &&
+    previousProps.isUploading === nextProps.isUploading &&
+    previousProps.onOpenAssetPage === nextProps.onOpenAssetPage &&
+    previousProps.onSearchQueryChange === nextProps.onSearchQueryChange &&
+    previousProps.searchQuery === nextProps.searchQuery &&
+    previousProps.session === nextProps.session
+  );
+}

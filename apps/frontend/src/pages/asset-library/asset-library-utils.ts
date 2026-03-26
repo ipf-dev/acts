@@ -55,6 +55,14 @@ export function triggerFileDownload(file: DownloadedFile): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+export function triggerFileAccessUrlDownload(accessUrl: string): void {
+  const anchor = document.createElement("a");
+  anchor.href = accessUrl;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
 export function buildAssetPreviewUrl(assetId: number, cacheKey: string): string {
   return `/api/assets/${assetId}/preview?v=${encodeURIComponent(cacheKey)}`;
 }

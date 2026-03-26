@@ -26,13 +26,28 @@ export function AssetPreviewPanel({
   title
 }: AssetPreviewPanelProps): React.JSX.Element {
   const [hasPreviewError, setHasPreviewError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const isPreviewable = sourceKind === "FILE" && (assetType === "IMAGE" || assetType === "VIDEO");
 
   useEffect(() => {
     setHasPreviewError(false);
+    setRetryCount(0);
   }, [assetId, sourceKind, assetType, cacheKey]);
 
-  if (!isPreviewable || hasPreviewError) {
+  useEffect(() => {
+    if (!hasPreviewError || !isPreviewable || retryCount >= 3) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setHasPreviewError(false);
+      setRetryCount((currentRetryCount) => currentRetryCount + 1);
+    }, 1500 * (retryCount + 1));
+
+    return () => window.clearTimeout(timeoutId);
+  }, [hasPreviewError, isPreviewable, retryCount]);
+
+  if (!isPreviewable || (hasPreviewError && retryCount >= 3)) {
     return (
       <div
         className={cn(
@@ -51,7 +66,7 @@ export function AssetPreviewPanel({
         alt={title}
         className={cn("h-full w-full object-cover", imageClassName)}
         onError={() => setHasPreviewError(true)}
-        src={buildAssetPreviewUrl(assetId, cacheKey)}
+        src={buildAssetPreviewUrl(assetId, `${cacheKey}-${retryCount}`)}
       />
       {assetType === "VIDEO" ? (
         <div className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-1 text-[11px] font-medium text-foreground shadow-sm">

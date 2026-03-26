@@ -33,3 +33,28 @@ export interface AssetLinkComposerView extends AssetTagDraftView {
   title: string;
   url: string;
 }
+
+export type AssetUploadBatchKindView = "FILE" | "LINK";
+export type AssetUploadBatchStatusView = "RUNNING" | "COMPLETED" | "FAILED";
+export type AssetUploadTaskStatusView =
+  | "PENDING"
+  | "UPLOADING"
+  | "FINALIZING"
+  | "COMPLETED"
+  | "FAILED";
+
+export interface AssetUploadTaskView {
+  id: string;
+  errorMessage: string | null;
+  label: string;
+  status: AssetUploadTaskStatusView;
+  totalBytes: number | null;
+  uploadedBytes: number;
+}
+
+export interface AssetUploadBatchView {
+  id: string;
+  kind: AssetUploadBatchKindView;
+  status: AssetUploadBatchStatusView;
+  tasks: AssetUploadTaskView[];
+}

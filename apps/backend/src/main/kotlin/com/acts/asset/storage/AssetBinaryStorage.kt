@@ -7,6 +7,14 @@ interface AssetBinaryStorage {
         expirationMinutes: Long = 15,
     ): String
 
+    fun presignDownloadUrl(
+        bucket: String,
+        objectKey: String,
+        contentType: String,
+        contentDisposition: String,
+        expirationMinutes: Long = 15,
+    ): String
+
     fun store(
         objectKey: String,
         contentType: String,
@@ -22,6 +30,11 @@ interface AssetBinaryStorage {
         bucket: String,
         objectKey: String,
     ): LoadedAssetObject?
+
+    fun exists(
+        bucket: String,
+        objectKey: String,
+    ): Boolean
 }
 
 data class StoredAssetObject(

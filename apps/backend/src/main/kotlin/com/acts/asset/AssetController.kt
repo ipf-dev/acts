@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.nio.charset.StandardCharsets
+import java.net.URI
 
 @RestController
 @RequestMapping("/api/assets")
@@ -74,26 +75,43 @@ class AssetController(
     fun downloadAsset(
         @PathVariable assetId: Long,
         authentication: Authentication?,
-    ): ResponseEntity<ByteArrayResource> {
+    ): ResponseEntity<Void> {
         return try {
             val actorEmail = currentActorEmail(authentication)
                 ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
-            val downloadResult = assetLibraryService.downloadAsset(
+            val fileAccessUrl = assetLibraryService.issueFileAccessUrl(
                 assetId = assetId,
                 actorEmail = actorEmail,
+                mode = AssetFileAccessMode.DOWNLOAD,
             )
 
-            ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(downloadResult.contentType))
-                .header(
-                    HttpHeaders.CONTENT_DISPOSITION,
-                    ContentDisposition.attachment()
-                        .filename(downloadResult.fileName, StandardCharsets.UTF_8)
-                        .build()
-                        .toString(),
-                )
-                .contentLength(downloadResult.content.size.toLong())
-                .body(ByteArrayResource(downloadResult.content))
+            ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(fileAccessUrl.url))
+                .build()
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        }
+    }
+
+    @GetMapping("/{assetId}/file-access-url")
+    fun getFileAccessUrl(
+        @PathVariable assetId: Long,
+        @RequestParam(defaultValue = "DOWNLOAD") mode: AssetFileAccessMode,
+        authentication: Authentication?,
+    ): ResponseEntity<AssetFileAccessUrlResponse> {
+        return try {
+            val actorEmail = currentActorEmail(authentication)
+                ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+
+            ResponseEntity.ok(
+                assetLibraryService.issueFileAccessUrl(
+                    assetId = assetId,
+                    actorEmail = actorEmail,
+                    mode = mode,
+                ),
+            )
         } catch (_: SecurityException) {
             ResponseEntity.status(HttpStatus.FORBIDDEN).build()
         } catch (_: IllegalArgumentException) {

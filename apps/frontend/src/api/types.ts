@@ -161,6 +161,16 @@ export interface UserFeatureAccessInput {
 
 export type AssetTypeView = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" | "SCENARIO" | "OTHER";
 export type AssetSourceKindView = "FILE" | "LINK";
+export type AssetFileAccessModeView = "DOWNLOAD" | "PLAYBACK";
+
+export interface AssetFileAccessUrlView {
+  url: string;
+  fileName: string;
+  contentType: string;
+  expiresAt: string;
+  mode: AssetFileAccessModeView;
+}
+
 export interface AssetSummaryView {
   id: number;
   title: string;

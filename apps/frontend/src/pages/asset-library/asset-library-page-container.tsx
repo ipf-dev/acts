@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { createDashboardApi } from "../../api/client";
 import {
@@ -14,10 +14,12 @@ import type {
 } from "../../api/types";
 import { assetTagDraftToInput, getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
 import { AssetLibraryPage } from "./asset-library-page";
+import { AssetUploadToastPanel } from "./asset-upload-toast-panel";
 import type {
   AssetFileUploadDraftView,
   AssetLinkDraftView
 } from "./asset-library-page-model";
+import { useAssetUploadTracker } from "./use-asset-upload-tracker";
 
 interface AssetLibraryPageState {
   assets: AssetSummaryView[];
@@ -26,8 +28,8 @@ interface AssetLibraryPageState {
   characterOptions: CharacterTagOptionView[];
   tagOptions: AssetTagOptionCatalogView;
   isExporting: boolean;
-  isLoading: boolean;
   isUploading: boolean;
+  isLoading: boolean;
   session: AuthSessionView;
 }
 
@@ -58,10 +60,29 @@ export function AssetLibraryPageContainer({
     characterOptions: [],
     tagOptions: emptyTagOptions,
     isExporting: false,
-    isLoading: true,
     isUploading: false,
+    isLoading: true,
     session: initialSession
   });
+  const {
+    applyFileProgress,
+    dismissUploadBatch,
+    markAllTasks,
+    markBatchStatus,
+    markTaskCompleted,
+    markTaskFailed,
+    startFileBatch,
+    startLinkBatch,
+    uploadBatch
+  } = useAssetUploadTracker();
+  const isMountedRef = useRef(true);
+
+  useEffect(
+    () => () => {
+      isMountedRef.current = false;
+    },
+    []
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -112,7 +133,32 @@ export function AssetLibraryPageContainer({
     };
   }, []);
 
+  useEffect(() => {
+    if (uploadBatch?.status !== "COMPLETED") {
+      return;
+    }
+
+    const completedBatchId = uploadBatch.id;
+    const timeoutId = window.setTimeout(() => {
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      if (uploadBatch?.id === completedBatchId) {
+        dismissUploadBatch();
+      }
+    }, 2600);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [dismissUploadBatch, uploadBatch]);
+
   async function handleUploadAssets(drafts: AssetFileUploadDraftView[]): Promise<void> {
+    if (drafts.length === 0) {
+      return;
+    }
+
+    const uploadBatchId = crypto.randomUUID();
+    startFileBatch(uploadBatchId, drafts);
     setState((currentState) => ({
       ...currentState,
       authErrorMessage: null,
@@ -120,40 +166,50 @@ export function AssetLibraryPageContainer({
       isUploading: true
     }));
 
-    try {
-      await runWithConcurrency(drafts, 3, (draft) =>
-        dashboardApi.uploadAsset({
-          description: draft.description,
-          file: draft.file,
-          tags: assetTagDraftToInput(draft),
-          title: draft.title
-        }).then(() => undefined)
-      );
+    const results = await runWithConcurrency(drafts, 3, async (draft) => {
+      try {
+        await dashboardApi.uploadAsset(
+          {
+            description: draft.description,
+            file: draft.file,
+            tags: assetTagDraftToInput(draft),
+            title: draft.title
+          },
+          {
+            onProgress: (progress) => applyFileProgress(uploadBatchId, draft.id, progress)
+          }
+        );
 
-      const [assets, tagOptions] = await Promise.all([
-        dashboardApi.listAssets(),
-        dashboardApi.listAssetTagOptions().catch(() => null)
-      ]);
+        if (!isMountedRef.current) {
+          return;
+        }
 
-      setState((currentState) => ({
-        ...currentState,
-        assets,
-        authSuccessMessage: `${drafts.length}개 애셋 업로드가 완료되었습니다.`,
-        tagOptions: tagOptions ?? currentState.tagOptions,
-        isUploading: false
-      }));
-    } catch (error: unknown) {
-      setState((currentState) => ({
-        ...currentState,
-        authErrorMessage: getAssetApiErrorMessage(error, {
-          fallback: "자산 업로드에 실패했습니다."
-        }),
-        isUploading: false
-      }));
-    }
+        markTaskCompleted(uploadBatchId, draft.id);
+      } catch (error: unknown) {
+        if (isMountedRef.current) {
+          markTaskFailed(
+            uploadBatchId,
+            draft.id,
+            getAssetApiErrorMessage(error, {
+              fallback: "파일 업로드에 실패했습니다."
+            })
+          );
+        }
+
+        throw error;
+      }
+    });
+
+    await finalizeUploadBatch(uploadBatchId, drafts.length, results, "FILE");
   }
 
   async function handleRegisterAssetLinks(drafts: AssetLinkDraftView[]): Promise<void> {
+    if (drafts.length === 0) {
+      return;
+    }
+
+    const uploadBatchId = crypto.randomUUID();
+    startLinkBatch(uploadBatchId, drafts);
     setState((currentState) => ({
       ...currentState,
       authErrorMessage: null,
@@ -162,6 +218,10 @@ export function AssetLibraryPageContainer({
     }));
 
     try {
+      markAllTasks(uploadBatchId, {
+        status: "FINALIZING"
+      });
+
       await dashboardApi.registerAssetLinks({
         links: drafts.map((draft) => ({
           linkType: draft.linkType,
@@ -171,28 +231,82 @@ export function AssetLibraryPageContainer({
         }))
       });
 
-      const [assets, tagOptions] = await Promise.all([
-        dashboardApi.listAssets(),
-        dashboardApi.listAssetTagOptions().catch(() => null)
-      ]);
+      if (!isMountedRef.current) {
+        return;
+      }
 
-      setState((currentState) => ({
-        ...currentState,
-        assets,
-        authSuccessMessage: `${drafts.length}개 링크 등록이 완료되었습니다.`,
-        tagOptions: tagOptions ?? currentState.tagOptions,
-        isUploading: false
-      }));
+      markAllTasks(uploadBatchId, {
+        errorMessage: null,
+        status: "COMPLETED"
+      });
+      await finalizeUploadBatch(uploadBatchId, drafts.length, createSuccessfulResults(drafts.length), "LINK");
     } catch (error: unknown) {
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      const errorMessage = getAssetApiErrorMessage(error, {
+        badRequest: "링크 정보가 올바르지 않습니다.",
+        fallback: "링크 등록에 실패했습니다."
+      });
+
+      markAllTasks(uploadBatchId, {
+        errorMessage,
+        status: "FAILED"
+      });
+      markBatchStatus(uploadBatchId, "FAILED");
       setState((currentState) => ({
         ...currentState,
-        authErrorMessage: getAssetApiErrorMessage(error, {
-          badRequest: "링크 정보가 올바르지 않습니다.",
-          fallback: "링크 등록에 실패했습니다."
-        }),
+        authErrorMessage: errorMessage,
         isUploading: false
       }));
     }
+  }
+
+  async function finalizeUploadBatch(
+    uploadBatchId: string,
+    taskCount: number,
+    results: PromiseSettledResult<void>[],
+    kind: "FILE" | "LINK"
+  ): Promise<void> {
+    const successCount = results.filter((result) => result.status === "fulfilled").length;
+    const failureCount = taskCount - successCount;
+    const nextResources =
+      successCount > 0
+        ? await Promise.all([dashboardApi.listAssets(), dashboardApi.listAssetTagOptions().catch(() => null)])
+        : null;
+
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setState((currentState) => ({
+      ...currentState,
+      assets: nextResources?.[0] ?? currentState.assets,
+      authErrorMessage:
+        failureCount > 0
+          ? kind === "FILE"
+            ? `${failureCount}개 파일 업로드에 실패했습니다. 진행 패널에서 실패 항목을 확인하세요.`
+            : `${failureCount}개 링크 등록에 실패했습니다. 진행 패널을 확인하세요.`
+          : null,
+      authSuccessMessage:
+        failureCount === 0
+          ? kind === "FILE"
+            ? `${successCount}개 애셋 업로드가 완료되었습니다.`
+            : `${successCount}개 링크 등록이 완료되었습니다.`
+          : successCount > 0
+            ? kind === "FILE"
+            ? `${successCount}개 애셋 업로드가 완료되었습니다.`
+              : `${successCount}개 링크 등록이 완료되었습니다.`
+            : null,
+      tagOptions: nextResources?.[1] ?? currentState.tagOptions,
+      isUploading: false
+    }));
+    markBatchStatus(uploadBatchId, failureCount > 0 ? "FAILED" : "COMPLETED");
+  }
+
+  function handleDismissUploadBatch(): void {
+    dismissUploadBatch();
   }
 
   async function handleExportAssets(): Promise<void> {
@@ -207,12 +321,20 @@ export function AssetLibraryPageContainer({
       const file = await dashboardApi.exportAssets();
       triggerFileDownload(file);
 
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setState((currentState) => ({
         ...currentState,
         authSuccessMessage: "내보내기 ZIP 다운로드가 시작되었습니다.",
         isExporting: false
       }));
     } catch (error: unknown) {
+      if (!isMountedRef.current) {
+        return;
+      }
+
       setState((currentState) => ({
         ...currentState,
         authErrorMessage: getAssetApiErrorMessage(error, {
@@ -225,23 +347,26 @@ export function AssetLibraryPageContainer({
   }
 
   return (
-    <AssetLibraryPage
-      assets={state.assets}
-      authErrorMessage={state.authErrorMessage}
-      authSuccessMessage={state.authSuccessMessage}
-      characterOptions={state.characterOptions}
-      tagOptions={state.tagOptions}
-      isExporting={state.isExporting}
-      isLoading={state.isLoading}
-      isUploading={state.isUploading}
-      onExportAssets={handleExportAssets}
-      onOpenAssetPage={onOpenAssetPage}
-      onRegisterAssetLinks={handleRegisterAssetLinks}
-      onSearchQueryChange={onSearchQueryChange}
-      onUploadAssets={handleUploadAssets}
-      searchQuery={searchQuery}
-      session={state.session}
-    />
+    <>
+      <AssetLibraryPage
+        assets={state.assets}
+        authErrorMessage={state.authErrorMessage}
+        authSuccessMessage={state.authSuccessMessage}
+        characterOptions={state.characterOptions}
+        tagOptions={state.tagOptions}
+        isExporting={state.isExporting}
+        isLoading={state.isLoading}
+        isUploading={state.isUploading}
+        onExportAssets={handleExportAssets}
+        onOpenAssetPage={onOpenAssetPage}
+        onRegisterAssetLinks={handleRegisterAssetLinks}
+        onSearchQueryChange={onSearchQueryChange}
+        onUploadAssets={handleUploadAssets}
+        searchQuery={searchQuery}
+        session={state.session}
+      />
+      <AssetUploadToastPanel batch={uploadBatch} onDismiss={handleDismissUploadBatch} />
+    </>
   );
 }
 
@@ -249,21 +374,43 @@ async function runWithConcurrency<T>(
   items: T[],
   concurrency: number,
   worker: (item: T) => Promise<void>
-): Promise<void> {
+): Promise<PromiseSettledResult<void>[]> {
   if (items.length === 0) {
-    return;
+    return [];
   }
 
   let nextIndex = 0;
   const workerCount = Math.min(concurrency, items.length);
+  const results: PromiseSettledResult<void>[] = Array.from({ length: items.length });
 
   await Promise.all(
     Array.from({ length: workerCount }, async () => {
       while (nextIndex < items.length) {
         const currentIndex = nextIndex;
         nextIndex += 1;
-        await worker(items[currentIndex]);
+
+        try {
+          await worker(items[currentIndex]);
+          results[currentIndex] = {
+            status: "fulfilled",
+            value: undefined
+          };
+        } catch (error: unknown) {
+          results[currentIndex] = {
+            reason: error,
+            status: "rejected"
+          };
+        }
       }
     })
   );
+
+  return results;
+}
+
+function createSuccessfulResults(count: number): PromiseSettledResult<void>[] {
+  return Array.from({ length: count }, () => ({
+    status: "fulfilled",
+    value: undefined
+  }));
 }

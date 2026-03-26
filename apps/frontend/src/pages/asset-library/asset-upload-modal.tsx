@@ -244,27 +244,33 @@ export function AssetUploadModal({
     setLinkDrafts((currentDrafts) => currentDrafts.filter((draft) => draft.id !== draftId));
   }
 
-  async function handleSubmit(): Promise<void> {
+  function handleSubmit(): void {
     if (uploadMode === "FILE") {
       const resolvedDrafts = fileDrafts.map((draft) => commitPendingTagInputs(draft));
-      setFileDrafts(resolvedDrafts);
-      await onUploadAssets(resolvedDrafts);
+      setFileDrafts([]);
+      onClose();
+      void onUploadAssets(resolvedDrafts);
       resolvedDrafts.forEach((draft) => {
         if (draft.previewUrl) {
           URL.revokeObjectURL(draft.previewUrl);
         }
       });
-      setFileDrafts([]);
-    } else {
-      await onRegisterAssetLinks(linkDrafts);
-      setLinkDrafts([]);
-      setLinkComposer(createEmptyLinkComposer());
+      return;
     }
 
+    const resolvedLinkDrafts = [...linkDrafts];
+    setLinkDrafts([]);
+    setLinkComposer(createEmptyLinkComposer());
     onClose();
+    void onRegisterAssetLinks(resolvedLinkDrafts);
   }
 
   const activeDraftCount = uploadMode === "FILE" ? fileDrafts.length : linkDrafts.length;
+  const submitButtonLabel = isUploading
+    ? "백그라운드 업로드 진행 중"
+    : uploadMode === "FILE"
+      ? `${activeDraftCount}개 업로드`
+      : `${activeDraftCount}개 등록`;
 
   return (
     <Dialog onOpenChange={(open) => (!open ? onClose() : undefined)} open={isOpen}>
@@ -473,8 +479,8 @@ export function AssetUploadModal({
           <p className="text-sm text-muted-foreground">
             {activeDraftCount > 0
               ? uploadMode === "FILE"
-                ? `${activeDraftCount}개 파일이 업로드 대기 중입니다.`
-                : `${activeDraftCount}개 링크가 등록 대기 중입니다.`
+                ? `${activeDraftCount}개 파일이 업로드 대기 중입니다. 업로드를 누르면 모달이 닫히고 백그라운드에서 진행됩니다.`
+                : `${activeDraftCount}개 링크가 등록 대기 중입니다. 등록을 누르면 모달이 닫히고 백그라운드에서 처리됩니다.`
               : uploadMode === "FILE"
                 ? "업로드할 파일을 먼저 추가하세요."
                 : "등록할 링크를 먼저 목록에 추가하세요."}
@@ -485,10 +491,10 @@ export function AssetUploadModal({
             </Button>
             <Button
               disabled={activeDraftCount === 0 || isUploading}
-              onClick={() => void handleSubmit()}
+              onClick={handleSubmit}
               type="button"
             >
-              {isUploading ? "처리 중..." : uploadMode === "FILE" ? `${activeDraftCount}개 업로드` : `${activeDraftCount}개 등록`}
+              {submitButtonLabel}
             </Button>
           </div>
         </div>

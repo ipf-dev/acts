@@ -13,7 +13,7 @@ import type {
   AuthSessionView,
   CharacterTagOptionView
 } from "../../api/types";
-import { flattenAssetTags, getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
+import { flattenAssetTags, getAssetApiErrorMessage, triggerFileAccessUrlDownload } from "./asset-library-utils";
 import { AssetDetailPage } from "./asset-detail-page";
 
 interface AssetDetailPageState {
@@ -190,8 +190,8 @@ export function AssetDetailPageContainer({
     }));
 
     try {
-      const file = await dashboardApi.downloadAsset(assetId);
-      triggerFileDownload(file);
+      const fileAccess = await dashboardApi.getAssetFileAccessUrl(assetId, "DOWNLOAD");
+      triggerFileAccessUrlDownload(fileAccess.url);
 
       setState((currentState) => ({
         ...currentState,

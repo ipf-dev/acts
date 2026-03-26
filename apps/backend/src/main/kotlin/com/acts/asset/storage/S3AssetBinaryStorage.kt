@@ -1,15 +1,19 @@
 package com.acts.asset.storage
 
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
 import software.amazon.awssdk.core.ResponseBytes
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.model.GetObjectResponse
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest
 import java.time.Duration
 
@@ -17,8 +21,18 @@ import java.time.Duration
 class S3AssetBinaryStorage(
     private val assetStorageProperties: AssetStorageProperties,
     private val s3Client: S3Client,
+    @Qualifier("s3Presigner")
     private val s3Presigner: S3Presigner,
+    @Qualifier("acceleratedS3Presigner")
+    private val acceleratedS3Presigner: S3Presigner,
 ) : AssetBinaryStorage {
+    companion object {
+        private val logger = LoggerFactory.getLogger(S3AssetBinaryStorage::class.java)
+    }
+
+    @Volatile
+    private var accelerationAvailable: Boolean? = null
+
     override fun presignUploadUrl(
         objectKey: String,
         contentType: String,
@@ -35,7 +49,29 @@ class S3AssetBinaryStorage(
             .putObjectRequest(putObjectRequest)
             .build()
 
-        return s3Presigner.presignPutObject(presignRequest).url().toString()
+        return activePresigner().presignPutObject(presignRequest).url().toString()
+    }
+
+    override fun presignDownloadUrl(
+        bucket: String,
+        objectKey: String,
+        contentType: String,
+        contentDisposition: String,
+        expirationMinutes: Long,
+    ): String {
+        val getObjectRequest = GetObjectRequest.builder()
+            .bucket(bucket)
+            .key(objectKey)
+            .responseContentDisposition(contentDisposition)
+            .responseContentType(contentType)
+            .build()
+
+        val presignRequest = GetObjectPresignRequest.builder()
+            .signatureDuration(Duration.ofMinutes(expirationMinutes))
+            .getObjectRequest(getObjectRequest)
+            .build()
+
+        return activePresigner().presignGetObject(presignRequest).url().toString()
     }
 
     override fun store(
@@ -88,5 +124,76 @@ class S3AssetBinaryStorage(
         } else {
             throw exception
         }
+    }
+
+    override fun exists(
+        bucket: String,
+        objectKey: String,
+    ): Boolean = try {
+        s3Client.headObject(
+            HeadObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .build(),
+        )
+        true
+    } catch (_: NoSuchKeyException) {
+        false
+    } catch (exception: S3Exception) {
+        if (exception.statusCode() == 404) {
+            false
+        } else {
+            throw exception
+        }
+    }
+
+    private fun activePresigner(): S3Presigner = if (shouldUseTransferAcceleration()) {
+        acceleratedS3Presigner
+    } else {
+        s3Presigner
+    }
+
+    private fun shouldUseTransferAcceleration(): Boolean {
+        if (!assetStorageProperties.transferAccelerationEnabled) {
+            return false
+        }
+
+        val cachedValue = accelerationAvailable
+        if (cachedValue != null) {
+            return cachedValue
+        }
+
+        synchronized(this) {
+            val synchronizedCachedValue = accelerationAvailable
+            if (synchronizedCachedValue != null) {
+                return synchronizedCachedValue
+            }
+
+            val resolvedValue = detectTransferAcceleration()
+            accelerationAvailable = resolvedValue
+            return resolvedValue
+        }
+    }
+
+    private fun detectTransferAcceleration(): Boolean = try {
+        val status = s3Client.getBucketAccelerateConfiguration { request ->
+            request.bucket(assetStorageProperties.bucket)
+        }.statusAsString()
+        val enabled = status.equals("Enabled", ignoreCase = true)
+
+        if (enabled) {
+            logger.info("S3 Transfer Acceleration is enabled for bucket={}", assetStorageProperties.bucket)
+        } else {
+            logger.info("S3 Transfer Acceleration is not enabled for bucket={}", assetStorageProperties.bucket)
+        }
+
+        enabled
+    } catch (exception: Exception) {
+        logger.warn(
+            "Could not determine S3 Transfer Acceleration state for bucket={}. Falling back to standard endpoint.",
+            assetStorageProperties.bucket,
+            exception,
+        )
+        false
     }
 }

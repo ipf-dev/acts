@@ -1,5 +1,7 @@
 import type {
   AdminAssetTagCatalogView,
+  AssetFileAccessModeView,
+  AssetFileAccessUrlView,
   AssetTagOptionCatalogView,
   AssetTagMergeInput,
   AssetTagRenameInput,
@@ -34,6 +36,7 @@ export interface DashboardApi {
   downloadAsset(assetId: number): Promise<DownloadedFile>;
   exportAssets(): Promise<DownloadedFile>;
   getAsset(assetId: number): Promise<AssetDetailView>;
+  getAssetFileAccessUrl(assetId: number, mode: AssetFileAccessModeView): Promise<AssetFileAccessUrlView>;
   getAdminAssetTagCatalog(): Promise<AdminAssetTagCatalogView>;
   getAssetRetentionPolicy(): Promise<AssetRetentionPolicyView>;
   listAssetTagOptions(): Promise<AssetTagOptionCatalogView>;
@@ -47,7 +50,7 @@ export interface DashboardApi {
   updateAsset(assetId: number, input: AssetUpdateInput): Promise<AssetDetailView>;
   updateAssetRetentionPolicy(input: AssetRetentionPolicyInput): Promise<AssetRetentionPolicyView>;
   updateCharacterTag(characterId: number, input: CharacterTagUpsertInput): Promise<void>;
-  uploadAsset(input: AssetUploadInput): Promise<AssetSummaryView>;
+  uploadAsset(input: AssetUploadInput, options?: AssetUploadOptions): Promise<AssetSummaryView>;
   health(): Promise<AppHealthView>;
   getSession(): Promise<AuthSessionView>;
   listOrganizations(): Promise<OrganizationOptionView[]>;
@@ -69,6 +72,18 @@ export interface DownloadedFile {
   blob: Blob;
   contentType: string;
   fileName: string;
+}
+
+export type AssetUploadProgressPhase = "PREPARING" | "UPLOADING" | "FINALIZING";
+
+export interface AssetUploadProgress {
+  phase: AssetUploadProgressPhase;
+  totalBytes: number | null;
+  uploadedBytes: number;
+}
+
+export interface AssetUploadOptions {
+  onProgress?: (progress: AssetUploadProgress) => void;
 }
 
 export class ApiError extends Error {
@@ -158,6 +173,11 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     async getAsset(assetId) {
       return readJson<AssetDetailView>(`/api/assets/${assetId}`);
     },
+    async getAssetFileAccessUrl(assetId, mode) {
+      return readJson<AssetFileAccessUrlView>(
+        `/api/assets/${assetId}/file-access-url?mode=${encodeURIComponent(mode)}`
+      );
+    },
     async getAdminAssetTagCatalog() {
       return readJson<AdminAssetTagCatalogView>("/api/auth/admin/asset-tags");
     },
@@ -238,8 +258,13 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
         body: JSON.stringify(input)
       });
     },
-    async uploadAsset(input) {
-      // Step 1: get presigned URL from backend
+    async uploadAsset(input, options) {
+      options?.onProgress?.({
+        phase: "PREPARING",
+        totalBytes: input.file.size,
+        uploadedBytes: 0
+      });
+
       const intentResponse = await readJson<{ assetId: number; presignedUrl: string; objectKey: string }>(
         "/api/assets/upload-intent",
         {
@@ -256,17 +281,25 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
         }
       );
 
-      // Step 2: upload directly to S3
-      const s3Response = await fetch(intentResponse.presignedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": input.file.type || "application/octet-stream" },
-        body: input.file,
+      options?.onProgress?.({
+        phase: "UPLOADING",
+        totalBytes: input.file.size,
+        uploadedBytes: 0
       });
-      if (!s3Response.ok) {
-        throw new ApiError(s3Response.status);
-      }
 
-      // Step 3: notify backend of completion
+      await uploadFileToPresignedUrl(
+        intentResponse.presignedUrl,
+        input.file,
+        input.file.type || "application/octet-stream",
+        options?.onProgress
+      );
+
+      options?.onProgress?.({
+        phase: "FINALIZING",
+        totalBytes: input.file.size,
+        uploadedBytes: input.file.size
+      });
+
       return readJson<AssetSummaryView>(`/api/assets/${intentResponse.assetId}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -274,8 +307,8 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
           objectKey: intentResponse.objectKey,
           fileSizeBytes: input.file.size,
           widthPx: input.widthPx ?? null,
-          heightPx: input.heightPx ?? null,
-        }),
+          heightPx: input.heightPx ?? null
+        })
       });
     },
     async updateCharacterTag(characterId, input) {
@@ -379,4 +412,68 @@ function parseContentDispositionFileName(contentDisposition: string | null): str
   }
 
   return null;
+}
+
+function uploadFileToPresignedUrl(
+  url: string,
+  file: File,
+  contentType: string,
+  onProgress?: (progress: AssetUploadProgress) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let lastEmittedPercent = -1;
+    let lastEmitTimestamp = 0;
+    const totalBytes = file.size > 0 ? file.size : null;
+
+    function emitUploadingProgress(uploadedBytes: number, force = false): void {
+      const normalizedUploadedBytes =
+        totalBytes !== null ? Math.max(0, Math.min(uploadedBytes, totalBytes)) : Math.max(0, uploadedBytes);
+      const nextPercent =
+        totalBytes && totalBytes > 0 ? Math.min(100, Math.round((normalizedUploadedBytes / totalBytes) * 100)) : 0;
+
+      const now = Date.now();
+      if (!force && nextPercent === lastEmittedPercent && now - lastEmitTimestamp < 120) {
+        return;
+      }
+
+      lastEmittedPercent = nextPercent;
+      lastEmitTimestamp = now;
+      onProgress?.({
+        phase: "UPLOADING",
+        totalBytes,
+        uploadedBytes: normalizedUploadedBytes
+      });
+    }
+
+    xhr.upload.addEventListener("loadstart", () => {
+      emitUploadingProgress(0, true);
+    });
+
+    xhr.upload.addEventListener("progress", (event) => {
+      emitUploadingProgress(event.loaded, event.loaded === 0);
+    });
+
+    xhr.upload.addEventListener("loadend", () => {
+      emitUploadingProgress(100, true);
+    });
+
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", contentType);
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        emitUploadingProgress(100, true);
+        resolve();
+        return;
+      }
+
+      reject(new ApiError(xhr.status || 500));
+    };
+
+    xhr.onerror = () => reject(new ApiError(xhr.status || 500, "업로드 중 네트워크 오류가 발생했습니다."));
+    xhr.onabort = () => reject(new ApiError(499, "업로드가 중단되었습니다."));
+    emitUploadingProgress(0, true);
+    xhr.send(file);
+  });
 }
