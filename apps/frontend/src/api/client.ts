@@ -283,6 +283,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
             title: input.title,
             description: input.description,
             tags: input.tags,
+            typeMetadata: input.typeMetadata,
           }),
         }
       );
@@ -458,6 +459,7 @@ async function uploadAssetMultipart(
         title: input.title,
         description: input.description,
         tags: input.tags,
+        typeMetadata: input.typeMetadata,
       }),
     }
   );

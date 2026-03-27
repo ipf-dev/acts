@@ -4,6 +4,7 @@ import {
   FileImage,
   FileText,
   Film,
+  Link2,
   Sparkles,
   Tag
 } from "lucide-react";
@@ -24,9 +25,10 @@ export function AssetTypeIcon({
       return <FileAudio2 className={iconClassName} />;
     case "IMAGE":
       return <FileImage className={iconClassName} />;
-    case "SCENARIO":
     case "DOCUMENT":
       return <FileText className={iconClassName} />;
+    case "URL":
+      return <Link2 className={iconClassName} />;
     case "VIDEO":
       return <Film className={iconClassName} />;
     default:

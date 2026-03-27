@@ -5,6 +5,6 @@ enum class AssetType {
     VIDEO,
     AUDIO,
     DOCUMENT,
-    SCENARIO,
+    URL,
     OTHER,
 }

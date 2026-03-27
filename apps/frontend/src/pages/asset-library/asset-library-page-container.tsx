@@ -174,6 +174,7 @@ export function AssetLibraryPageContainer({
             description: draft.description,
             file: draft.file,
             tags: assetTagDraftToInput(draft),
+            typeMetadata: draft.typeMetadata,
             title: draft.title
           },
           {

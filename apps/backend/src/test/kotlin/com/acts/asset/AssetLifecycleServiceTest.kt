@@ -84,6 +84,7 @@ class AssetLifecycleServiceTest @Autowired constructor(
                 contentType = "text/plain",
             ),
         )
+        whenever(assetBinaryStorage.exists(any(), any())).thenReturn(true)
     }
 
     @Test

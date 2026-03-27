@@ -312,6 +312,7 @@ class AssetLibraryService(
         title: String,
         description: String?,
         requestedTags: AssetStructuredTagsRequest,
+        requestedTypeMetadata: AssetTypeMetadataRequest = AssetTypeMetadataRequest(),
         actorEmail: String,
         actorName: String?,
     ): AssetDetailResponse {
@@ -326,11 +327,18 @@ class AssetLibraryService(
         val previousState = AssetMetadataSnapshot(
             title = asset.title,
             description = asset.description,
+            typeMetadata = asset.toTypeMetadataResponse(),
             tags = previousTags.toStructuredTagsResponse(),
+        )
+        val resolvedTypeMetadata = resolveTypeMetadata(
+            assetType = asset.assetType,
+            sourceKind = asset.sourceKind,
+            request = requestedTypeMetadata,
         )
 
         asset.title = resolvedTitle
         asset.description = resolvedDescription
+        asset.applyTypeMetadata(resolvedTypeMetadata)
         asset.searchText = assetSearchTextBuilder.buildFromCandidates(asset, nextTags)
         val savedAsset = assetRepository.save(asset)
 
@@ -351,6 +359,7 @@ class AssetLibraryService(
         val nextState = AssetMetadataSnapshot(
             title = savedAsset.title,
             description = savedAsset.description,
+            typeMetadata = savedAsset.toTypeMetadataResponse(),
             tags = savedTags.toStructuredTagsResponse(),
         )
 
@@ -601,6 +610,24 @@ class AssetLibraryService(
         val resolvedDescription = request.description.normalizedOrNull()
         val assetType = assetTypeClassifier.classify(fileName = resolvedFileName, contentType = contentType)
         val tags = assetTagSuggestionService.buildTags(request.tags)
+        val requestedTypeMetadata = if (
+            assetType == AssetType.DOCUMENT &&
+            request.typeMetadata.documentKind == null
+        ) {
+            request.typeMetadata.copy(
+                documentKind = assetTypeClassifier.inferDocumentKind(
+                    fileName = resolvedFileName,
+                    contentType = contentType,
+                ),
+            )
+        } else {
+            request.typeMetadata
+        }
+        val resolvedTypeMetadata = resolveTypeMetadata(
+            assetType = assetType,
+            sourceKind = AssetSourceKind.FILE,
+            request = requestedTypeMetadata,
+        )
         val objectKey = createObjectKey(resolvedFileName)
 
         val asset = AssetEntity(
@@ -622,6 +649,12 @@ class AssetLibraryService(
             widthPx = null,
             heightPx = null,
             durationMs = null,
+            imageArtStyle = resolvedTypeMetadata.imageArtStyle,
+            imageHasLayerFile = resolvedTypeMetadata.imageHasLayerFile,
+            audioTtsVoice = resolvedTypeMetadata.audioTtsVoice,
+            audioRecordingType = resolvedTypeMetadata.audioRecordingType,
+            videoStage = resolvedTypeMetadata.videoStage,
+            documentKind = resolvedTypeMetadata.documentKind,
         )
         asset.searchText = assetSearchTextBuilder.buildFromCandidates(asset, tags)
         val savedAsset = assetRepository.save(asset)
@@ -803,6 +836,7 @@ class AssetLibraryService(
         widthPx = widthPx,
         heightPx = heightPx,
         durationMs = durationMs,
+        typeMetadata = toTypeMetadataResponse(),
         tags = tags,
         searchText = searchText,
         canEdit = permissions.canEdit,
@@ -837,6 +871,7 @@ class AssetLibraryService(
         widthPx = widthPx,
         heightPx = heightPx,
         durationMs = durationMs,
+        typeMetadata = toTypeMetadataResponse(),
         tags = tags,
         searchText = searchText,
         canEdit = permissions.canEdit,
@@ -861,6 +896,24 @@ class AssetLibraryService(
         events = events,
     )
 
+    private fun AssetEntity.toTypeMetadataResponse(): AssetTypeMetadataResponse = AssetTypeMetadataResponse(
+        imageArtStyle = imageArtStyle,
+        imageHasLayerFile = imageHasLayerFile,
+        audioTtsVoice = audioTtsVoice,
+        audioRecordingType = audioRecordingType,
+        videoStage = videoStage,
+        documentKind = documentKind,
+    )
+
+    private fun AssetEntity.applyTypeMetadata(typeMetadata: AssetTypeMetadataResponse) {
+        imageArtStyle = typeMetadata.imageArtStyle
+        imageHasLayerFile = typeMetadata.imageHasLayerFile
+        audioTtsVoice = typeMetadata.audioTtsVoice
+        audioRecordingType = typeMetadata.audioRecordingType
+        videoStage = typeMetadata.videoStage
+        documentKind = typeMetadata.documentKind
+    }
+
     private fun createObjectKey(fileName: String): String {
         val timestampPrefix = DateTimeFormatter.ofPattern("yyyy/MM/dd", Locale.US)
             .withZone(ZoneOffset.UTC)
@@ -876,6 +929,86 @@ class AssetLibraryService(
     )
 
     private fun createPreviewObjectKey(objectKey: String): String = "$objectKey.preview.jpg"
+
+    private fun resolveTypeMetadata(
+        assetType: AssetType,
+        sourceKind: AssetSourceKind,
+        request: AssetTypeMetadataRequest,
+    ): AssetTypeMetadataResponse {
+        val normalizedAudioTtsVoice = request.audioTtsVoice.normalizedOrNull()
+
+        return when {
+            sourceKind != AssetSourceKind.FILE -> {
+                require(!request.hasAnyValue(normalizedAudioTtsVoice)) { "링크 자산에는 파일 세부 정보를 저장할 수 없습니다." }
+                AssetTypeMetadataResponse()
+            }
+
+            assetType == AssetType.IMAGE -> {
+                require(
+                    request.audioRecordingType == null &&
+                        normalizedAudioTtsVoice == null &&
+                        request.videoStage == null &&
+                        request.documentKind == null,
+                ) {
+                    "이미지 자산에는 이미지 세부 정보만 저장할 수 있습니다."
+                }
+                AssetTypeMetadataResponse(
+                    imageArtStyle = request.imageArtStyle,
+                    imageHasLayerFile = request.imageHasLayerFile ?: false,
+                )
+            }
+
+            assetType == AssetType.AUDIO -> {
+                require(
+                    request.imageArtStyle == null &&
+                        request.imageHasLayerFile == null &&
+                        request.videoStage == null &&
+                        request.documentKind == null,
+                ) {
+                    "오디오 자산에는 오디오 세부 정보만 저장할 수 있습니다."
+                }
+                AssetTypeMetadataResponse(
+                    audioTtsVoice = normalizedAudioTtsVoice,
+                    audioRecordingType = request.audioRecordingType,
+                )
+            }
+
+            assetType == AssetType.VIDEO -> {
+                require(
+                    request.imageArtStyle == null &&
+                        request.imageHasLayerFile == null &&
+                        normalizedAudioTtsVoice == null &&
+                        request.audioRecordingType == null &&
+                        request.documentKind == null,
+                ) {
+                    "영상 자산에는 영상 세부 정보만 저장할 수 있습니다."
+                }
+                AssetTypeMetadataResponse(
+                    videoStage = request.videoStage,
+                )
+            }
+
+            assetType == AssetType.DOCUMENT -> {
+                require(
+                    request.imageArtStyle == null &&
+                        request.imageHasLayerFile == null &&
+                        normalizedAudioTtsVoice == null &&
+                        request.audioRecordingType == null &&
+                        request.videoStage == null,
+                ) {
+                    "문서 자산에는 문서 세부 정보만 저장할 수 있습니다."
+                }
+                AssetTypeMetadataResponse(
+                    documentKind = request.documentKind,
+                )
+            }
+
+            else -> {
+                require(!request.hasAnyValue(normalizedAudioTtsVoice)) { "이 자산 유형은 추가 파일 세부 정보를 지원하지 않습니다." }
+                AssetTypeMetadataResponse()
+            }
+        }
+    }
 
     private fun sanitizeFileName(fileName: String): String = fileName
         .trim()
@@ -894,6 +1027,9 @@ class AssetLibraryService(
             }
             if (previousState.description != nextState.description) {
                 add("설명")
+            }
+            if (previousState.typeMetadata != nextState.typeMetadata) {
+                add("세부 정보")
             }
             if (previousState.tags != nextState.tags) {
                 add("태그")
@@ -1020,8 +1156,16 @@ class AssetLibraryService(
 private data class AssetMetadataSnapshot(
     val title: String,
     val description: String?,
+    val typeMetadata: AssetTypeMetadataResponse,
     val tags: AssetStructuredTagsResponse,
 )
+
+private fun AssetTypeMetadataRequest.hasAnyValue(normalizedAudioTtsVoice: String?): Boolean = imageArtStyle != null ||
+    imageHasLayerFile != null ||
+    normalizedAudioTtsVoice != null ||
+    audioRecordingType != null ||
+    videoStage != null ||
+    documentKind != null
 
 private data class PendingAssetResult(
     val assetId: Long,

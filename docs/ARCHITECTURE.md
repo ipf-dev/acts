@@ -47,11 +47,11 @@ Expected first-slice backend capabilities:
 - company-wide viewer allowlist with immediate permission recalculation
 - per-user feature allow/deny overrides with audit logging
 - audit logging for login success plus admin org, feature, and permission changes
-- asset metadata in PostgreSQL with binary files stored in object storage or external links stored as metadata-only records
-- object-storage-backed file upload endpoint plus metadata-only link registration endpoint for the first asset slice
+- asset metadata in PostgreSQL with binary files stored in object storage or external links stored as metadata-only `URL` records
+- object-storage-backed file upload endpoint plus metadata-only `URL` link registration endpoint for the first asset slice
 - file asset download and playback URLs issued as short-lived presigned GET links after backend authorization, with S3 Transfer Acceleration auto-detected when available
 - asset catalog tables for `assets`, `asset_files`, `asset_tags`, `asset_events`, plus character taxonomy tables `character_tags`, `character_tag_aliases`
-- structured asset tags for `CHARACTER` / `LOCATION` / `KEYWORD`, character alias-aware search indexing, description capture, image metadata extraction, async dispatch of video thumbnail generation to a dedicated Lambda image worker, creator/org stamping, and no user-facing asset status field
+- structured asset tags for `CHARACTER` / `LOCATION` / `KEYWORD`, character alias-aware search indexing, description capture, image metadata extraction, 이미지/오디오/영상/문서별 세부 메타데이터 저장, 기존 `SCENARIO` 타입은 `DOCUMENT` + `documentKind=SCENARIO`로 흡수, 링크는 `URL` 타입으로 저장, async dispatch of video thumbnail generation to a dedicated Lambda image worker, creator/org stamping, and no user-facing asset status field
 - centralized asset authorization for list/detail/download/update/delete/export
 - shared asset visibility for all authenticated users, with owner/Admin management rules and company-wide export privileges
 - asset detail lookup for the dedicated detail page, image/video preview endpoint, metadata update, owner/admin soft delete, presigned download redirect endpoint, and ZIP export endpoint
@@ -79,9 +79,9 @@ Expected first-slice frontend surfaces:
 - admin feature authorization tab with searchable user selection, per-feature allow/deny matrix, and save flow for the currently implemented asset library feature
 - admin tag management tab with character create/edit/delete + alias support and location/keyword search, usage-sorted pagination, and unified rename/merge/delete dialogs
 - admin policy tab for retention settings and deleted asset restore status/actions
-- asset library page with file/link split upload modal, a background upload progress toast panel updated independently from the main library list render and calculated from uploaded bytes instead of completed file counts, character dropdown + location/keyword tag suggestion search, grouped tag display, search, org/creator filters, and company-wide viewer export action without a separate asset status filter
+- asset library page with file/link split upload modal, 확장자 기반 이미지/오디오/영상/문서 세부 메타데이터 입력, 링크의 `URL` 타입 분리, same-metadata-based image/audio/video/document filters, a background upload progress toast panel updated independently from the main library list render and calculated from uploaded bytes instead of completed file counts, character dropdown + location/keyword tag suggestion search, grouped tag display, search, org/creator filters, and company-wide viewer export action without a separate asset status filter
 - shell-level feature gating so denied users cannot enter the implemented asset library surface
-- asset detail page with image/video preview or external link summary, history, editable metadata, download/open-link action, and owner/admin delete action
+- asset detail page with image/video preview or external link summary, history, 타입별 세부 메타데이터를 포함한 editable metadata, download/open-link action, and owner/admin delete action
 - generation request forms and result views
 - searchable asset detail flows
 - guide-aware creation UI

@@ -61,6 +61,22 @@ class AssetEntity(
     var heightPx: Int? = null,
     @Column(name = "duration_ms")
     var durationMs: Long? = null,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "image_art_style")
+    var imageArtStyle: AssetImageArtStyle? = null,
+    @Column(name = "image_has_layer_file")
+    var imageHasLayerFile: Boolean? = null,
+    @Column(name = "audio_tts_voice")
+    var audioTtsVoice: String? = null,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "audio_recording_type")
+    var audioRecordingType: AssetAudioRecordingType? = null,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "video_stage")
+    var videoStage: AssetVideoStage? = null,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_kind")
+    var documentKind: AssetDocumentKind? = null,
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false)

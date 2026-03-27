@@ -23,6 +23,8 @@ import type {
   AssetTagDraftView
 } from "./asset-library-page-model";
 import { AssetTagEditor, type AssetTagCollectionKey, type AssetTagInputKey } from "./asset-tag-editor-section";
+import { AssetTypeMetadataEditorSection } from "./asset-type-metadata-section";
+import { createEmptyAssetTypeMetadataInput } from "./asset-type-metadata-model";
 
 interface AssetUploadModalProps {
   characterOptions: CharacterTagOptionView[];
@@ -119,6 +121,15 @@ export function AssetUploadModal({
   function handleDescriptionChange(draftId: string, value: string): void {
     setFileDrafts((currentDrafts) =>
       currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, description: value } : draft))
+    );
+  }
+
+  function handleTypeMetadataChange(
+    draftId: string,
+    value: AssetFileUploadDraftView["typeMetadata"]
+  ): void {
+    setFileDrafts((currentDrafts) =>
+      currentDrafts.map((draft) => (draft.id === draftId ? { ...draft, typeMetadata: value } : draft))
     );
   }
 
@@ -368,6 +379,12 @@ export function AssetUploadModal({
                           tagOptions={tagOptions}
                           value={draft}
                         />
+
+                        <AssetTypeMetadataEditorSection
+                          assetType={draft.type}
+                          onChange={(value) => handleTypeMetadataChange(draft.id, value)}
+                          value={draft.typeMetadata}
+                        />
                       </div>
                     </div>
 
@@ -524,7 +541,8 @@ async function createDraftFromFile(file: File): Promise<AssetFileUploadDraftView
     suggestedWidth: dimensions?.width ?? null,
     description: "",
     title: normalizeDisplayValue(normalizedFileName.replace(/\.[^/.]+$/, "")),
-    type
+    type,
+    typeMetadata: createInitialTypeMetadataInput(file, type)
   };
 }
 
@@ -565,12 +583,29 @@ function inferAssetType(file: File): AssetFileUploadDraftView["type"] {
     return "AUDIO";
   }
   if (extension && ["txt", "md", "rtf"].includes(extension)) {
-    return "SCENARIO";
+    return "DOCUMENT";
   }
   if (extension && ["pdf", "doc", "docx", "ppt", "pptx", "zip", "ai"].includes(extension)) {
     return "DOCUMENT";
   }
   return "OTHER";
+}
+
+function createInitialTypeMetadataInput(
+  file: File,
+  type: AssetFileUploadDraftView["type"]
+): AssetFileUploadDraftView["typeMetadata"] {
+  const baseMetadata = createEmptyAssetTypeMetadataInput(type);
+  const extension = file.name.split(".").pop()?.toLowerCase();
+
+  if (type === "DOCUMENT" && extension && ["txt", "md", "rtf"].includes(extension)) {
+    return {
+      ...baseMetadata,
+      documentKind: "SCENARIO"
+    };
+  }
+
+  return baseMetadata;
 }
 
 function addDraftTagValue<T extends AssetLinkComposerView | AssetFileUploadDraftView>(

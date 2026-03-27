@@ -147,7 +147,8 @@ class AssetLibraryServiceTest @Autowired constructor(
             query = AssetListQuery(search = "코코 축제"),
         )
 
-        assertThat(uploadedAsset.type).isEqualTo(AssetType.SCENARIO)
+        assertThat(uploadedAsset.type).isEqualTo(AssetType.DOCUMENT)
+        assertThat(uploadedAsset.typeMetadata.documentKind).isEqualTo(AssetDocumentKind.SCENARIO)
         assertThat(uploadedAsset.organizationName).isEqualTo("마케팅팀")
         assertThat(uploadedAsset.ownerEmail).isEqualTo("coco@iportfolio.co.kr")
         assertThat(uploadedAsset.tags.keywords).contains("코코", "축제")
@@ -595,7 +596,7 @@ class AssetLibraryServiceTest @Autowired constructor(
 
         assertThat(registeredLinks).hasSize(2)
         assertThat(youtubeAsset.sourceKind).isEqualTo(AssetSourceKind.LINK)
-        assertThat(youtubeAsset.type).isEqualTo(AssetType.VIDEO)
+        assertThat(youtubeAsset.type).isEqualTo(AssetType.URL)
         assertThat(youtubeAsset.linkUrl).isEqualTo("https://youtube.com/watch?v=demo")
         assertThat(youtubeAsset.canDownload).isFalse()
         assertThat(searchedAssets).extracting("id").contains(youtubeAsset.id)
@@ -774,6 +775,85 @@ class AssetLibraryServiceTest @Autowired constructor(
 
         assertThat(previewResult.contentType).isEqualTo("image/jpeg")
         assertThat(previewResult.content).containsExactly(9, 8, 7)
+    }
+
+    @Test
+    fun `stores image type metadata and exposes it in detail`() {
+        val uploadedAsset = uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "축제 배경 이미지",
+            fileName = "festival-background.png",
+            contentType = "image/png",
+            typeMetadata = AssetTypeMetadataRequest(
+                imageArtStyle = AssetImageArtStyle.BACKGROUND,
+                imageHasLayerFile = true,
+            ),
+        )
+
+        val assetDetail = assetLibraryService.getAsset(
+            assetId = uploadedAsset.id,
+            actorEmail = "coco@iportfolio.co.kr",
+        )
+
+        assertThat(uploadedAsset.type).isEqualTo(AssetType.IMAGE)
+        assertThat(uploadedAsset.typeMetadata.imageArtStyle).isEqualTo(AssetImageArtStyle.BACKGROUND)
+        assertThat(uploadedAsset.typeMetadata.imageHasLayerFile).isTrue()
+        assertThat(assetDetail.typeMetadata.imageArtStyle).isEqualTo(AssetImageArtStyle.BACKGROUND)
+        assertThat(assetDetail.typeMetadata.imageHasLayerFile).isTrue()
+    }
+
+    @Test
+    fun `updates video type metadata and records an update history event`() {
+        val uploadedAsset = uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "영상 세부 정보 애셋",
+            fileName = "metadata-video.mp4",
+            contentType = "video/mp4",
+        )
+
+        val updatedAsset = assetLibraryService.updateAsset(
+            assetId = uploadedAsset.id,
+            title = "영상 세부 정보 애셋",
+            description = "설명",
+            requestedTags = AssetStructuredTagsRequest(
+                keywords = listOf("태그"),
+            ),
+            requestedTypeMetadata = AssetTypeMetadataRequest(
+                videoStage = AssetVideoStage.FINAL,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+
+        assertThat(updatedAsset.typeMetadata.videoStage).isEqualTo(AssetVideoStage.FINAL)
+        assertThat(updatedAsset.events).hasSize(2)
+        assertThat(updatedAsset.events.first().eventType).isEqualTo(AssetEventType.METADATA_UPDATED)
+        assertThat(updatedAsset.events.first().detail).contains("세부 정보")
+    }
+
+    @Test
+    fun `stores document type metadata and exposes it in detail`() {
+        val uploadedAsset = uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "축제 기획서",
+            fileName = "festival-plan.pdf",
+            contentType = "application/pdf",
+            typeMetadata = AssetTypeMetadataRequest(
+                documentKind = AssetDocumentKind.PLANNING,
+            ),
+        )
+
+        val assetDetail = assetLibraryService.getAsset(
+            assetId = uploadedAsset.id,
+            actorEmail = "coco@iportfolio.co.kr",
+        )
+
+        assertThat(uploadedAsset.type).isEqualTo(AssetType.DOCUMENT)
+        assertThat(uploadedAsset.typeMetadata.documentKind).isEqualTo(AssetDocumentKind.PLANNING)
+        assertThat(assetDetail.typeMetadata.documentKind).isEqualTo(AssetDocumentKind.PLANNING)
     }
 
     @Test
@@ -983,18 +1063,21 @@ class AssetLibraryServiceTest @Autowired constructor(
         actorName: String,
         title: String,
         fileName: String,
+        contentType: String = "text/plain",
         requestedTags: AssetStructuredTagsRequest = AssetStructuredTagsRequest(
             keywords = listOf("태그"),
         ),
+        typeMetadata: AssetTypeMetadataRequest = AssetTypeMetadataRequest(),
     ): AssetSummaryResponse {
         val intentResponse = assetLibraryService.initiateUpload(
             request = AssetUploadIntentRequest(
                 fileName = fileName,
-                contentType = "text/plain",
+                contentType = contentType,
                 fileSizeBytes = 5L,
                 title = title,
                 description = "설명",
                 tags = requestedTags,
+                typeMetadata = typeMetadata,
             ),
             actorEmail = actorEmail,
             actorName = actorName,

@@ -22,15 +22,25 @@ import {
 } from "../../components/ui/select";
 import { GOOGLE_LOGIN_PATH } from "../../api/auth";
 import type {
+  AssetAudioRecordingTypeView,
+  AssetDocumentKindView,
+  AssetImageArtStyleView,
   AssetTagOptionCatalogView,
   AssetSummaryView,
   AuthSessionView,
-  CharacterTagOptionView
+  CharacterTagOptionView,
+  AssetVideoStageView
 } from "../../api/types";
 import { cn, isBlank } from "../../lib/utils";
 import { typeLabelMap } from "./asset-detail-model";
 import { AssetTypeIcon } from "./asset-detail-section";
 import { AssetPreviewPanel } from "./asset-preview-panel";
+import {
+  audioRecordingTypeOptions,
+  documentKindOptions,
+  imageArtStyleOptions,
+  videoStageOptions
+} from "./asset-type-metadata-model";
 import { AssetUploadModal } from "./asset-upload-modal";
 import { flattenAssetTags, getAssetPrimaryText } from "./asset-library-utils";
 import type {
@@ -58,6 +68,17 @@ interface AssetLibraryPageProps {
 }
 
 type AssetLibraryLayoutMode = "grid" | "list";
+type AssetLibraryTypeFilter = AssetSummaryView["type"] | "ALL";
+type ImageLayerFileFilter = "ALL" | "INCLUDED" | "NOT_INCLUDED";
+
+interface AssetTypeMetadataFilterState {
+  imageArtStyle: AssetImageArtStyleView | "ALL";
+  imageHasLayerFile: ImageLayerFileFilter;
+  audioTtsVoice: string;
+  audioRecordingType: AssetAudioRecordingTypeView | "ALL";
+  videoStage: AssetVideoStageView | "ALL";
+  documentKind: AssetDocumentKindView | "ALL";
+}
 
 const cardDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "short"
@@ -85,7 +106,10 @@ function AssetLibraryPageComponent({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<AssetLibraryLayoutMode>("grid");
   const [organizationFilter, setOrganizationFilter] = useState("ALL");
-  const [typeFilter, setTypeFilter] = useState("ALL");
+  const [typeFilter, setTypeFilter] = useState<AssetLibraryTypeFilter>("ALL");
+  const [typeMetadataFilters, setTypeMetadataFilters] = useState<AssetTypeMetadataFilterState>(
+    createEmptyTypeMetadataFilters
+  );
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const creatorOptions = Array.from(new Set(assets.map((asset) => asset.ownerName))).sort((left, right) =>
@@ -110,6 +134,10 @@ function AssetLibraryPageComponent({
       return false;
     }
 
+    if (!matchesTypeMetadataFilters(asset, typeFilter, typeMetadataFilters)) {
+      return false;
+    }
+
     if (organizationFilter !== "ALL" && asset.organizationName !== organizationFilter) {
       return false;
     }
@@ -124,7 +152,8 @@ function AssetLibraryPageComponent({
     !isBlank(searchQuery) ||
     typeFilter !== "ALL" ||
     organizationFilter !== "ALL" ||
-    creatorFilter !== "ALL";
+    creatorFilter !== "ALL" ||
+    hasActiveTypeMetadataFilters(typeFilter, typeMetadataFilters);
 
   useEffect(() => {
     if (uploadCompletionVersion === 0) {
@@ -132,16 +161,21 @@ function AssetLibraryPageComponent({
     }
 
     onSearchQueryChange("");
-    setTypeFilter("ALL");
+    handleTypeFilterChange("ALL");
     setOrganizationFilter("ALL");
     setCreatorFilter("ALL");
   }, [onSearchQueryChange, uploadCompletionVersion]);
 
   function resetFilters(): void {
     onSearchQueryChange("");
-    setTypeFilter("ALL");
+    handleTypeFilterChange("ALL");
     setOrganizationFilter("ALL");
     setCreatorFilter("ALL");
+  }
+
+  function handleTypeFilterChange(nextValue: AssetLibraryTypeFilter): void {
+    setTypeFilter(nextValue);
+    setTypeMetadataFilters(createEmptyTypeMetadataFilters());
   }
 
   return (
@@ -223,7 +257,7 @@ function AssetLibraryPageComponent({
                   />
                 </div>
 
-                <Select onValueChange={setTypeFilter} value={typeFilter}>
+                <Select onValueChange={(value) => handleTypeFilterChange(value as AssetLibraryTypeFilter)} value={typeFilter}>
                   <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
                     <SelectValue placeholder="전체 유형" />
                   </SelectTrigger>
@@ -288,6 +322,159 @@ function AssetLibraryPageComponent({
                   </button>
                 </div>
               </div>
+
+              {typeFilter === "IMAGE" ? (
+                <div className="grid gap-3 rounded-2xl border border-border bg-background/70 p-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">이미지 아트 스타일</p>
+                    <Select
+                      onValueChange={(value) =>
+                        setTypeMetadataFilters((currentFilters) => ({
+                          ...currentFilters,
+                          imageArtStyle: value as AssetTypeMetadataFilterState["imageArtStyle"]
+                        }))
+                      }
+                      value={typeMetadataFilters.imageArtStyle}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
+                        <SelectValue placeholder="전체 아트 스타일" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">전체 아트 스타일</SelectItem>
+                        {imageArtStyleOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">레이어 파일</p>
+                    <Select
+                      onValueChange={(value) =>
+                        setTypeMetadataFilters((currentFilters) => ({
+                          ...currentFilters,
+                          imageHasLayerFile: value as ImageLayerFileFilter
+                        }))
+                      }
+                      value={typeMetadataFilters.imageHasLayerFile}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
+                        <SelectValue placeholder="전체 레이어 상태" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">전체 레이어 상태</SelectItem>
+                        <SelectItem value="INCLUDED">레이어 파일 포함</SelectItem>
+                        <SelectItem value="NOT_INCLUDED">레이어 파일 미포함</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
+
+              {typeFilter === "AUDIO" ? (
+                <div className="grid gap-3 rounded-2xl border border-border bg-background/70 p-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="space-y-2 md:col-span-2">
+                    <p className="text-xs font-medium text-muted-foreground">TTS 목소리</p>
+                    <Input
+                      className="h-11 rounded-xl border-0 bg-muted shadow-none"
+                      onChange={(event) =>
+                        setTypeMetadataFilters((currentFilters) => ({
+                          ...currentFilters,
+                          audioTtsVoice: event.target.value
+                        }))
+                      }
+                      placeholder="TTS 목소리로 필터링"
+                      value={typeMetadataFilters.audioTtsVoice}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">녹음 유형</p>
+                    <Select
+                      onValueChange={(value) =>
+                        setTypeMetadataFilters((currentFilters) => ({
+                          ...currentFilters,
+                          audioRecordingType: value as AssetTypeMetadataFilterState["audioRecordingType"]
+                        }))
+                      }
+                      value={typeMetadataFilters.audioRecordingType}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
+                        <SelectValue placeholder="전체 녹음 유형" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">전체 녹음 유형</SelectItem>
+                        {audioRecordingTypeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
+
+              {typeFilter === "VIDEO" ? (
+                <div className="grid gap-3 rounded-2xl border border-border bg-background/70 p-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">영상 정보</p>
+                    <Select
+                      onValueChange={(value) =>
+                        setTypeMetadataFilters((currentFilters) => ({
+                          ...currentFilters,
+                          videoStage: value as AssetTypeMetadataFilterState["videoStage"]
+                        }))
+                      }
+                      value={typeMetadataFilters.videoStage}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
+                        <SelectValue placeholder="전체 영상 정보" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">전체 영상 정보</SelectItem>
+                        {videoStageOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
+
+              {typeFilter === "DOCUMENT" ? (
+                <div className="grid gap-3 rounded-2xl border border-border bg-background/70 p-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">문서 정보</p>
+                    <Select
+                      onValueChange={(value) =>
+                        setTypeMetadataFilters((currentFilters) => ({
+                          ...currentFilters,
+                          documentKind: value as AssetTypeMetadataFilterState["documentKind"]
+                        }))
+                      }
+                      value={typeMetadataFilters.documentKind}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
+                        <SelectValue placeholder="전체 문서 정보" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">전체 문서 정보</SelectItem>
+                        {documentKindOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
                 <p>{isLoading ? "자산을 불러오는 중..." : `${visibleAssets.length}개 애셋`}</p>
@@ -510,7 +697,7 @@ const assetTypeOptions: AssetSummaryView["type"][] = [
   "VIDEO",
   "AUDIO",
   "DOCUMENT",
-  "SCENARIO",
+  "URL",
   "OTHER"
 ];
 
@@ -533,4 +720,80 @@ function areAssetLibraryPagePropsEqual(
     previousProps.session === nextProps.session &&
     previousProps.uploadCompletionVersion === nextProps.uploadCompletionVersion
   );
+}
+
+function createEmptyTypeMetadataFilters(): AssetTypeMetadataFilterState {
+  return {
+    imageArtStyle: "ALL",
+    imageHasLayerFile: "ALL",
+    audioTtsVoice: "",
+    audioRecordingType: "ALL",
+    videoStage: "ALL",
+    documentKind: "ALL"
+  };
+}
+
+function hasActiveTypeMetadataFilters(
+  typeFilter: AssetLibraryTypeFilter,
+  filters: AssetTypeMetadataFilterState
+): boolean {
+  switch (typeFilter) {
+    case "IMAGE":
+      return filters.imageArtStyle !== "ALL" || filters.imageHasLayerFile !== "ALL";
+    case "AUDIO":
+      return !isBlank(filters.audioTtsVoice) || filters.audioRecordingType !== "ALL";
+    case "VIDEO":
+      return filters.videoStage !== "ALL";
+    case "DOCUMENT":
+      return filters.documentKind !== "ALL";
+    default:
+      return false;
+  }
+}
+
+function matchesTypeMetadataFilters(
+  asset: AssetSummaryView,
+  typeFilter: AssetLibraryTypeFilter,
+  filters: AssetTypeMetadataFilterState
+): boolean {
+  switch (typeFilter) {
+    case "IMAGE":
+      if (filters.imageArtStyle !== "ALL" && asset.typeMetadata.imageArtStyle !== filters.imageArtStyle) {
+        return false;
+      }
+
+      if (filters.imageHasLayerFile === "INCLUDED" && asset.typeMetadata.imageHasLayerFile !== true) {
+        return false;
+      }
+
+      if (filters.imageHasLayerFile === "NOT_INCLUDED" && asset.typeMetadata.imageHasLayerFile !== false) {
+        return false;
+      }
+
+      return true;
+    case "AUDIO": {
+      const normalizedTtsVoiceFilter = normalizeSearchValue(filters.audioTtsVoice);
+      if (
+        normalizedTtsVoiceFilter.length > 0 &&
+        !normalizeSearchValue(asset.typeMetadata.audioTtsVoice ?? "").includes(normalizedTtsVoiceFilter)
+      ) {
+        return false;
+      }
+
+      if (
+        filters.audioRecordingType !== "ALL" &&
+        asset.typeMetadata.audioRecordingType !== filters.audioRecordingType
+      ) {
+        return false;
+      }
+
+      return true;
+    }
+    case "VIDEO":
+      return filters.videoStage === "ALL" || asset.typeMetadata.videoStage === filters.videoStage;
+    case "DOCUMENT":
+      return filters.documentKind === "ALL" || asset.typeMetadata.documentKind === filters.documentKind;
+    default:
+      return true;
+  }
 }

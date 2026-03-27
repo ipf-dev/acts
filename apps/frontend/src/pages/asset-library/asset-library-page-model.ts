@@ -1,4 +1,4 @@
-import type { AssetTypeView } from "../../api/types";
+import type { AssetTypeMetadataInputView, AssetTypeView } from "../../api/types";
 
 export interface AssetTagDraftView {
   characterTagIds: number[];
@@ -19,6 +19,7 @@ export interface AssetFileUploadDraftView extends AssetTagDraftView {
   suggestedWidth: number | null;
   title: string;
   type: AssetTypeView;
+  typeMetadata: AssetTypeMetadataInputView;
 }
 
 export interface AssetLinkDraftView extends AssetTagDraftView {

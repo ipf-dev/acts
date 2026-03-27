@@ -15,7 +15,7 @@ class AssetTypeClassifier {
             normalizedContentType?.startsWith("image/") == true || extension in imageExtensions -> AssetType.IMAGE
             normalizedContentType?.startsWith("video/") == true || extension in videoExtensions -> AssetType.VIDEO
             normalizedContentType?.startsWith("audio/") == true || extension in audioExtensions -> AssetType.AUDIO
-            extension in scenarioExtensions -> AssetType.SCENARIO
+            extension in scenarioExtensions -> AssetType.DOCUMENT
             normalizedContentType == "application/pdf" || extension in documentExtensions -> AssetType.DOCUMENT
             else -> AssetType.OTHER
         }
@@ -26,20 +26,20 @@ class AssetTypeClassifier {
         linkType: String?,
     ): AssetType {
         val normalizedUrl = url.lowercase()
-        val normalizedLinkType = linkType?.lowercase().orEmpty()
+        return if (normalizedUrl.isNotBlank()) AssetType.URL else AssetType.OTHER
+    }
+
+    fun inferDocumentKind(
+        fileName: String,
+        contentType: String?,
+    ): AssetDocumentKind? {
+        val normalizedContentType = contentType?.lowercase()
+        val extension = fileName.substringAfterLast(".", "").lowercase()
 
         return when {
-            normalizedLinkType.contains("youtube") ||
-                normalizedUrl.contains("youtube.com") ||
-                normalizedUrl.contains("youtu.be") -> AssetType.VIDEO
-            normalizedLinkType.contains("drive") ||
-                normalizedLinkType.contains("document") ||
-                normalizedLinkType.contains("notion") ||
-                normalizedUrl.contains("drive.google.com") ||
-                normalizedUrl.contains("docs.google.com") ||
-                normalizedUrl.contains("notion.so") ||
-                normalizedUrl.contains("notion.site") -> AssetType.DOCUMENT
-            else -> AssetType.OTHER
+            extension in scenarioExtensions -> AssetDocumentKind.SCENARIO
+            normalizedContentType == "text/plain" && extension.isBlank() -> AssetDocumentKind.SCENARIO
+            else -> null
         }
     }
 

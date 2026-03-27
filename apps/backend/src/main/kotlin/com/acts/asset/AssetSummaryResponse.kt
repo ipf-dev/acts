@@ -22,6 +22,7 @@ data class AssetSummaryResponse(
     val widthPx: Int?,
     val heightPx: Int?,
     val durationMs: Long?,
+    val typeMetadata: AssetTypeMetadataResponse,
     val tags: AssetStructuredTagsResponse,
     val searchText: String,
     val canEdit: Boolean,

@@ -16,7 +16,7 @@ export const typeLabelMap: Record<AssetSummaryView["type"], string> = {
   DOCUMENT: "문서",
   IMAGE: "이미지",
   OTHER: "기타",
-  SCENARIO: "시나리오",
+  URL: "URL",
   VIDEO: "영상"
 };
 

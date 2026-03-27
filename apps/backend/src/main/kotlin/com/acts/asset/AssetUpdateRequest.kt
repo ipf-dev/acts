@@ -10,4 +10,6 @@ data class AssetUpdateRequest @JsonCreator constructor(
     val description: String? = null,
     @JsonProperty("tags")
     val tags: AssetStructuredTagsRequest = AssetStructuredTagsRequest(),
+    @JsonProperty("typeMetadata")
+    val typeMetadata: AssetTypeMetadataRequest = AssetTypeMetadataRequest(),
 )

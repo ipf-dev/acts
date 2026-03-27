@@ -185,6 +185,7 @@ class AssetController(
                     title = request.title,
                     description = request.description,
                     requestedTags = request.tags,
+                    requestedTypeMetadata = request.typeMetadata,
                     actorEmail = actorEmail,
                     actorName = actorName,
                 ),

@@ -7,6 +7,10 @@ export type UserRole = "USER" | "ADMIN";
 export type UserMappingMode = "MANUAL" | "UNMAPPED";
 export type AppFeatureKeyView = "ASSET_LIBRARY";
 export type AssetTagTypeView = "CHARACTER" | "LOCATION" | "KEYWORD";
+export type AssetImageArtStyleView = "BACKGROUND" | "CHARACTER_SHEET" | "DRAFT" | "OTHER";
+export type AssetAudioRecordingTypeView = "VOICE_OVER" | "CHANT" | "MUSIC";
+export type AssetVideoStageView = "SOURCE" | "EDITED" | "FINAL";
+export type AssetDocumentKindView = "SCENARIO" | "PLANNING" | "OTHER";
 
 export interface AssetStructuredTagsView {
   characters: string[];
@@ -159,9 +163,27 @@ export interface UserFeatureAccessInput {
   allowedFeatureKeys: AppFeatureKeyView[];
 }
 
-export type AssetTypeView = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" | "SCENARIO" | "OTHER";
+export type AssetTypeView = "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT" | "URL" | "OTHER";
 export type AssetSourceKindView = "FILE" | "LINK";
 export type AssetFileAccessModeView = "DOWNLOAD" | "PLAYBACK";
+
+export interface AssetTypeMetadataView {
+  imageArtStyle: AssetImageArtStyleView | null;
+  imageHasLayerFile: boolean | null;
+  audioTtsVoice: string | null;
+  audioRecordingType: AssetAudioRecordingTypeView | null;
+  videoStage: AssetVideoStageView | null;
+  documentKind: AssetDocumentKindView | null;
+}
+
+export interface AssetTypeMetadataInputView {
+  imageArtStyle: AssetImageArtStyleView | null;
+  imageHasLayerFile: boolean | null;
+  audioTtsVoice: string;
+  audioRecordingType: AssetAudioRecordingTypeView | null;
+  videoStage: AssetVideoStageView | null;
+  documentKind: AssetDocumentKindView | null;
+}
 
 export interface AssetFileAccessUrlView {
   url: string;
@@ -191,6 +213,7 @@ export interface AssetSummaryView {
   widthPx: number | null;
   heightPx: number | null;
   durationMs: number | null;
+  typeMetadata: AssetTypeMetadataView;
   tags: AssetStructuredTagsView;
   searchText: string;
   canEdit: boolean;
@@ -205,6 +228,7 @@ export interface AssetUploadInput {
   title?: string;
   description?: string;
   tags: AssetStructuredTagsInput;
+  typeMetadata: AssetTypeMetadataInputView;
   widthPx?: number;
   heightPx?: number;
 }
@@ -239,6 +263,7 @@ export interface AssetUpdateInput {
   title: string;
   description?: string;
   tags: AssetStructuredTagsInput;
+  typeMetadata: AssetTypeMetadataInputView;
 }
 
 export interface AssetFileView {

@@ -23,6 +23,7 @@ import { Textarea } from "../../components/ui/textarea";
 import type {
   AssetDetailView,
   AssetSummaryView,
+  AssetTypeMetadataInputView,
   AssetUpdateInput,
   AuthSessionView,
   CharacterTagOptionView
@@ -50,6 +51,13 @@ import {
   normalizeTagValue,
   openAssetExternalLink
 } from "./asset-library-utils";
+import {
+  createAssetTypeMetadataInputFromView
+} from "./asset-type-metadata-model";
+import {
+  AssetTypeMetadataDisplaySection,
+  AssetTypeMetadataEditorSection
+} from "./asset-type-metadata-section";
 
 interface AssetDetailPageProps {
   asset: AssetDetailView | null;
@@ -101,6 +109,14 @@ export function AssetDetailPage({
   const [locationInput, setLocationInput] = useState("");
   const [locationsDraft, setLocationsDraft] = useState<string[]>([]);
   const [titleDraft, setTitleDraft] = useState("");
+  const [typeMetadataDraft, setTypeMetadataDraft] = useState<AssetTypeMetadataInputView>({
+    imageArtStyle: null,
+    imageHasLayerFile: null,
+    audioTtsVoice: "",
+    audioRecordingType: null,
+    videoStage: null,
+    documentKind: null
+  });
   const canDelete = asset?.canDelete ?? false;
   const canEdit = asset?.canEdit ?? false;
   const canDownload = asset?.canDownload ?? false;
@@ -119,6 +135,9 @@ export function AssetDetailPage({
     setKeywordsDraft(asset.tags.keywords);
     setLocationInput("");
     setKeywordInput("");
+    setTypeMetadataDraft(
+      createAssetTypeMetadataInputFromView(asset.type, asset.sourceKind, asset.typeMetadata)
+    );
   }, [asset, characterOptions]);
 
   async function handleSave(): Promise<void> {
@@ -146,7 +165,8 @@ export function AssetDetailPage({
         characterTagIds: resolvedTags.characterTagIds,
         locations: resolvedTags.locations,
         keywords: resolvedTags.keywords
-      }
+      },
+      typeMetadata: typeMetadataDraft
     });
   }
 
@@ -352,6 +372,12 @@ export function AssetDetailPage({
                         <p className="text-xs font-medium text-muted-foreground">태그</p>
                         <AssetTagGroupList tags={asset.tags} />
                       </section>
+
+                      <AssetTypeMetadataDisplaySection
+                        assetType={asset.type}
+                        sourceKind={asset.sourceKind}
+                        typeMetadata={asset.typeMetadata}
+                      />
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -424,12 +450,19 @@ export function AssetDetailPage({
                         />
                       </section>
 
+                      <AssetTypeMetadataDisplaySection
+                        assetType={asset.type}
+                        className="rounded-2xl border border-border bg-muted/20 p-4"
+                        sourceKind={asset.sourceKind}
+                        typeMetadata={asset.typeMetadata}
+                      />
+
                       <section className="space-y-4 rounded-2xl border border-border bg-muted/30 p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-sm font-medium">권한 및 메타데이터</p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              소유자와 Admin은 제목, 설명, 태그를 수정할 수 있습니다.
+                              소유자와 Admin은 제목, 설명, 태그, 세부 메타데이터를 수정할 수 있습니다.
                             </p>
                           </div>
                           <Badge variant={canEdit ? "success" : "outline"}>
@@ -470,6 +503,13 @@ export function AssetDetailPage({
                                 value={descriptionDraft}
                               />
                             </div>
+
+                            <AssetTypeMetadataEditorSection
+                              assetType={asset.type}
+                              onChange={setTypeMetadataDraft}
+                              sourceKind={asset.sourceKind}
+                              value={typeMetadataDraft}
+                            />
 
                             <AssetTagEditor
                               characterOptions={characterOptions}
