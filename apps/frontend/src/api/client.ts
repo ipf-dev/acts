@@ -259,6 +259,12 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       });
     },
     async uploadAsset(input, options) {
+      const MULTIPART_THRESHOLD = 10 * 1024 * 1024;
+
+      if (input.file.size > MULTIPART_THRESHOLD) {
+        return uploadAssetMultipart(readJson, input, options);
+      }
+
       options?.onProgress?.({
         phase: "PREPARING",
         totalBytes: input.file.size,
@@ -414,6 +420,194 @@ function parseContentDispositionFileName(contentDisposition: string | null): str
   return null;
 }
 
+interface MultipartIntentResponse {
+  assetId: number;
+  uploadId: string;
+  objectKey: string;
+  partSize: number;
+  parts: { partNumber: number; presignedUrl: string }[];
+}
+
+interface CompletedPart {
+  partNumber: number;
+  eTag: string;
+}
+
+const MULTIPART_CONCURRENCY = 4;
+
+async function uploadAssetMultipart(
+  readJson: <T>(input: RequestInfo, init?: RequestInit) => Promise<T>,
+  input: AssetUploadInput,
+  options?: AssetUploadOptions
+): Promise<AssetSummaryView> {
+  options?.onProgress?.({
+    phase: "PREPARING",
+    totalBytes: input.file.size,
+    uploadedBytes: 0
+  });
+
+  const intentResponse = await readJson<MultipartIntentResponse>(
+    "/api/assets/upload-multipart-intent",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: input.file.name,
+        contentType: input.file.type || "application/octet-stream",
+        fileSizeBytes: input.file.size,
+        title: input.title,
+        description: input.description,
+        tags: input.tags,
+      }),
+    }
+  );
+
+  options?.onProgress?.({
+    phase: "UPLOADING",
+    totalBytes: input.file.size,
+    uploadedBytes: 0
+  });
+
+  const completedParts = await uploadPartsWithConcurrency(
+    input.file,
+    intentResponse.parts,
+    intentResponse.partSize,
+    MULTIPART_CONCURRENCY,
+    options?.onProgress
+      ? (uploadedBytes: number) => {
+          options.onProgress!({
+            phase: "UPLOADING",
+            totalBytes: input.file.size,
+            uploadedBytes: Math.min(uploadedBytes, input.file.size)
+          });
+        }
+      : undefined
+  );
+
+  options?.onProgress?.({
+    phase: "FINALIZING",
+    totalBytes: input.file.size,
+    uploadedBytes: input.file.size
+  });
+
+  return readJson<AssetSummaryView>(
+    `/api/assets/${intentResponse.assetId}/complete-multipart`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        uploadId: intentResponse.uploadId,
+        objectKey: intentResponse.objectKey,
+        fileSizeBytes: input.file.size,
+        widthPx: input.widthPx ?? null,
+        heightPx: input.heightPx ?? null,
+        parts: completedParts,
+      }),
+    }
+  );
+}
+
+async function uploadPartsWithConcurrency(
+  file: File,
+  parts: { partNumber: number; presignedUrl: string }[],
+  partSize: number,
+  concurrency: number,
+  onBytesUploaded?: (totalUploadedBytes: number) => void
+): Promise<CompletedPart[]> {
+  const completedParts: CompletedPart[] = [];
+  const partUploadedBytes = new Map<number, number>();
+  let lastEmitTimestamp = 0;
+
+  function emitProgress(): void {
+    if (!onBytesUploaded) return;
+    const now = Date.now();
+    if (now - lastEmitTimestamp < 120) return;
+    lastEmitTimestamp = now;
+
+    let total = 0;
+    for (const bytes of partUploadedBytes.values()) {
+      total += bytes;
+    }
+    onBytesUploaded(total);
+  }
+
+  let index = 0;
+
+  async function worker(): Promise<void> {
+    while (index < parts.length) {
+      const currentIndex = index++;
+      const part = parts[currentIndex];
+      const start = currentIndex * partSize;
+      const end = Math.min(start + partSize, file.size);
+      const blob = file.slice(start, end);
+
+      partUploadedBytes.set(part.partNumber, 0);
+
+      const eTag = await uploadPartToPresignedUrl(
+        part.presignedUrl,
+        blob,
+        (loaded: number) => {
+          partUploadedBytes.set(part.partNumber, loaded);
+          emitProgress();
+        }
+      );
+
+      partUploadedBytes.set(part.partNumber, end - start);
+      emitProgress();
+
+      completedParts.push({ partNumber: part.partNumber, eTag });
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, parts.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
+
+  if (onBytesUploaded) {
+    onBytesUploaded(file.size);
+  }
+
+  return completedParts.sort((a, b) => a.partNumber - b.partNumber);
+}
+
+function uploadPartToPresignedUrl(
+  url: string,
+  blob: Blob,
+  onProgress?: (loaded: number) => void
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener("progress", (event) => {
+      onProgress?.(event.loaded);
+    });
+
+    xhr.open("PUT", url);
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const eTag = xhr.getResponseHeader("ETag");
+        if (!eTag) {
+          reject(new ApiError(500, "S3 응답에서 ETag 헤더를 찾을 수 없습니다."));
+          return;
+        }
+        resolve(eTag.replace(/"/g, ""));
+        return;
+      }
+
+      reject(new ApiError(xhr.status || 500));
+    };
+
+    xhr.onerror = () =>
+      reject(new ApiError(xhr.status || 500, "파트 업로드 중 네트워크 오류가 발생했습니다."));
+    xhr.onabort = () => reject(new ApiError(499, "파트 업로드가 중단되었습니다."));
+
+    xhr.send(blob);
+  });
+}
+
 function uploadFileToPresignedUrl(
   url: string,
   file: File,
@@ -425,10 +619,12 @@ function uploadFileToPresignedUrl(
     let lastEmittedPercent = -1;
     let lastEmitTimestamp = 0;
     const totalBytes = file.size > 0 ? file.size : null;
+    let latestUploadedBytes = 0;
 
     function emitUploadingProgress(uploadedBytes: number, force = false): void {
       const normalizedUploadedBytes =
         totalBytes !== null ? Math.max(0, Math.min(uploadedBytes, totalBytes)) : Math.max(0, uploadedBytes);
+      latestUploadedBytes = normalizedUploadedBytes;
       const nextPercent =
         totalBytes && totalBytes > 0 ? Math.min(100, Math.round((normalizedUploadedBytes / totalBytes) * 100)) : 0;
 
@@ -454,8 +650,8 @@ function uploadFileToPresignedUrl(
       emitUploadingProgress(event.loaded, event.loaded === 0);
     });
 
-    xhr.upload.addEventListener("loadend", () => {
-      emitUploadingProgress(100, true);
+    xhr.upload.addEventListener("load", () => {
+      emitUploadingProgress(totalBytes ?? latestUploadedBytes, true);
     });
 
     xhr.open("PUT", url);
@@ -463,7 +659,7 @@ function uploadFileToPresignedUrl(
 
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        emitUploadingProgress(100, true);
+        emitUploadingProgress(totalBytes ?? latestUploadedBytes, true);
         resolve();
         return;
       }

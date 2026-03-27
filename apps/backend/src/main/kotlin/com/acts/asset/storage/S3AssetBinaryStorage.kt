@@ -6,15 +6,20 @@ import org.springframework.stereotype.Component
 import software.amazon.awssdk.core.ResponseBytes
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload
+import software.amazon.awssdk.services.s3.model.CompletedPart
+import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import software.amazon.awssdk.services.s3.model.GetObjectResponse
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
+import software.amazon.awssdk.services.s3.model.UploadPartRequest
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest
+import software.amazon.awssdk.services.s3.presigner.model.UploadPartPresignRequest
 import java.time.Duration
 
 @Component
@@ -72,6 +77,81 @@ class S3AssetBinaryStorage(
             .build()
 
         return activePresigner().presignGetObject(presignRequest).url().toString()
+    }
+
+    override fun createMultipartUpload(
+        objectKey: String,
+        contentType: String,
+    ): String {
+        val request = CreateMultipartUploadRequest.builder()
+            .bucket(assetStorageProperties.bucket)
+            .key(objectKey)
+            .contentType(contentType)
+            .build()
+
+        return s3Client.createMultipartUpload(request).uploadId()
+    }
+
+    override fun presignUploadPartUrl(
+        objectKey: String,
+        uploadId: String,
+        partNumber: Int,
+        expirationMinutes: Long,
+    ): String {
+        val uploadPartRequest = UploadPartRequest.builder()
+            .bucket(assetStorageProperties.bucket)
+            .key(objectKey)
+            .uploadId(uploadId)
+            .partNumber(partNumber)
+            .build()
+
+        val presignRequest = UploadPartPresignRequest.builder()
+            .signatureDuration(Duration.ofMinutes(expirationMinutes))
+            .uploadPartRequest(uploadPartRequest)
+            .build()
+
+        return activePresigner().presignUploadPart(presignRequest).url().toString()
+    }
+
+    override fun completeMultipartUpload(
+        objectKey: String,
+        uploadId: String,
+        parts: List<CompletedPartInfo>,
+    ) {
+        val completedParts = parts
+            .sortedBy { part -> part.partNumber }
+            .map { part ->
+                CompletedPart.builder()
+                    .partNumber(part.partNumber)
+                    .eTag(part.eTag)
+                    .build()
+            }
+
+        s3Client.completeMultipartUpload { request ->
+            request.bucket(assetStorageProperties.bucket)
+                .key(objectKey)
+                .uploadId(uploadId)
+                .multipartUpload(
+                    CompletedMultipartUpload.builder()
+                        .parts(completedParts)
+                        .build(),
+                )
+        }
+    }
+
+    override fun abortMultipartUpload(
+        objectKey: String,
+        uploadId: String,
+    ) {
+        try {
+            s3Client.abortMultipartUpload { request ->
+                request.bucket(assetStorageProperties.bucket)
+                    .key(objectKey)
+                    .uploadId(uploadId)
+            }
+        } catch (exception: Exception) {
+            logger.warn("Failed to abort multipart upload uploadId={} objectKey={}", uploadId, objectKey, exception)
+        }
     }
 
     override fun store(

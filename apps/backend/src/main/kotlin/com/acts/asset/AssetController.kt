@@ -318,6 +318,56 @@ class AssetController(
         }
     }
 
+    @PostMapping("/upload-multipart-intent", consumes = ["application/json"])
+    fun initiateMultipartUpload(
+        authentication: Authentication?,
+        @RequestBody request: AssetUploadIntentRequest,
+    ): ResponseEntity<AssetMultipartUploadIntentResponse> {
+        val actorEmail = currentActorEmail(authentication)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+        val actorName = currentActorName(authentication)
+
+        return try {
+            ResponseEntity.ok(
+                assetLibraryService.initiateMultipartUpload(
+                    request = request,
+                    actorEmail = actorEmail,
+                    actorName = actorName,
+                ),
+            )
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
+    }
+
+    @PostMapping("/{assetId}/complete-multipart", consumes = ["application/json"])
+    fun completeMultipartUpload(
+        authentication: Authentication?,
+        @PathVariable assetId: Long,
+        @RequestBody request: AssetMultipartUploadCompleteRequest,
+    ): ResponseEntity<AssetSummaryResponse> {
+        val actorEmail = currentActorEmail(authentication)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+
+        return try {
+            ResponseEntity.ok(
+                assetLibraryService.completeMultipartUpload(
+                    assetId = assetId,
+                    request = request,
+                    actorEmail = actorEmail,
+                ),
+            )
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalStateException) {
+            ResponseEntity.status(HttpStatus.CONFLICT).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        }
+    }
+
     @PostMapping("/links", consumes = ["application/json"])
     fun registerLinks(
         authentication: Authentication?,

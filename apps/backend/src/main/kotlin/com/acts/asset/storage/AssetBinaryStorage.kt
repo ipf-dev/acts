@@ -15,6 +15,29 @@ interface AssetBinaryStorage {
         expirationMinutes: Long = 15,
     ): String
 
+    fun createMultipartUpload(
+        objectKey: String,
+        contentType: String,
+    ): String
+
+    fun presignUploadPartUrl(
+        objectKey: String,
+        uploadId: String,
+        partNumber: Int,
+        expirationMinutes: Long = 30,
+    ): String
+
+    fun completeMultipartUpload(
+        objectKey: String,
+        uploadId: String,
+        parts: List<CompletedPartInfo>,
+    )
+
+    fun abortMultipartUpload(
+        objectKey: String,
+        uploadId: String,
+    )
+
     fun store(
         objectKey: String,
         contentType: String,
@@ -36,6 +59,11 @@ interface AssetBinaryStorage {
         objectKey: String,
     ): Boolean
 }
+
+data class CompletedPartInfo(
+    val partNumber: Int,
+    val eTag: String,
+)
 
 data class StoredAssetObject(
     val bucket: String,
