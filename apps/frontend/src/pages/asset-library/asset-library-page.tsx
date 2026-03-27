@@ -1,4 +1,4 @@
-import { memo, useDeferredValue, useState } from "react";
+import { memo, useDeferredValue, useEffect, useState } from "react";
 import type React from "react";
 import {
   Clock3,
@@ -54,6 +54,7 @@ interface AssetLibraryPageProps {
   onUploadAssets: (drafts: AssetFileUploadDraftView[]) => Promise<void>;
   searchQuery: string;
   session: AuthSessionView;
+  uploadCompletionVersion: number;
 }
 
 type AssetLibraryLayoutMode = "grid" | "list";
@@ -77,7 +78,8 @@ function AssetLibraryPageComponent({
   onSearchQueryChange,
   onUploadAssets,
   searchQuery,
-  session
+  session,
+  uploadCompletionVersion
 }: AssetLibraryPageProps): React.JSX.Element {
   const [creatorFilter, setCreatorFilter] = useState("ALL");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -123,6 +125,17 @@ function AssetLibraryPageComponent({
     typeFilter !== "ALL" ||
     organizationFilter !== "ALL" ||
     creatorFilter !== "ALL";
+
+  useEffect(() => {
+    if (uploadCompletionVersion === 0) {
+      return;
+    }
+
+    onSearchQueryChange("");
+    setTypeFilter("ALL");
+    setOrganizationFilter("ALL");
+    setCreatorFilter("ALL");
+  }, [onSearchQueryChange, uploadCompletionVersion]);
 
   function resetFilters(): void {
     onSearchQueryChange("");
@@ -517,6 +530,7 @@ function areAssetLibraryPagePropsEqual(
     previousProps.onOpenAssetPage === nextProps.onOpenAssetPage &&
     previousProps.onSearchQueryChange === nextProps.onSearchQueryChange &&
     previousProps.searchQuery === nextProps.searchQuery &&
-    previousProps.session === nextProps.session
+    previousProps.session === nextProps.session &&
+    previousProps.uploadCompletionVersion === nextProps.uploadCompletionVersion
   );
 }

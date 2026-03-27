@@ -31,6 +31,7 @@ interface AssetLibraryPageState {
   isUploading: boolean;
   isLoading: boolean;
   session: AuthSessionView;
+  uploadCompletionVersion: number;
 }
 
 const dashboardApi = createDashboardApi();
@@ -62,11 +63,13 @@ export function AssetLibraryPageContainer({
     isExporting: false,
     isUploading: false,
     isLoading: true,
-    session: initialSession
+    session: initialSession,
+    uploadCompletionVersion: 0
   });
   const {
     applyFileProgress,
     dismissUploadBatch,
+    dismissUploadBatchIfMatches,
     markAllTasks,
     markBatchStatus,
     markTaskCompleted,
@@ -77,12 +80,12 @@ export function AssetLibraryPageContainer({
   } = useAssetUploadTracker();
   const isMountedRef = useRef(true);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
       isMountedRef.current = false;
-    },
-    []
-  );
+    };
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -144,13 +147,11 @@ export function AssetLibraryPageContainer({
         return;
       }
 
-      if (uploadBatch?.id === completedBatchId) {
-        dismissUploadBatch();
-      }
+      dismissUploadBatchIfMatches(completedBatchId);
     }, 2600);
 
     return () => window.clearTimeout(timeoutId);
-  }, [dismissUploadBatch, uploadBatch]);
+  }, [dismissUploadBatchIfMatches, uploadBatch]);
 
   async function handleUploadAssets(drafts: AssetFileUploadDraftView[]): Promise<void> {
     if (drafts.length === 0) {
@@ -168,7 +169,7 @@ export function AssetLibraryPageContainer({
 
     const results = await runWithConcurrency(drafts, 3, async (draft) => {
       try {
-        await dashboardApi.uploadAsset(
+        const uploadedAsset = await dashboardApi.uploadAsset(
           {
             description: draft.description,
             file: draft.file,
@@ -180,11 +181,10 @@ export function AssetLibraryPageContainer({
           }
         );
 
-        if (!isMountedRef.current) {
-          return;
+        if (isMountedRef.current) {
+          markTaskCompleted(uploadBatchId, draft.id);
         }
-
-        markTaskCompleted(uploadBatchId, draft.id);
+        return uploadedAsset;
       } catch (error: unknown) {
         if (isMountedRef.current) {
           markTaskFailed(
@@ -200,7 +200,13 @@ export function AssetLibraryPageContainer({
       }
     });
 
-    await finalizeUploadBatch(uploadBatchId, drafts.length, results, "FILE");
+    await finalizeUploadBatch(
+      uploadBatchId,
+      drafts.length,
+      results,
+      "FILE",
+      extractFulfilledValues(results)
+    );
   }
 
   async function handleRegisterAssetLinks(drafts: AssetLinkDraftView[]): Promise<void> {
@@ -222,7 +228,7 @@ export function AssetLibraryPageContainer({
         status: "FINALIZING"
       });
 
-      await dashboardApi.registerAssetLinks({
+      const registeredAssets = await dashboardApi.registerAssetLinks({
         links: drafts.map((draft) => ({
           linkType: draft.linkType,
           tags: assetTagDraftToInput(draft),
@@ -239,7 +245,13 @@ export function AssetLibraryPageContainer({
         errorMessage: null,
         status: "COMPLETED"
       });
-      await finalizeUploadBatch(uploadBatchId, drafts.length, createSuccessfulResults(drafts.length), "LINK");
+      await finalizeUploadBatch(
+        uploadBatchId,
+        drafts.length,
+        createSuccessfulResults(drafts.length),
+        "LINK",
+        registeredAssets
+      );
     } catch (error: unknown) {
       if (!isMountedRef.current) {
         return;
@@ -263,18 +275,11 @@ export function AssetLibraryPageContainer({
     }
   }
 
-  async function finalizeUploadBatch(
-    uploadBatchId: string,
-    taskCount: number,
-    results: PromiseSettledResult<void>[],
-    kind: "FILE" | "LINK"
-  ): Promise<void> {
-    const successCount = results.filter((result) => result.status === "fulfilled").length;
-    const failureCount = taskCount - successCount;
-    const nextResources =
-      successCount > 0
-        ? await Promise.all([dashboardApi.listAssets(), dashboardApi.listAssetTagOptions().catch(() => null)])
-        : null;
+  async function syncAssetLibraryCatalog(): Promise<void> {
+    const [assetsResult, tagOptionsResult] = await Promise.allSettled([
+      dashboardApi.listAssets(),
+      dashboardApi.listAssetTagOptions()
+    ]);
 
     if (!isMountedRef.current) {
       return;
@@ -282,27 +287,62 @@ export function AssetLibraryPageContainer({
 
     setState((currentState) => ({
       ...currentState,
-      assets: nextResources?.[0] ?? currentState.assets,
-      authErrorMessage:
-        failureCount > 0
-          ? kind === "FILE"
-            ? `${failureCount}개 파일 업로드에 실패했습니다. 진행 패널에서 실패 항목을 확인하세요.`
-            : `${failureCount}개 링크 등록에 실패했습니다. 진행 패널을 확인하세요.`
-          : null,
-      authSuccessMessage:
-        failureCount === 0
+      assets: assetsResult.status === "fulfilled" ? assetsResult.value : currentState.assets,
+      tagOptions: tagOptionsResult.status === "fulfilled" ? tagOptionsResult.value : currentState.tagOptions
+    }));
+  }
+
+  async function finalizeUploadBatch(
+    uploadBatchId: string,
+    taskCount: number,
+    results: PromiseSettledResult<unknown>[],
+    kind: "FILE" | "LINK",
+    successfulAssets: AssetSummaryView[]
+  ): Promise<void> {
+    const successCount = results.filter((result) => result.status === "fulfilled").length;
+    const failureCount = taskCount - successCount;
+    const partialFailureMessage =
+      failureCount > 0
+        ? kind === "FILE"
+          ? `${failureCount}개 파일 업로드에 실패했습니다. 진행 패널에서 실패 항목을 확인하세요.`
+          : `${failureCount}개 링크 등록에 실패했습니다. 진행 패널을 확인하세요.`
+        : null;
+    const successMessage =
+      failureCount === 0
+        ? kind === "FILE"
+          ? `${successCount}개 애셋 업로드가 완료되었습니다.`
+          : `${successCount}개 링크 등록이 완료되었습니다.`
+        : successCount > 0
           ? kind === "FILE"
             ? `${successCount}개 애셋 업로드가 완료되었습니다.`
             : `${successCount}개 링크 등록이 완료되었습니다.`
-          : successCount > 0
-            ? kind === "FILE"
-            ? `${successCount}개 애셋 업로드가 완료되었습니다.`
-              : `${successCount}개 링크 등록이 완료되었습니다.`
-            : null,
-      tagOptions: nextResources?.[1] ?? currentState.tagOptions,
-      isUploading: false
+          : null;
+
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setState((currentState) => ({
+      ...currentState,
+      assets: mergeAssetSummaries(currentState.assets, successfulAssets),
+      authErrorMessage: partialFailureMessage,
+      authSuccessMessage: successMessage,
+      isUploading: false,
+      uploadCompletionVersion:
+        successCount > 0 ? currentState.uploadCompletionVersion + 1 : currentState.uploadCompletionVersion
     }));
     markBatchStatus(uploadBatchId, failureCount > 0 ? "FAILED" : "COMPLETED");
+
+    if (successCount > 0) {
+      window.setTimeout(() => {
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        dismissUploadBatchIfMatches(uploadBatchId);
+      }, 2600);
+      void syncAssetLibraryCatalog();
+    }
   }
 
   function handleDismissUploadBatch(): void {
@@ -364,6 +404,7 @@ export function AssetLibraryPageContainer({
         onUploadAssets={handleUploadAssets}
         searchQuery={searchQuery}
         session={state.session}
+        uploadCompletionVersion={state.uploadCompletionVersion}
       />
       <AssetUploadToastPanel batch={uploadBatch} onDismiss={handleDismissUploadBatch} />
     </>
@@ -373,15 +414,15 @@ export function AssetLibraryPageContainer({
 async function runWithConcurrency<T>(
   items: T[],
   concurrency: number,
-  worker: (item: T) => Promise<void>
-): Promise<PromiseSettledResult<void>[]> {
+  worker: (item: T) => Promise<AssetSummaryView>
+): Promise<PromiseSettledResult<AssetSummaryView>[]> {
   if (items.length === 0) {
     return [];
   }
 
   let nextIndex = 0;
   const workerCount = Math.min(concurrency, items.length);
-  const results: PromiseSettledResult<void>[] = Array.from({ length: items.length });
+  const results: PromiseSettledResult<AssetSummaryView>[] = Array.from({ length: items.length });
 
   await Promise.all(
     Array.from({ length: workerCount }, async () => {
@@ -390,10 +431,10 @@ async function runWithConcurrency<T>(
         nextIndex += 1;
 
         try {
-          await worker(items[currentIndex]);
+          const value = await worker(items[currentIndex]);
           results[currentIndex] = {
             status: "fulfilled",
-            value: undefined
+            value
           };
         } catch (error: unknown) {
           results[currentIndex] = {
@@ -413,4 +454,33 @@ function createSuccessfulResults(count: number): PromiseSettledResult<void>[] {
     status: "fulfilled",
     value: undefined
   }));
+}
+
+function extractFulfilledValues<T>(results: PromiseSettledResult<T>[]): T[] {
+  return results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+}
+
+function mergeAssetSummaries(
+  currentAssets: AssetSummaryView[],
+  nextAssets: AssetSummaryView[]
+): AssetSummaryView[] {
+  if (nextAssets.length === 0) {
+    return currentAssets;
+  }
+
+  const mergedAssets = new Map<number, AssetSummaryView>();
+  currentAssets.forEach((asset) => {
+    mergedAssets.set(asset.id, asset);
+  });
+  nextAssets.forEach((asset) => {
+    mergedAssets.set(asset.id, asset);
+  });
+
+  return Array.from(mergedAssets.values()).sort((left, right) => {
+    const createdAtCompare = Date.parse(right.createdAt) - Date.parse(left.createdAt);
+    if (createdAtCompare !== 0) {
+      return createdAtCompare;
+    }
+    return right.id - left.id;
+  });
 }

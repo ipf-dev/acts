@@ -38,12 +38,17 @@ type AssetUploadTrackerAction =
     }
   | {
       type: "DISMISS_BATCH";
+    }
+  | {
+      type: "DISMISS_BATCH_IF_MATCHES";
+      batchId: string;
     };
 
 interface AssetUploadTrackerValue {
   uploadBatch: AssetUploadBatchView | null;
   applyFileProgress: (batchId: string, taskId: string, progress: AssetUploadProgress) => void;
   dismissUploadBatch: () => void;
+  dismissUploadBatchIfMatches: (batchId: string) => void;
   markAllTasks: (batchId: string, patch: Partial<AssetUploadTaskView>) => void;
   markBatchStatus: (batchId: string, status: AssetUploadBatchStatusView) => void;
   markTaskCompleted: (batchId: string, taskId: string) => void;
@@ -161,10 +166,18 @@ export function useAssetUploadTracker(): AssetUploadTrackerValue {
     });
   }, []);
 
+  const dismissUploadBatchIfMatches = useCallback((batchId: string) => {
+    dispatch({
+      type: "DISMISS_BATCH_IF_MATCHES",
+      batchId
+    });
+  }, []);
+
   return {
     uploadBatch,
     applyFileProgress,
     dismissUploadBatch,
+    dismissUploadBatchIfMatches,
     markAllTasks,
     markBatchStatus,
     markTaskCompleted,
@@ -179,6 +192,14 @@ function assetUploadTrackerReducer(
   action: AssetUploadTrackerAction
 ): AssetUploadBatchView | null {
   if (action.type === "DISMISS_BATCH") {
+    return null;
+  }
+
+  if (action.type === "DISMISS_BATCH_IF_MATCHES") {
+    if (!state || state.id !== action.batchId) {
+      return state;
+    }
+
     return null;
   }
 
