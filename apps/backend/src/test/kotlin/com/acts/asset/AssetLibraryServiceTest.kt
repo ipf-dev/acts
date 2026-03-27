@@ -1,8 +1,8 @@
 package com.acts.asset
 
 import com.acts.asset.event.AssetEventType
-import com.acts.asset.preview.AssetPreviewGenerator
-import com.acts.asset.preview.GeneratedAssetPreview
+import com.acts.asset.preview.AssetPreviewDispatcher
+import com.acts.asset.preview.VideoPreviewDispatchRequest
 import com.acts.asset.storage.AssetBinaryStorage
 import com.acts.asset.storage.LoadedAssetObject
 import com.acts.asset.storage.StoredAssetObject
@@ -21,11 +21,13 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.argThat
+import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.any
 import org.mockito.kotlin.never
 import org.mockito.kotlin.whenever
+import org.mockito.Mockito.timeout
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.mock.mockito.MockBean
@@ -47,7 +49,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     private lateinit var assetBinaryStorage: AssetBinaryStorage
 
     @MockBean
-    private lateinit var assetPreviewGenerator: AssetPreviewGenerator
+    private lateinit var assetPreviewDispatcher: AssetPreviewDispatcher
 
     @BeforeEach
     fun prepareUser() {
@@ -113,7 +115,6 @@ class AssetLibraryServiceTest @Autowired constructor(
         )
         whenever(assetBinaryStorage.loadOrNull(any(), any())).thenReturn(null)
         whenever(assetBinaryStorage.exists(any(), any())).thenReturn(true)
-        whenever(assetPreviewGenerator.generateVideoPreview(any(), any())).thenReturn(null)
     }
 
     @Test
@@ -155,6 +156,111 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThat(uploadedAsset.canDownload).isTrue()
         assertThat(listedAssets).hasSize(1)
         assertThat(listedAssets.single().id).isEqualTo(uploadedAsset.id)
+    }
+
+    @Test
+    fun `dispatches video preview generation to lambda when upload completes`() {
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
+                fileName = "coco-video.mp4",
+                contentType = "video/mp4",
+                fileSizeBytes = 5L,
+                title = "코코 영상",
+                description = "람다 썸네일 생성 테스트",
+                tags = AssetStructuredTagsRequest(),
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+
+        assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+        )
+
+        verify(assetPreviewDispatcher, timeout(3000)).requestVideoPreview(
+            argThat<VideoPreviewDispatchRequest> { objectKey == intentResponse.objectKey },
+        )
+    }
+
+    @Test
+    fun `completes video upload even when preview dispatch fails`() {
+        doThrow(IllegalStateException("lambda unavailable"))
+            .whenever(assetPreviewDispatcher)
+            .requestVideoPreview(any())
+
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
+                fileName = "coco-video.mp4",
+                contentType = "video/mp4",
+                fileSizeBytes = 5L,
+                title = "코코 영상",
+                description = "람다 예외 허용 테스트",
+                tags = AssetStructuredTagsRequest(),
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+
+        val uploadedAsset = assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+        )
+
+        val listedAssets = assetLibraryService.listAssets(
+            actorEmail = "coco@iportfolio.co.kr",
+            query = AssetListQuery(search = "코코 영상"),
+        )
+
+        assertThat(uploadedAsset.id).isPositive()
+        assertThat(listedAssets).extracting("id").contains(uploadedAsset.id)
+        verify(assetPreviewDispatcher, timeout(3000)).requestVideoPreview(
+            argThat<VideoPreviewDispatchRequest> { objectKey == intentResponse.objectKey },
+        )
+    }
+
+    @Test
+    fun `re-dispatches video preview generation when preview is requested before thumbnail exists`() {
+        val intentResponse = assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
+                fileName = "coco-video.mp4",
+                contentType = "video/mp4",
+                fileSizeBytes = 5L,
+                title = "코코 영상",
+                description = "람다 재요청 테스트",
+                tags = AssetStructuredTagsRequest(),
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+        )
+        assetLibraryService.completeUpload(
+            assetId = intentResponse.assetId,
+            request = AssetUploadCompleteRequest(
+                objectKey = intentResponse.objectKey,
+                fileSizeBytes = 5L,
+            ),
+            actorEmail = "coco@iportfolio.co.kr",
+        )
+        whenever(assetBinaryStorage.loadOrNull(any(), eq("${intentResponse.objectKey}.preview.jpg"))).thenReturn(null)
+
+        assertThatThrownBy {
+            assetLibraryService.loadPreview(
+                assetId = intentResponse.assetId,
+                actorEmail = "coco@iportfolio.co.kr",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+
+        verify(assetPreviewDispatcher, timeout(3000).atLeastOnce()).requestVideoPreview(
+            argThat<VideoPreviewDispatchRequest> { objectKey == intentResponse.objectKey },
+        )
     }
 
     @Test
@@ -630,17 +736,11 @@ class AssetLibraryServiceTest @Autowired constructor(
     }
 
     @Test
-    fun `generates and returns video thumbnail preview`() {
-        whenever(assetPreviewGenerator.generateVideoPreview(eq("preview-video.mp4"), any())).thenReturn(
-            GeneratedAssetPreview(
+    fun `returns cached video thumbnail preview from storage`() {
+        whenever(assetBinaryStorage.loadOrNull(any(), any())).thenReturn(
+            LoadedAssetObject(
                 content = byteArrayOf(9, 8, 7),
                 contentType = "image/jpeg",
-            ),
-        )
-        whenever(assetBinaryStorage.load(any(), any())).thenReturn(
-            LoadedAssetObject(
-                content = "video-binary".toByteArray(),
-                contentType = "video/mp4",
             ),
         )
 
@@ -674,11 +774,6 @@ class AssetLibraryServiceTest @Autowired constructor(
 
         assertThat(previewResult.contentType).isEqualTo("image/jpeg")
         assertThat(previewResult.content).containsExactly(9, 8, 7)
-        verify(assetBinaryStorage, atLeastOnce()).store(
-            objectKey = argThat { endsWith(".preview.jpg") },
-            contentType = eq("image/jpeg"),
-            content = argThat { contentEquals(byteArrayOf(9, 8, 7)) },
-        )
     }
 
     @Test

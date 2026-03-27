@@ -14,4 +14,4 @@ acts:
   storage:
     bucket: acts-assets-prod
   preview:
-    ffmpeg-path: ${ACTS_PREVIEW_FFMPEG_PATH:}
+    video-thumbnail-lambda-function-name: ${ACTS_PREVIEW_VIDEO_THUMBNAIL_LAMBDA_FUNCTION_NAME:acts-video-preview-generator}

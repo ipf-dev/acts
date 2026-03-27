@@ -3,6 +3,17 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/acts}
     username: ${SPRING_DATASOURCE_USERNAME:acts}
     password: ${SPRING_DATASOURCE_PASSWORD:acts}
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+        highlight_sql: true
+        use_sql_comments: true
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
 
 server:
   port: ${SERVER_PORT:8088}
@@ -14,4 +25,4 @@ acts:
   storage:
     bucket: acts-assets-dev-572836591883-ap-northeast-2-an
   preview:
-    ffmpeg-path: ${ACTS_PREVIEW_FFMPEG_PATH:}
+    video-thumbnail-lambda-function-name: ${ACTS_PREVIEW_VIDEO_THUMBNAIL_LAMBDA_FUNCTION_NAME:acts-video-preview-generator}

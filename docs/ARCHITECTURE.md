@@ -22,7 +22,7 @@ The first product slice should support a single internal production loop:
 | --- | --- |
 | `apps/backend` | API, auth, persistence, background integration edges |
 | `apps/frontend` | UI, route composition, API clients, presentational primitives |
-| `infra` | local infra bootstrap such as databases or emulators |
+| `infra` | local bootstrap plus shared deployment assets such as Lambda worker packaging |
 | `docs` | product brief, architecture, infra, deploy, conventions |
 
 ## Backend Shape
@@ -51,7 +51,7 @@ Expected first-slice backend capabilities:
 - object-storage-backed file upload endpoint plus metadata-only link registration endpoint for the first asset slice
 - file asset download and playback URLs issued as short-lived presigned GET links after backend authorization, with S3 Transfer Acceleration auto-detected when available
 - asset catalog tables for `assets`, `asset_files`, `asset_tags`, `asset_events`, plus character taxonomy tables `character_tags`, `character_tag_aliases`
-- structured asset tags for `CHARACTER` / `LOCATION` / `KEYWORD`, character alias-aware search indexing, description capture, image metadata extraction, video thumbnail generation, creator/org stamping, and no user-facing asset status field
+- structured asset tags for `CHARACTER` / `LOCATION` / `KEYWORD`, character alias-aware search indexing, description capture, image metadata extraction, async dispatch of video thumbnail generation to a dedicated Lambda image worker, creator/org stamping, and no user-facing asset status field
 - centralized asset authorization for list/detail/download/update/delete/export
 - shared asset visibility for all authenticated users, with owner/Admin management rules and company-wide export privileges
 - asset detail lookup for the dedicated detail page, image/video preview endpoint, metadata update, owner/admin soft delete, presigned download redirect endpoint, and ZIP export endpoint

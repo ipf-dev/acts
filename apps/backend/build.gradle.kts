@@ -21,6 +21,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("software.amazon.awssdk:lambda")
     implementation("software.amazon.awssdk:s3")
     implementation("software.amazon.awssdk:sts")
 

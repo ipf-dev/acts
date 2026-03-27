@@ -4,5 +4,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties("acts.preview")
 data class AssetPreviewProperties(
-    val ffmpegPath: String? = null,
+    val videoThumbnailLambdaFunctionName: String? = null,
 )
