@@ -160,6 +160,116 @@ class AssetLibraryServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `lists asset catalog page with server side pagination and filters`() {
+        val marketingOrganizationId = requireNotNull(
+            organizationRepository.findAllByOrderByNameAsc()
+                .first { organization -> organization.name == "마케팅팀" }
+                .id,
+        )
+        val firstImage = uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "코코 배경 1",
+            fileName = "coco-background-1.png",
+            contentType = "image/png",
+            typeMetadata = AssetTypeMetadataRequest(
+                imageArtStyle = AssetImageArtStyle.BACKGROUND,
+                imageHasLayerFile = true,
+            ),
+        )
+        val secondImage = uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "코코 배경 2",
+            fileName = "coco-background-2.png",
+            contentType = "image/png",
+            typeMetadata = AssetTypeMetadataRequest(
+                imageArtStyle = AssetImageArtStyle.BACKGROUND,
+                imageHasLayerFile = true,
+            ),
+        )
+        uploadAsset(
+            actorEmail = "tony@iportfolio.co.kr",
+            actorName = "Tony",
+            title = "토니 러프",
+            fileName = "tony-draft.png",
+            contentType = "image/png",
+            typeMetadata = AssetTypeMetadataRequest(
+                imageArtStyle = AssetImageArtStyle.DRAFT,
+                imageHasLayerFile = false,
+            ),
+        )
+
+        val firstPage = assetLibraryService.listAssetCatalog(
+            actorEmail = "coco@iportfolio.co.kr",
+            query = AssetListQuery(
+                assetType = AssetType.IMAGE,
+                organizationId = marketingOrganizationId,
+                creatorEmail = "COCO@iportfolio.co.kr",
+                imageArtStyle = AssetImageArtStyle.BACKGROUND,
+                imageHasLayerFile = true,
+            ),
+            page = 0,
+            size = 1,
+        )
+        val secondPage = assetLibraryService.listAssetCatalog(
+            actorEmail = "coco@iportfolio.co.kr",
+            query = AssetListQuery(
+                assetType = AssetType.IMAGE,
+                organizationId = marketingOrganizationId,
+                creatorEmail = "coco@iportfolio.co.kr",
+                imageArtStyle = AssetImageArtStyle.BACKGROUND,
+                imageHasLayerFile = true,
+            ),
+            page = 1,
+            size = 1,
+        )
+
+        assertThat(firstPage.totalItems).isEqualTo(2)
+        assertThat(firstPage.totalPages).isEqualTo(2)
+        assertThat(firstPage.hasPrevious).isFalse()
+        assertThat(firstPage.hasNext).isTrue()
+        assertThat(firstPage.items).extracting("id").containsExactly(secondImage.id)
+        assertThat(secondPage.hasPrevious).isTrue()
+        assertThat(secondPage.hasNext).isFalse()
+        assertThat(secondPage.items).extracting("id").containsExactly(firstImage.id)
+    }
+
+    @Test
+    fun `lists asset catalog filter options from ready assets only`() {
+        uploadAsset(
+            actorEmail = "coco@iportfolio.co.kr",
+            actorName = "Coco",
+            title = "마케팅 자산",
+            fileName = "marketing-filter.txt",
+        )
+        uploadAsset(
+            actorEmail = "tony@iportfolio.co.kr",
+            actorName = "Tony",
+            title = "콘텐츠 자산",
+            fileName = "content-filter.txt",
+        )
+        assetLibraryService.initiateUpload(
+            request = AssetUploadIntentRequest(
+                fileName = "leader-pending.txt",
+                contentType = "text/plain",
+                fileSizeBytes = 5L,
+                title = "리더 대기 자산",
+                description = "아직 완료되지 않은 자산",
+                tags = AssetStructuredTagsRequest(),
+            ),
+            actorEmail = "leader@iportfolio.co.kr",
+            actorName = "Leader",
+        )
+
+        val filterOptions = assetLibraryService.listAssetCatalogFilterOptions("coco@iportfolio.co.kr")
+
+        assertThat(filterOptions.organizations).extracting("name").containsExactly("마케팅팀", "콘텐츠개발1팀")
+        assertThat(filterOptions.creators).extracting("email")
+            .containsExactly("coco@iportfolio.co.kr", "tony@iportfolio.co.kr")
+    }
+
+    @Test
     fun `dispatches video preview generation to lambda when upload completes`() {
         val intentResponse = assetLibraryService.initiateUpload(
             request = AssetUploadIntentRequest(

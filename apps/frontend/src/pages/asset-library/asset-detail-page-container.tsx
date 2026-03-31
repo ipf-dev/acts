@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { createDashboardApi } from "../../api/client";
 import {
@@ -14,12 +14,11 @@ import type {
   AuthSessionView,
   CharacterTagOptionView
 } from "../../api/types";
-import { flattenAssetTags, getAssetApiErrorMessage, triggerFileAccessUrlDownload } from "./asset-library-utils";
 import { AssetDetailPage } from "./asset-detail-page";
+import { flattenAssetTags, getAssetApiErrorMessage, triggerFileAccessUrlDownload } from "./asset-library-utils";
 
 interface AssetDetailPageState {
   asset: AssetDetailView | null;
-  assets: AssetSummaryView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   characterOptions: CharacterTagOptionView[];
@@ -30,6 +29,7 @@ interface AssetDetailPageState {
   isSaving: boolean;
   playbackErrorMessage: string | null;
   playbackUrl: string | null;
+  relatedAssets: AssetSummaryView[];
   session: AuthSessionView;
 }
 
@@ -53,7 +53,6 @@ export function AssetDetailPageContainer({
 }: AssetDetailPageContainerProps): React.JSX.Element {
   const [state, setState] = useState<AssetDetailPageState>({
     asset: null,
-    assets: [],
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
     characterOptions: [],
@@ -64,6 +63,7 @@ export function AssetDetailPageContainer({
     isSaving: false,
     playbackErrorMessage: null,
     playbackUrl: null,
+    relatedAssets: [],
     session: initialSession
   });
   const playbackRequestSequenceRef = useRef(0);
@@ -74,23 +74,38 @@ export function AssetDetailPageContainer({
 
     async function loadPage(): Promise<void> {
       setState((currentState) => ({
-          ...currentState,
-          authErrorMessage: null,
-          authSuccessMessage: null,
-          isLoading: true,
-          isLoadingPlayback: false,
-          playbackErrorMessage: null,
-          playbackUrl: null
-        }));
+        ...currentState,
+        authErrorMessage: null,
+        authSuccessMessage: null,
+        isLoading: true,
+        isLoadingPlayback: false,
+        playbackErrorMessage: null,
+        playbackUrl: null,
+        relatedAssets: []
+      }));
 
       try {
-        const [asset, assets, characterOptions] = initialSession.authenticated
-          ? await Promise.all([
-              dashboardApi.getAsset(assetId),
-              dashboardApi.listAssets(),
-              dashboardApi.listCharacterTagOptions()
-            ])
-          : [null, [], []];
+        if (!initialSession.authenticated) {
+          if (!isActive) {
+            return;
+          }
+
+          setState((currentState) => ({
+            ...currentState,
+            asset: null,
+            characterOptions: [],
+            isLoading: false,
+            relatedAssets: [],
+            session: initialSession
+          }));
+          return;
+        }
+
+        const [asset, characterOptions] = await Promise.all([
+          dashboardApi.getAsset(assetId),
+          dashboardApi.listCharacterTagOptions()
+        ]);
+        const relatedAssets = await loadRelatedAssets(asset);
 
         if (!isActive) {
           return;
@@ -99,7 +114,6 @@ export function AssetDetailPageContainer({
         setState((currentState) => ({
           ...currentState,
           asset,
-          assets,
           authErrorMessage: getLoginFailureMessage(initialLocationSearch),
           authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
           characterOptions,
@@ -107,10 +121,11 @@ export function AssetDetailPageContainer({
           isLoadingPlayback: shouldLoadPlaybackUrl(asset),
           playbackErrorMessage: null,
           playbackUrl: null,
+          relatedAssets,
           session: initialSession
         }));
 
-        if (asset && shouldLoadPlaybackUrl(asset)) {
+        if (shouldLoadPlaybackUrl(asset)) {
           void loadPlaybackUrl(asset.id);
         }
       } catch (error: unknown) {
@@ -127,7 +142,8 @@ export function AssetDetailPageContainer({
             notFound: "대상 자산을 찾을 수 없습니다."
           }),
           authSuccessMessage: null,
-          isLoading: false
+          isLoading: false,
+          relatedAssets: []
         }));
       }
     }
@@ -137,7 +153,7 @@ export function AssetDetailPageContainer({
     return () => {
       isActive = false;
     };
-  }, [assetId]);
+  }, [assetId, initialSession]);
 
   async function loadPlaybackUrl(targetAssetId: number): Promise<void> {
     const requestSequence = playbackRequestSequenceRef.current + 1;
@@ -187,19 +203,19 @@ export function AssetDetailPageContainer({
     }));
 
     try {
-      const [asset, assets, characterOptions] = await Promise.all([
+      const [asset, characterOptions] = await Promise.all([
         dashboardApi.updateAsset(assetId, input),
-        dashboardApi.listAssets(),
         dashboardApi.listCharacterTagOptions()
       ]);
+      const relatedAssets = await loadRelatedAssets(asset);
 
       setState((currentState) => ({
         ...currentState,
         asset,
-        assets,
         authSuccessMessage: "애셋 정보가 업데이트되었습니다.",
         characterOptions,
-        isSaving: false
+        isSaving: false,
+        relatedAssets
       }));
     } catch (error: unknown) {
       setState((currentState) => ({
@@ -275,27 +291,6 @@ export function AssetDetailPageContainer({
     await loadPlaybackUrl(state.asset.id);
   }
 
-  const relatedAssets = useMemo(() => {
-    const currentAsset = state.asset;
-
-    if (!currentAsset) {
-      return [];
-    }
-
-    return state.assets
-      .filter((asset) => asset.id !== currentAsset.id)
-      .map((asset) => ({
-        asset,
-        score:
-          flattenAssetTags(asset.tags).filter((tag) => flattenAssetTags(currentAsset.tags).includes(tag)).length +
-          (asset.organizationName === currentAsset.organizationName ? 1 : 0)
-      }))
-      .filter(({ score }) => score > 0)
-      .sort((left, right) => right.score - left.score)
-      .slice(0, 3)
-      .map(({ asset }) => asset);
-  }, [state.asset, state.assets]);
-
   return (
     <AssetDetailPage
       asset={state.asset}
@@ -315,7 +310,7 @@ export function AssetDetailPageContainer({
       onSave={handleSave}
       playbackErrorMessage={state.playbackErrorMessage}
       playbackUrl={state.playbackUrl}
-      relatedAssets={relatedAssets}
+      relatedAssets={state.relatedAssets}
       session={state.session}
     />
   );
@@ -344,6 +339,33 @@ export function AssetDetailPageContainer({
   function isLatestPlaybackRequest(requestSequence: number): boolean {
     return requestSequence === playbackRequestSequenceRef.current;
   }
+}
+
+async function loadRelatedAssets(asset: AssetDetailView): Promise<AssetSummaryView[]> {
+  const relatedCatalog = await dashboardApi.listAssets({
+    page: 0,
+    size: 48,
+    organizationId: asset.organizationId ?? undefined
+  });
+
+  return buildRelatedAssets(asset, relatedCatalog.items);
+}
+
+function buildRelatedAssets(asset: AssetDetailView, candidates: AssetSummaryView[]): AssetSummaryView[] {
+  const currentTags = flattenAssetTags(asset.tags);
+
+  return candidates
+    .filter((candidate) => candidate.id !== asset.id)
+    .map((candidate) => ({
+      asset: candidate,
+      score:
+        flattenAssetTags(candidate.tags).filter((tag) => currentTags.includes(tag)).length +
+        (candidate.organizationName === asset.organizationName ? 1 : 0)
+    }))
+    .filter(({ score }) => score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 3)
+    .map(({ asset: relatedAsset }) => relatedAsset);
 }
 
 function shouldLoadPlaybackUrl(asset: AssetDetailView | null): boolean {

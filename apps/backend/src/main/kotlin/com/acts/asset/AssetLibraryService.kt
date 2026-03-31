@@ -252,21 +252,64 @@ class AssetLibraryService(
 
         val visibleAssets = filterReadyAssets(assets)
             .filter { asset -> asset.matches(query) }
-        if (visibleAssets.isEmpty()) {
-            return emptyList()
+        return buildSummaryResponses(actor, visibleAssets)
+    }
+
+    @Transactional
+    fun listAssetCatalog(
+        actorEmail: String,
+        query: AssetListQuery = AssetListQuery(),
+        page: Int = 0,
+        size: Int = 24,
+    ): AssetCatalogPageResponse {
+        require(page >= 0) { "페이지 번호는 0 이상이어야 합니다." }
+        require(size in 1..100) { "페이지 크기는 1 이상 100 이하여야 합니다." }
+
+        val actor = requireActor(actorEmail)
+        assetAuthorizationService.requireLibraryAccess(actor)
+
+        val queryResult = assetRepository.findCatalogPage(
+            query = query,
+            offset = page * size,
+            limit = size,
+        )
+        val totalPages = if (queryResult.totalCount == 0L) {
+            0
+        } else {
+            ((queryResult.totalCount + size - 1) / size).toInt()
         }
 
-        val assetIds = visibleAssets.mapNotNull { asset -> asset.id }
-        val tagsByAssetId = assetTagRepository.findAllByAssetIds(assetIds)
-            .groupBy { assetTag -> requireNotNull(assetTag.asset.id) }
+        return AssetCatalogPageResponse(
+            items = buildSummaryResponses(actor, queryResult.assets),
+            page = page,
+            size = size,
+            totalItems = queryResult.totalCount,
+            totalPages = totalPages,
+            hasNext = page + 1 < totalPages,
+            hasPrevious = page > 0 && totalPages > 0,
+        )
+    }
 
-        return visibleAssets
-            .map { asset ->
-                asset.toSummaryResponse(
-                    tags = tagsByAssetId[asset.id].orEmpty().toStructuredTagsResponse(),
-                    permissions = assetAuthorizationService.permissionsFor(actor, asset),
+    @Transactional
+    fun listAssetCatalogFilterOptions(actorEmail: String): AssetCatalogFilterOptionsResponse {
+        val actor = requireActor(actorEmail)
+        assetAuthorizationService.requireLibraryAccess(actor)
+
+        val filterOptions = assetRepository.findCatalogFilterOptions()
+        return AssetCatalogFilterOptionsResponse(
+            organizations = filterOptions.organizations.map { organization ->
+                AssetCatalogOrganizationOptionResponse(
+                    id = organization.id,
+                    name = organization.name,
                 )
-            }
+            },
+            creators = filterOptions.creators.map { creator ->
+                AssetCatalogCreatorOptionResponse(
+                    email = creator.email,
+                    name = creator.name,
+                )
+            },
+        )
     }
 
     @Transactional
@@ -752,7 +795,7 @@ class AssetLibraryService(
     }
 
     private fun AssetEntity.matches(query: AssetListQuery): Boolean {
-        val normalizedSearchTerms = query.search.normalizedSearchTerms()
+        val normalizedSearchTerms = query.normalizedSearchTerms()
         if (normalizedSearchTerms.any { searchTerm -> !searchText.contains(searchTerm) }) {
             return false
         }
@@ -765,7 +808,34 @@ class AssetLibraryService(
             return false
         }
 
-        if (query.creatorEmail != null && !ownerEmail.equals(query.creatorEmail, ignoreCase = true)) {
+        if (query.normalizedCreatorEmail() != null && !ownerEmail.equals(query.normalizedCreatorEmail(), ignoreCase = true)) {
+            return false
+        }
+
+        if (query.imageArtStyle != null && imageArtStyle != query.imageArtStyle) {
+            return false
+        }
+
+        if (query.imageHasLayerFile != null && imageHasLayerFile != query.imageHasLayerFile) {
+            return false
+        }
+
+        if (
+            query.normalizedAudioTtsVoice() != null &&
+            !(audioTtsVoice?.lowercase()?.contains(query.normalizedAudioTtsVoice()!!) ?: false)
+        ) {
+            return false
+        }
+
+        if (query.audioRecordingType != null && audioRecordingType != query.audioRecordingType) {
+            return false
+        }
+
+        if (query.videoStage != null && videoStage != query.videoStage) {
+            return false
+        }
+
+        if (query.documentKind != null && documentKind != query.documentKind) {
             return false
         }
 
@@ -812,6 +882,25 @@ class AssetLibraryService(
 
     private fun requireActor(actorEmail: String) = userAccountRepository.findById(actorEmail.lowercase())
         .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
+
+    private fun buildSummaryResponses(
+        actor: com.acts.auth.user.UserAccountEntity,
+        assets: List<AssetEntity>,
+    ): List<AssetSummaryResponse> {
+        if (assets.isEmpty()) {
+            return emptyList()
+        }
+
+        val tagsByAssetId = assetTagRepository.findAllByAssetIds(assets.mapNotNull { asset -> asset.id })
+            .groupBy { assetTag -> requireNotNull(assetTag.asset.id) }
+
+        return assets.map { asset ->
+            asset.toSummaryResponse(
+                tags = tagsByAssetId[asset.id].orEmpty().toStructuredTagsResponse(),
+                permissions = assetAuthorizationService.permissionsFor(actor, asset),
+            )
+        }
+    }
 
     private fun AssetEntity.toSummaryResponse(
         tags: AssetStructuredTagsResponse,
@@ -1141,14 +1230,6 @@ class AssetLibraryService(
             else -> host
         }
     }
-
-    private fun String?.normalizedSearchTerms(): List<String> = this
-        ?.let(::normalizeText)
-        ?.trim()
-        ?.lowercase()
-        ?.split(Regex("\\s+"))
-        ?.filter { searchTerm -> searchTerm.isNotBlank() }
-        .orEmpty()
 
     private fun normalizeText(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFC)
 }

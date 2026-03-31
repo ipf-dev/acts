@@ -1,4 +1,11 @@
-import type { AssetTypeMetadataInputView, AssetTypeView } from "../../api/types";
+import type {
+  AssetAudioRecordingTypeView,
+  AssetDocumentKindView,
+  AssetImageArtStyleView,
+  AssetTypeMetadataInputView,
+  AssetTypeView,
+  AssetVideoStageView
+} from "../../api/types";
 
 export interface AssetTagDraftView {
   characterTagIds: number[];
@@ -33,6 +40,29 @@ export interface AssetLinkComposerView extends AssetTagDraftView {
   linkType: string;
   title: string;
   url: string;
+}
+
+export type AssetLibraryTypeFilterView = AssetTypeView | "ALL";
+export type ImageLayerFileFilterView = "ALL" | "INCLUDED" | "NOT_INCLUDED";
+
+export interface AssetTypeMetadataFilterStateView {
+  imageArtStyle: AssetImageArtStyleView | "ALL";
+  imageHasLayerFile: ImageLayerFileFilterView;
+  audioTtsVoice: string;
+  audioRecordingType: AssetAudioRecordingTypeView | "ALL";
+  videoStage: AssetVideoStageView | "ALL";
+  documentKind: AssetDocumentKindView | "ALL";
+}
+
+export function createEmptyAssetTypeMetadataFilters(): AssetTypeMetadataFilterStateView {
+  return {
+    imageArtStyle: "ALL",
+    imageHasLayerFile: "ALL",
+    audioTtsVoice: "",
+    audioRecordingType: "ALL",
+    videoStage: "ALL",
+    documentKind: "ALL"
+  };
 }
 
 export type AssetUploadBatchKindView = "FILE" | "LINK";

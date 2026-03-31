@@ -1,38 +1,43 @@
-import { memo, useDeferredValue, useEffect, useState } from "react";
+import { memo, useState } from "react";
 import type React from "react";
-import {
-  Clock3,
-  Grid2x2,
-  List,
-  RotateCcw,
-  Search,
-  Sparkles
-} from "lucide-react";
+import { Clock3, Grid2x2, List, RotateCcw, Search, Sparkles } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "../../components/ui/select";
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationFirst,
+  PaginationItem,
+  PaginationLast,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
+} from "../../components/ui/pagination";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { GOOGLE_LOGIN_PATH } from "../../api/auth";
 import type {
-  AssetAudioRecordingTypeView,
-  AssetDocumentKindView,
-  AssetImageArtStyleView,
-  AssetTagOptionCatalogView,
+  AssetCatalogFilterOptionsView,
+  AssetCatalogPageView,
   AssetSummaryView,
+  AssetTagOptionCatalogView,
   AuthSessionView,
-  CharacterTagOptionView,
-  AssetVideoStageView
+  CharacterTagOptionView
 } from "../../api/types";
 import { cn, isBlank } from "../../lib/utils";
 import { typeLabelMap } from "./asset-detail-model";
 import { AssetTypeIcon } from "./asset-detail-section";
+import { flattenAssetTags, getAssetPrimaryText } from "./asset-library-utils";
+import type {
+  AssetFileUploadDraftView,
+  AssetLibraryTypeFilterView,
+  AssetLinkDraftView,
+  AssetTypeMetadataFilterStateView,
+  ImageLayerFileFilterView
+} from "./asset-library-page-model";
+import { AssetUploadModal } from "./asset-upload-modal";
 import { AssetPreviewPanel } from "./asset-preview-panel";
 import {
   audioRecordingTypeOptions,
@@ -40,147 +45,98 @@ import {
   imageArtStyleOptions,
   videoStageOptions
 } from "./asset-type-metadata-model";
-import { AssetUploadModal } from "./asset-upload-modal";
-import { flattenAssetTags, getAssetPrimaryText } from "./asset-library-utils";
-import type {
-  AssetFileUploadDraftView,
-  AssetLinkDraftView
-} from "./asset-library-page-model";
 
 interface AssetLibraryPageProps {
-  assets: AssetSummaryView[];
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  catalogFilterOptions: AssetCatalogFilterOptionsView;
+  catalogPage: AssetCatalogPageView;
   characterOptions: CharacterTagOptionView[];
+  creatorFilter: string;
   tagOptions: AssetTagOptionCatalogView;
   isLoading: boolean;
   isUploading: boolean;
+  organizationFilter: string;
+  onCreatorFilterChange: (value: string) => void;
   onOpenAssetPage: (assetId: number) => void;
+  onOrganizationFilterChange: (value: string) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onRegisterAssetLinks: (drafts: AssetLinkDraftView[]) => Promise<void>;
+  onResetFilters: () => void;
   onSearchQueryChange: (value: string) => void;
+  onTypeFilterChange: (value: AssetLibraryTypeFilterView) => void;
+  onTypeMetadataFiltersChange: (filters: AssetTypeMetadataFilterStateView) => void;
   onUploadAssets: (drafts: AssetFileUploadDraftView[]) => Promise<void>;
   searchQuery: string;
   session: AuthSessionView;
-  uploadCompletionVersion: number;
+  typeFilter: AssetLibraryTypeFilterView;
+  typeMetadataFilters: AssetTypeMetadataFilterStateView;
 }
 
 type AssetLibraryLayoutMode = "grid" | "list";
-type AssetLibraryTypeFilter = AssetSummaryView["type"] | "ALL";
-type ImageLayerFileFilter = "ALL" | "INCLUDED" | "NOT_INCLUDED";
-
-interface AssetTypeMetadataFilterState {
-  imageArtStyle: AssetImageArtStyleView | "ALL";
-  imageHasLayerFile: ImageLayerFileFilter;
-  audioTtsVoice: string;
-  audioRecordingType: AssetAudioRecordingTypeView | "ALL";
-  videoStage: AssetVideoStageView | "ALL";
-  documentKind: AssetDocumentKindView | "ALL";
-}
 
 const cardDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "short"
 });
 
+const assetTypeOptions: AssetSummaryView["type"][] = [
+  "IMAGE",
+  "VIDEO",
+  "AUDIO",
+  "DOCUMENT",
+  "URL",
+  "OTHER"
+];
+const pageSizeOptions = [12, 24, 48];
+
 function AssetLibraryPageComponent({
-  assets,
   authErrorMessage,
   authSuccessMessage,
+  catalogFilterOptions,
+  catalogPage,
   characterOptions,
+  creatorFilter,
   tagOptions,
   isLoading,
   isUploading,
+  organizationFilter,
+  onCreatorFilterChange,
   onOpenAssetPage,
+  onOrganizationFilterChange,
+  onPageChange,
+  onPageSizeChange,
   onRegisterAssetLinks,
+  onResetFilters,
   onSearchQueryChange,
+  onTypeFilterChange,
+  onTypeMetadataFiltersChange,
   onUploadAssets,
   searchQuery,
   session,
-  uploadCompletionVersion
+  typeFilter,
+  typeMetadataFilters
 }: AssetLibraryPageProps): React.JSX.Element {
-  const [creatorFilter, setCreatorFilter] = useState("ALL");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<AssetLibraryLayoutMode>("grid");
-  const [organizationFilter, setOrganizationFilter] = useState("ALL");
-  const [typeFilter, setTypeFilter] = useState<AssetLibraryTypeFilter>("ALL");
-  const [typeMetadataFilters, setTypeMetadataFilters] = useState<AssetTypeMetadataFilterState>(
-    createEmptyTypeMetadataFilters
-  );
-  const deferredSearchQuery = useDeferredValue(searchQuery);
-
-  const creatorOptions = Array.from(new Set(assets.map((asset) => asset.ownerName))).sort((left, right) =>
-    left.localeCompare(right, "ko-KR")
-  );
-  const organizationOptions = Array.from(
-    new Set(
-      assets
-        .map((asset) => asset.organizationName)
-        .filter((organizationName): organizationName is string => Boolean(organizationName))
-    )
-  ).sort((left, right) => left.localeCompare(right, "ko-KR"));
-  const normalizedTerms = normalizeSearchValue(deferredSearchQuery)
-    .split(/\s+/)
-    .filter(Boolean);
-  const visibleAssets = assets.filter((asset) => {
-    if (normalizedTerms.some((term) => !asset.searchText.includes(term))) {
-      return false;
-    }
-
-    if (typeFilter !== "ALL" && asset.type !== typeFilter) {
-      return false;
-    }
-
-    if (!matchesTypeMetadataFilters(asset, typeFilter, typeMetadataFilters)) {
-      return false;
-    }
-
-    if (organizationFilter !== "ALL" && asset.organizationName !== organizationFilter) {
-      return false;
-    }
-
-    if (creatorFilter !== "ALL" && asset.ownerName !== creatorFilter) {
-      return false;
-    }
-
-    return true;
-  });
+  const visibleAssets = catalogPage.items;
   const hasActiveFilters =
     !isBlank(searchQuery) ||
     typeFilter !== "ALL" ||
     organizationFilter !== "ALL" ||
     creatorFilter !== "ALL" ||
     hasActiveTypeMetadataFilters(typeFilter, typeMetadataFilters);
-
-  useEffect(() => {
-    if (uploadCompletionVersion === 0) {
-      return;
-    }
-
-    onSearchQueryChange("");
-    handleTypeFilterChange("ALL");
-    setOrganizationFilter("ALL");
-    setCreatorFilter("ALL");
-  }, [onSearchQueryChange, uploadCompletionVersion]);
-
-  function resetFilters(): void {
-    onSearchQueryChange("");
-    handleTypeFilterChange("ALL");
-    setOrganizationFilter("ALL");
-    setCreatorFilter("ALL");
-  }
-
-  function handleTypeFilterChange(nextValue: AssetLibraryTypeFilter): void {
-    setTypeFilter(nextValue);
-    setTypeMetadataFilters(createEmptyTypeMetadataFilters());
-  }
+  const paginationItems = buildPaginationItems(catalogPage.page, catalogPage.totalPages);
+  const paginationRangeStart = catalogPage.totalItems === 0 ? 0 : catalogPage.page * catalogPage.size + 1;
+  const paginationRangeEnd =
+    catalogPage.totalItems === 0 ? 0 : catalogPage.page * catalogPage.size + visibleAssets.length;
 
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1">
           <h1 className="text-[32px] font-semibold tracking-tight">자산 라이브러리</h1>
-          <p className="text-sm text-muted-foreground">
-            하모니 힐즈 IP 콘텐츠 애셋을 검색하고 관리하세요.
-          </p>
+          <p className="text-sm text-muted-foreground">하모니 힐즈 IP 콘텐츠 애셋을 검색하고 관리하세요.</p>
         </div>
 
         {session.authenticated ? (
@@ -240,7 +196,7 @@ function AssetLibraryPageComponent({
                   />
                 </div>
 
-                <Select onValueChange={(value) => handleTypeFilterChange(value as AssetLibraryTypeFilter)} value={typeFilter}>
+                <Select onValueChange={(value) => onTypeFilterChange(value as AssetLibraryTypeFilterView)} value={typeFilter}>
                   <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
                     <SelectValue placeholder="전체 유형" />
                   </SelectTrigger>
@@ -254,29 +210,29 @@ function AssetLibraryPageComponent({
                   </SelectContent>
                 </Select>
 
-                <Select onValueChange={setOrganizationFilter} value={organizationFilter}>
+                <Select onValueChange={onOrganizationFilterChange} value={organizationFilter}>
                   <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
                     <SelectValue placeholder="전체 부서" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">전체 부서</SelectItem>
-                    {organizationOptions.map((organizationName) => (
-                      <SelectItem key={organizationName} value={organizationName}>
-                        {organizationName}
+                    {catalogFilterOptions.organizations.map((organization) => (
+                      <SelectItem key={organization.id} value={String(organization.id)}>
+                        {organization.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
 
-                <Select onValueChange={setCreatorFilter} value={creatorFilter}>
+                <Select onValueChange={onCreatorFilterChange} value={creatorFilter}>
                   <SelectTrigger className="h-11 rounded-xl border-0 bg-muted shadow-none">
                     <SelectValue placeholder="전체 제작자" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">전체 제작자</SelectItem>
-                    {creatorOptions.map((ownerName) => (
-                      <SelectItem key={ownerName} value={ownerName}>
-                        {ownerName}
+                    {catalogFilterOptions.creators.map((creator) => (
+                      <SelectItem key={creator.email} value={creator.email}>
+                        {creator.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -312,10 +268,10 @@ function AssetLibraryPageComponent({
                     <p className="text-xs font-medium text-muted-foreground">이미지 아트 스타일</p>
                     <Select
                       onValueChange={(value) =>
-                        setTypeMetadataFilters((currentFilters) => ({
-                          ...currentFilters,
-                          imageArtStyle: value as AssetTypeMetadataFilterState["imageArtStyle"]
-                        }))
+                        onTypeMetadataFiltersChange({
+                          ...typeMetadataFilters,
+                          imageArtStyle: value as AssetTypeMetadataFilterStateView["imageArtStyle"]
+                        })
                       }
                       value={typeMetadataFilters.imageArtStyle}
                     >
@@ -337,10 +293,10 @@ function AssetLibraryPageComponent({
                     <p className="text-xs font-medium text-muted-foreground">레이어 파일</p>
                     <Select
                       onValueChange={(value) =>
-                        setTypeMetadataFilters((currentFilters) => ({
-                          ...currentFilters,
-                          imageHasLayerFile: value as ImageLayerFileFilter
-                        }))
+                        onTypeMetadataFiltersChange({
+                          ...typeMetadataFilters,
+                          imageHasLayerFile: value as ImageLayerFileFilterView
+                        })
                       }
                       value={typeMetadataFilters.imageHasLayerFile}
                     >
@@ -364,10 +320,10 @@ function AssetLibraryPageComponent({
                     <Input
                       className="h-11 rounded-xl border-0 bg-muted shadow-none"
                       onChange={(event) =>
-                        setTypeMetadataFilters((currentFilters) => ({
-                          ...currentFilters,
+                        onTypeMetadataFiltersChange({
+                          ...typeMetadataFilters,
                           audioTtsVoice: event.target.value
-                        }))
+                        })
                       }
                       placeholder="TTS 목소리로 필터링"
                       value={typeMetadataFilters.audioTtsVoice}
@@ -378,10 +334,10 @@ function AssetLibraryPageComponent({
                     <p className="text-xs font-medium text-muted-foreground">녹음 유형</p>
                     <Select
                       onValueChange={(value) =>
-                        setTypeMetadataFilters((currentFilters) => ({
-                          ...currentFilters,
-                          audioRecordingType: value as AssetTypeMetadataFilterState["audioRecordingType"]
-                        }))
+                        onTypeMetadataFiltersChange({
+                          ...typeMetadataFilters,
+                          audioRecordingType: value as AssetTypeMetadataFilterStateView["audioRecordingType"]
+                        })
                       }
                       value={typeMetadataFilters.audioRecordingType}
                     >
@@ -407,10 +363,10 @@ function AssetLibraryPageComponent({
                     <p className="text-xs font-medium text-muted-foreground">영상 정보</p>
                     <Select
                       onValueChange={(value) =>
-                        setTypeMetadataFilters((currentFilters) => ({
-                          ...currentFilters,
-                          videoStage: value as AssetTypeMetadataFilterState["videoStage"]
-                        }))
+                        onTypeMetadataFiltersChange({
+                          ...typeMetadataFilters,
+                          videoStage: value as AssetTypeMetadataFilterStateView["videoStage"]
+                        })
                       }
                       value={typeMetadataFilters.videoStage}
                     >
@@ -436,10 +392,10 @@ function AssetLibraryPageComponent({
                     <p className="text-xs font-medium text-muted-foreground">문서 정보</p>
                     <Select
                       onValueChange={(value) =>
-                        setTypeMetadataFilters((currentFilters) => ({
-                          ...currentFilters,
-                          documentKind: value as AssetTypeMetadataFilterState["documentKind"]
-                        }))
+                        onTypeMetadataFiltersChange({
+                          ...typeMetadataFilters,
+                          documentKind: value as AssetTypeMetadataFilterStateView["documentKind"]
+                        })
                       }
                       value={typeMetadataFilters.documentKind}
                     >
@@ -460,14 +416,15 @@ function AssetLibraryPageComponent({
               ) : null}
 
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-                <p>{isLoading ? "자산을 불러오는 중..." : `${visibleAssets.length}개 애셋`}</p>
+                <p>
+                  {isLoading
+                    ? "자산을 불러오는 중..."
+                    : catalogPage.totalItems === 0
+                      ? "조건에 맞는 자산이 없습니다."
+                      : `총 ${catalogPage.totalItems}개 애셋`}
+                </p>
                 {hasActiveFilters ? (
-                  <Button
-                    className="h-8 rounded-full px-3 text-xs"
-                    onClick={resetFilters}
-                    type="button"
-                    variant="ghost"
-                  >
+                  <Button className="h-8 rounded-full px-3 text-xs" onClick={onResetFilters} type="button" variant="ghost">
                     <RotateCcw className="h-3.5 w-3.5" />
                     필터 초기화
                   </Button>
@@ -484,11 +441,7 @@ function AssetLibraryPageComponent({
                     className="rounded-[20px] border border-border bg-card p-4 shadow-none transition-all hover:border-primary/25 hover:shadow-[0_14px_40px_rgba(17,24,39,0.06)]"
                     key={asset.id}
                   >
-                    <button
-                      className="block w-full text-left"
-                      onClick={() => onOpenAssetPage(asset.id)}
-                      type="button"
-                    >
+                    <button className="block w-full text-left" onClick={() => onOpenAssetPage(asset.id)} type="button">
                       <AssetPreviewPanel
                         assetId={asset.id}
                         sourceKind={asset.sourceKind}
@@ -521,10 +474,7 @@ function AssetLibraryPageComponent({
                           </span>
                         ) : null}
                         {flattenAssetTags(asset.tags).slice(0, 3).map((tag) => (
-                          <span
-                            className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground/80"
-                            key={`${asset.id}-${tag}`}
-                          >
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground/80" key={`${asset.id}-${tag}`}>
                             {tag}
                           </span>
                         ))}
@@ -543,9 +493,7 @@ function AssetLibraryPageComponent({
                             {cardDateFormatter.format(new Date(asset.updatedAt))}
                           </span>
                         </div>
-                        <p className="mt-2 text-[12px] text-muted-foreground">
-                          {asset.organizationName ?? "조직 미지정"}
-                        </p>
+                        <p className="mt-2 text-[12px] text-muted-foreground">{asset.organizationName ?? "조직 미지정"}</p>
                       </div>
                     </button>
                   </article>
@@ -583,9 +531,7 @@ function AssetLibraryPageComponent({
                                 />
                                 <div className="min-w-0">
                                   <p className="line-clamp-1 font-medium">{asset.title}</p>
-                                  <p className="mt-1 text-xs text-muted-foreground">
-                                    {getAssetPrimaryText(asset)}
-                                  </p>
+                                  <p className="mt-1 text-xs text-muted-foreground">{getAssetPrimaryText(asset)}</p>
                                 </div>
                               </div>
                             </td>
@@ -593,10 +539,7 @@ function AssetLibraryPageComponent({
                             <td className="px-4 py-4">
                               <div className="flex flex-wrap gap-1.5">
                                 {flattenAssetTags(asset.tags).slice(0, 2).map((tag) => (
-                                  <span
-                                    className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground/80"
-                                    key={`${asset.id}-${tag}`}
-                                  >
+                                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground/80" key={`${asset.id}-${tag}`}>
                                     {tag}
                                   </span>
                                 ))}
@@ -607,9 +550,7 @@ function AssetLibraryPageComponent({
                                 ) : null}
                               </div>
                             </td>
-                            <td className="px-4 py-4 text-muted-foreground">
-                              {asset.organizationName ?? "조직 미지정"}
-                            </td>
+                            <td className="px-4 py-4 text-muted-foreground">{asset.organizationName ?? "조직 미지정"}</td>
                             <td className="px-4 py-4 text-muted-foreground">{asset.ownerName}</td>
                             <td className="px-4 py-4 text-muted-foreground">
                               {cardDateFormatter.format(new Date(asset.updatedAt))}
@@ -650,6 +591,85 @@ function AssetLibraryPageComponent({
               </CardContent>
             </Card>
           )}
+
+          {catalogPage.totalItems > 0 ? (
+            <Card className="rounded-[24px] border-border shadow-none">
+              <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-1 text-center lg:text-left">
+                  <p className="text-sm font-medium">
+                    {paginationRangeStart}-{paginationRangeEnd} / {catalogPage.totalItems}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    페이지 {catalogPage.totalPages === 0 ? 0 : catalogPage.page + 1} / {catalogPage.totalPages}
+                  </p>
+                </div>
+
+                <Pagination className="justify-center lg:flex-1">
+                  <PaginationContent className="flex-wrap justify-center">
+                    <PaginationItem>
+                      <PaginationFirst
+                        disabled={!catalogPage.hasPrevious || isLoading}
+                        onClick={() => onPageChange(0)}
+                        type="button"
+                      />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        disabled={!catalogPage.hasPrevious || isLoading}
+                        onClick={() => onPageChange(catalogPage.page - 1)}
+                        type="button"
+                      />
+                    </PaginationItem>
+                    {paginationItems.map((item, index) => (
+                      <PaginationItem key={`${item}-${index}`}>
+                        {item === "ellipsis" ? (
+                          <PaginationEllipsis />
+                        ) : (
+                          <PaginationLink
+                            disabled={isLoading}
+                            isActive={item === catalogPage.page}
+                            onClick={() => onPageChange(item)}
+                          >
+                            {item + 1}
+                          </PaginationLink>
+                        )}
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        disabled={!catalogPage.hasNext || isLoading}
+                        onClick={() => onPageChange(catalogPage.page + 1)}
+                        type="button"
+                      />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationLast
+                        disabled={!catalogPage.hasNext || isLoading}
+                        onClick={() => onPageChange(catalogPage.totalPages - 1)}
+                        type="button"
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+
+                <div className="flex justify-center lg:justify-end">
+                  <Select onValueChange={(value) => onPageSizeChange(Number(value))} value={String(catalogPage.size)}>
+                    <SelectTrigger className="h-10 w-[112px] rounded-xl border-border bg-background text-sm shadow-none">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pageSizeOptions.map((pageSize) => (
+                        <SelectItem key={pageSize} value={String(pageSize)}>
+                          {pageSize}개씩
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
         </>
       )}
       <AssetUploadModal
@@ -667,57 +687,42 @@ function AssetLibraryPageComponent({
 
 export const AssetLibraryPage = memo(AssetLibraryPageComponent, areAssetLibraryPagePropsEqual);
 
-function normalizeDisplayValue(value: string): string {
-  return value.normalize("NFC");
-}
-
-function normalizeSearchValue(value: string): string {
-  return normalizeDisplayValue(value).trim().toLowerCase();
-}
-
-const assetTypeOptions: AssetSummaryView["type"][] = [
-  "IMAGE",
-  "VIDEO",
-  "AUDIO",
-  "DOCUMENT",
-  "URL",
-  "OTHER"
-];
-
 function areAssetLibraryPagePropsEqual(
   previousProps: AssetLibraryPageProps,
   nextProps: AssetLibraryPageProps
 ): boolean {
   return (
-    previousProps.assets === nextProps.assets &&
     previousProps.authErrorMessage === nextProps.authErrorMessage &&
     previousProps.authSuccessMessage === nextProps.authSuccessMessage &&
+    previousProps.catalogFilterOptions === nextProps.catalogFilterOptions &&
+    previousProps.catalogPage === nextProps.catalogPage &&
     previousProps.characterOptions === nextProps.characterOptions &&
+    previousProps.creatorFilter === nextProps.creatorFilter &&
     previousProps.tagOptions === nextProps.tagOptions &&
     previousProps.isLoading === nextProps.isLoading &&
     previousProps.isUploading === nextProps.isUploading &&
+    previousProps.organizationFilter === nextProps.organizationFilter &&
+    previousProps.onCreatorFilterChange === nextProps.onCreatorFilterChange &&
     previousProps.onOpenAssetPage === nextProps.onOpenAssetPage &&
+    previousProps.onOrganizationFilterChange === nextProps.onOrganizationFilterChange &&
+    previousProps.onPageChange === nextProps.onPageChange &&
+    previousProps.onPageSizeChange === nextProps.onPageSizeChange &&
+    previousProps.onResetFilters === nextProps.onResetFilters &&
     previousProps.onSearchQueryChange === nextProps.onSearchQueryChange &&
+    previousProps.onTypeFilterChange === nextProps.onTypeFilterChange &&
+    previousProps.onTypeMetadataFiltersChange === nextProps.onTypeMetadataFiltersChange &&
+    previousProps.onUploadAssets === nextProps.onUploadAssets &&
+    previousProps.onRegisterAssetLinks === nextProps.onRegisterAssetLinks &&
     previousProps.searchQuery === nextProps.searchQuery &&
     previousProps.session === nextProps.session &&
-    previousProps.uploadCompletionVersion === nextProps.uploadCompletionVersion
+    previousProps.typeFilter === nextProps.typeFilter &&
+    previousProps.typeMetadataFilters === nextProps.typeMetadataFilters
   );
 }
 
-function createEmptyTypeMetadataFilters(): AssetTypeMetadataFilterState {
-  return {
-    imageArtStyle: "ALL",
-    imageHasLayerFile: "ALL",
-    audioTtsVoice: "",
-    audioRecordingType: "ALL",
-    videoStage: "ALL",
-    documentKind: "ALL"
-  };
-}
-
 function hasActiveTypeMetadataFilters(
-  typeFilter: AssetLibraryTypeFilter,
-  filters: AssetTypeMetadataFilterState
+  typeFilter: AssetLibraryTypeFilterView,
+  filters: AssetTypeMetadataFilterStateView
 ): boolean {
   switch (typeFilter) {
     case "IMAGE":
@@ -733,49 +738,30 @@ function hasActiveTypeMetadataFilters(
   }
 }
 
-function matchesTypeMetadataFilters(
-  asset: AssetSummaryView,
-  typeFilter: AssetLibraryTypeFilter,
-  filters: AssetTypeMetadataFilterState
-): boolean {
-  switch (typeFilter) {
-    case "IMAGE":
-      if (filters.imageArtStyle !== "ALL" && asset.typeMetadata.imageArtStyle !== filters.imageArtStyle) {
-        return false;
-      }
-
-      if (filters.imageHasLayerFile === "INCLUDED" && asset.typeMetadata.imageHasLayerFile !== true) {
-        return false;
-      }
-
-      if (filters.imageHasLayerFile === "NOT_INCLUDED" && asset.typeMetadata.imageHasLayerFile !== false) {
-        return false;
-      }
-
-      return true;
-    case "AUDIO": {
-      const normalizedTtsVoiceFilter = normalizeSearchValue(filters.audioTtsVoice);
-      if (
-        normalizedTtsVoiceFilter.length > 0 &&
-        !normalizeSearchValue(asset.typeMetadata.audioTtsVoice ?? "").includes(normalizedTtsVoiceFilter)
-      ) {
-        return false;
-      }
-
-      if (
-        filters.audioRecordingType !== "ALL" &&
-        asset.typeMetadata.audioRecordingType !== filters.audioRecordingType
-      ) {
-        return false;
-      }
-
-      return true;
-    }
-    case "VIDEO":
-      return filters.videoStage === "ALL" || asset.typeMetadata.videoStage === filters.videoStage;
-    case "DOCUMENT":
-      return filters.documentKind === "ALL" || asset.typeMetadata.documentKind === filters.documentKind;
-    default:
-      return true;
+function buildPaginationItems(currentPage: number, totalPages: number): Array<number | "ellipsis"> {
+  if (totalPages <= 0) {
+    return [];
   }
+
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index);
+  }
+
+  if (currentPage <= 3) {
+    return [0, 1, 2, 3, 4, "ellipsis", totalPages - 1];
+  }
+
+  if (currentPage >= totalPages - 4) {
+    return [0, "ellipsis", totalPages - 5, totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1];
+  }
+
+  return [
+    0,
+    "ellipsis",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "ellipsis",
+    totalPages - 1
+  ];
 }

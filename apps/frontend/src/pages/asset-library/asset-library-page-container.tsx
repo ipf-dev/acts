@@ -7,8 +7,10 @@ import {
   getLoginSuccessMessage
 } from "../../api/auth";
 import type {
+  AssetCatalogFilterOptionsView,
+  AssetCatalogPageView,
+  AssetCatalogQueryView,
   AssetTagOptionCatalogView,
-  AssetSummaryView,
   AuthSessionView,
   CharacterTagOptionView
 } from "../../api/types";
@@ -17,28 +19,24 @@ import { AssetLibraryPage } from "./asset-library-page";
 import { AssetUploadToastPanel } from "./asset-upload-toast-panel";
 import type {
   AssetFileUploadDraftView,
-  AssetLinkDraftView
+  AssetLibraryTypeFilterView,
+  AssetLinkDraftView,
+  AssetTypeMetadataFilterStateView
 } from "./asset-library-page-model";
+import { createEmptyAssetTypeMetadataFilters } from "./asset-library-page-model";
 import { useAssetUploadTracker } from "./use-asset-upload-tracker";
 
 interface AssetLibraryPageState {
-  assets: AssetSummaryView[];
+  assetCatalog: AssetCatalogPageView;
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
+  catalogFilterOptions: AssetCatalogFilterOptionsView;
   characterOptions: CharacterTagOptionView[];
   tagOptions: AssetTagOptionCatalogView;
   isUploading: boolean;
   isLoading: boolean;
   session: AuthSessionView;
-  uploadCompletionVersion: number;
 }
-
-const dashboardApi = createDashboardApi();
-const initialLocationSearch = window.location.search;
-const emptyTagOptions: AssetTagOptionCatalogView = {
-  keywords: [],
-  locations: []
-};
 
 interface AssetLibraryPageContainerProps {
   onOpenAssetPage: (assetId: number) => void;
@@ -47,6 +45,26 @@ interface AssetLibraryPageContainerProps {
   session: AuthSessionView;
 }
 
+const dashboardApi = createDashboardApi();
+const initialLocationSearch = window.location.search;
+const emptyTagOptions: AssetTagOptionCatalogView = {
+  keywords: [],
+  locations: []
+};
+const emptyCatalogFilterOptions: AssetCatalogFilterOptionsView = {
+  organizations: [],
+  creators: []
+};
+const emptyCatalogPage: AssetCatalogPageView = {
+  items: [],
+  page: 0,
+  size: 24,
+  totalItems: 0,
+  totalPages: 0,
+  hasNext: false,
+  hasPrevious: false
+};
+
 export function AssetLibraryPageContainer({
   onOpenAssetPage,
   onSearchQueryChange,
@@ -54,16 +72,26 @@ export function AssetLibraryPageContainer({
   session: initialSession
 }: AssetLibraryPageContainerProps): React.JSX.Element {
   const [state, setState] = useState<AssetLibraryPageState>({
-    assets: [],
+    assetCatalog: emptyCatalogPage,
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+    catalogFilterOptions: emptyCatalogFilterOptions,
     characterOptions: [],
     tagOptions: emptyTagOptions,
     isUploading: false,
     isLoading: true,
-    session: initialSession,
-    uploadCompletionVersion: 0
+    session: initialSession
   });
+  const [catalogRefreshVersion, setCatalogRefreshVersion] = useState(0);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(24);
+  const [creatorFilter, setCreatorFilter] = useState("ALL");
+  const [organizationFilter, setOrganizationFilter] = useState("ALL");
+  const [typeFilter, setTypeFilter] = useState<AssetLibraryTypeFilterView>("ALL");
+  const [typeMetadataFilters, setTypeMetadataFilters] = useState<AssetTypeMetadataFilterStateView>(
+    createEmptyAssetTypeMetadataFilters
+  );
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
   const {
     applyFileProgress,
     dismissUploadBatch,
@@ -80,24 +108,43 @@ export function AssetLibraryPageContainer({
 
   useEffect(() => {
     isMountedRef.current = true;
+    clearLoginRedirectState();
     return () => {
       isMountedRef.current = false;
     };
   }, []);
 
   useEffect(() => {
-    let isActive = true;
-    clearLoginRedirectState();
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 320);
 
-    async function loadPage(): Promise<void> {
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadSupportingData(): Promise<void> {
+      if (!initialSession.authenticated) {
+        setState((currentState) => ({
+          ...currentState,
+          assetCatalog: emptyCatalogPage,
+          catalogFilterOptions: emptyCatalogFilterOptions,
+          characterOptions: [],
+          tagOptions: emptyTagOptions,
+          isLoading: false,
+          session: initialSession
+        }));
+        return;
+      }
+
       try {
-        const [assets, characterOptions, tagOptions] = initialSession.authenticated
-          ? await Promise.all([
-              dashboardApi.listAssets(),
-              dashboardApi.listCharacterTagOptions(),
-              dashboardApi.listAssetTagOptions().catch(() => emptyTagOptions)
-            ])
-          : [[], [], emptyTagOptions];
+        const [characterOptions, tagOptions, catalogFilterOptions] = await Promise.all([
+          dashboardApi.listCharacterTagOptions(),
+          dashboardApi.listAssetTagOptions().catch(() => emptyTagOptions),
+          dashboardApi.listAssetCatalogFilterOptions().catch(() => emptyCatalogFilterOptions)
+        ]);
 
         if (!isActive) {
           return;
@@ -105,11 +152,76 @@ export function AssetLibraryPageContainer({
 
         setState((currentState) => ({
           ...currentState,
-          assets,
-          authErrorMessage: getLoginFailureMessage(initialLocationSearch),
-          authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+          catalogFilterOptions,
           characterOptions,
           tagOptions,
+          session: initialSession
+        }));
+      } catch (error: unknown) {
+        if (!isActive) {
+          return;
+        }
+
+        setState((currentState) => ({
+          ...currentState,
+          authErrorMessage: getAssetApiErrorMessage(error, {
+            fallback: "자산 라이브러리 보조 정보를 불러오지 못했습니다."
+          }),
+          authSuccessMessage: null,
+          isLoading: false,
+          session: initialSession
+        }));
+      }
+    }
+
+    void loadSupportingData();
+
+    return () => {
+      isActive = false;
+    };
+  }, [initialSession]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadCatalog(): Promise<void> {
+      if (!initialSession.authenticated) {
+        setState((currentState) => ({
+          ...currentState,
+          assetCatalog: emptyCatalogPage,
+          isLoading: false,
+          session: initialSession
+        }));
+        return;
+      }
+
+      setState((currentState) => ({
+        ...currentState,
+        isLoading: true,
+        session: initialSession
+      }));
+
+      try {
+        const assetCatalog = await dashboardApi.listAssets(
+          buildAssetCatalogQuery({
+            creatorFilter,
+            organizationFilter,
+            page,
+            pageSize,
+            searchQuery: debouncedSearchQuery,
+            typeFilter,
+            typeMetadataFilters
+          })
+        );
+
+        if (!isActive) {
+          return;
+        }
+
+        setState((currentState) => ({
+          ...currentState,
+          assetCatalog,
+          authErrorMessage: null,
           isLoading: false,
           session: initialSession
         }));
@@ -120,19 +232,33 @@ export function AssetLibraryPageContainer({
 
         setState((currentState) => ({
           ...currentState,
-          authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
+          authErrorMessage: getAssetApiErrorMessage(error, {
+            denied: "현재 권한으로는 자산 라이브러리에 접근할 수 없습니다.",
+            fallback: "자산 목록을 불러오지 못했습니다."
+          }),
           authSuccessMessage: null,
-          isLoading: false
+          isLoading: false,
+          session: initialSession
         }));
       }
     }
 
-    void loadPage();
+    void loadCatalog();
 
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [
+    catalogRefreshVersion,
+    creatorFilter,
+    debouncedSearchQuery,
+    initialSession,
+    organizationFilter,
+    page,
+    pageSize,
+    typeFilter,
+    typeMetadataFilters
+  ]);
 
   useEffect(() => {
     if (uploadBatch?.status !== "COMPLETED") {
@@ -199,13 +325,7 @@ export function AssetLibraryPageContainer({
       }
     });
 
-    await finalizeUploadBatch(
-      uploadBatchId,
-      drafts.length,
-      results,
-      "FILE",
-      extractFulfilledValues(results)
-    );
+    await finalizeUploadBatch(uploadBatchId, drafts.length, results, "FILE");
   }
 
   async function handleRegisterAssetLinks(drafts: AssetLinkDraftView[]): Promise<void> {
@@ -227,7 +347,7 @@ export function AssetLibraryPageContainer({
         status: "FINALIZING"
       });
 
-      const registeredAssets = await dashboardApi.registerAssetLinks({
+      await dashboardApi.registerAssetLinks({
         links: drafts.map((draft) => ({
           linkType: draft.linkType,
           tags: assetTagDraftToInput(draft),
@@ -248,8 +368,7 @@ export function AssetLibraryPageContainer({
         uploadBatchId,
         drafts.length,
         createSuccessfulResults(drafts.length),
-        "LINK",
-        registeredAssets
+        "LINK"
       );
     } catch (error: unknown) {
       if (!isMountedRef.current) {
@@ -274,10 +393,10 @@ export function AssetLibraryPageContainer({
     }
   }
 
-  async function syncAssetLibraryCatalog(): Promise<void> {
-    const [assetsResult, tagOptionsResult] = await Promise.allSettled([
-      dashboardApi.listAssets(),
-      dashboardApi.listAssetTagOptions()
+  async function refreshSupportingData(): Promise<void> {
+    const [tagOptionsResult, catalogFilterOptionsResult] = await Promise.allSettled([
+      dashboardApi.listAssetTagOptions(),
+      dashboardApi.listAssetCatalogFilterOptions()
     ]);
 
     if (!isMountedRef.current) {
@@ -286,7 +405,10 @@ export function AssetLibraryPageContainer({
 
     setState((currentState) => ({
       ...currentState,
-      assets: assetsResult.status === "fulfilled" ? assetsResult.value : currentState.assets,
+      catalogFilterOptions:
+        catalogFilterOptionsResult.status === "fulfilled"
+          ? catalogFilterOptionsResult.value
+          : currentState.catalogFilterOptions,
       tagOptions: tagOptionsResult.status === "fulfilled" ? tagOptionsResult.value : currentState.tagOptions
     }));
   }
@@ -295,8 +417,7 @@ export function AssetLibraryPageContainer({
     uploadBatchId: string,
     taskCount: number,
     results: PromiseSettledResult<unknown>[],
-    kind: "FILE" | "LINK",
-    successfulAssets: AssetSummaryView[]
+    kind: "FILE" | "LINK"
   ): Promise<void> {
     const successCount = results.filter((result) => result.status === "fulfilled").length;
     const failureCount = taskCount - successCount;
@@ -323,16 +444,17 @@ export function AssetLibraryPageContainer({
 
     setState((currentState) => ({
       ...currentState,
-      assets: mergeAssetSummaries(currentState.assets, successfulAssets),
       authErrorMessage: partialFailureMessage,
       authSuccessMessage: successMessage,
-      isUploading: false,
-      uploadCompletionVersion:
-        successCount > 0 ? currentState.uploadCompletionVersion + 1 : currentState.uploadCompletionVersion
+      isUploading: false
     }));
     markBatchStatus(uploadBatchId, failureCount > 0 ? "FAILED" : "COMPLETED");
 
     if (successCount > 0) {
+      resetFilters();
+      setCatalogRefreshVersion((currentVersion) => currentVersion + 1);
+      void refreshSupportingData();
+
       window.setTimeout(() => {
         if (!isMountedRef.current) {
           return;
@@ -340,7 +462,6 @@ export function AssetLibraryPageContainer({
 
         dismissUploadBatchIfMatches(uploadBatchId);
       }, 2600);
-      void syncAssetLibraryCatalog();
     }
   }
 
@@ -348,23 +469,78 @@ export function AssetLibraryPageContainer({
     dismissUploadBatch();
   }
 
+  function handleSearchQueryChange(nextValue: string): void {
+    onSearchQueryChange(nextValue);
+    setPage(0);
+  }
+
+  function handleTypeFilterChange(nextValue: AssetLibraryTypeFilterView): void {
+    setTypeFilter(nextValue);
+    setTypeMetadataFilters(createEmptyAssetTypeMetadataFilters());
+    setPage(0);
+  }
+
+  function handleTypeMetadataFiltersChange(nextFilters: AssetTypeMetadataFilterStateView): void {
+    setTypeMetadataFilters(nextFilters);
+    setPage(0);
+  }
+
+  function handleOrganizationFilterChange(nextValue: string): void {
+    setOrganizationFilter(nextValue);
+    setPage(0);
+  }
+
+  function handleCreatorFilterChange(nextValue: string): void {
+    setCreatorFilter(nextValue);
+    setPage(0);
+  }
+
+  function handlePageChange(nextPage: number): void {
+    setPage(Math.max(0, nextPage));
+  }
+
+  function handlePageSizeChange(nextSize: number): void {
+    setPageSize(nextSize);
+    setPage(0);
+  }
+
+  function resetFilters(): void {
+    onSearchQueryChange("");
+    setCreatorFilter("ALL");
+    setOrganizationFilter("ALL");
+    setPage(0);
+    setTypeFilter("ALL");
+    setTypeMetadataFilters(createEmptyAssetTypeMetadataFilters());
+  }
+
   return (
     <>
       <AssetLibraryPage
-        assets={state.assets}
         authErrorMessage={state.authErrorMessage}
         authSuccessMessage={state.authSuccessMessage}
+        catalogFilterOptions={state.catalogFilterOptions}
+        catalogPage={state.assetCatalog}
         characterOptions={state.characterOptions}
+        creatorFilter={creatorFilter}
         tagOptions={state.tagOptions}
         isLoading={state.isLoading}
         isUploading={state.isUploading}
+        onCreatorFilterChange={handleCreatorFilterChange}
         onOpenAssetPage={onOpenAssetPage}
+        onOrganizationFilterChange={handleOrganizationFilterChange}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
         onRegisterAssetLinks={handleRegisterAssetLinks}
-        onSearchQueryChange={onSearchQueryChange}
+        onResetFilters={resetFilters}
+        onSearchQueryChange={handleSearchQueryChange}
+        onTypeFilterChange={handleTypeFilterChange}
+        onTypeMetadataFiltersChange={handleTypeMetadataFiltersChange}
         onUploadAssets={handleUploadAssets}
+        organizationFilter={organizationFilter}
         searchQuery={searchQuery}
         session={state.session}
-        uploadCompletionVersion={state.uploadCompletionVersion}
+        typeFilter={typeFilter}
+        typeMetadataFilters={typeMetadataFilters}
       />
       <AssetUploadToastPanel batch={uploadBatch} onDismiss={handleDismissUploadBatch} />
     </>
@@ -374,15 +550,15 @@ export function AssetLibraryPageContainer({
 async function runWithConcurrency<T>(
   items: T[],
   concurrency: number,
-  worker: (item: T) => Promise<AssetSummaryView>
-): Promise<PromiseSettledResult<AssetSummaryView>[]> {
+  worker: (item: T) => Promise<unknown>
+): Promise<PromiseSettledResult<unknown>[]> {
   if (items.length === 0) {
     return [];
   }
 
   let nextIndex = 0;
   const workerCount = Math.min(concurrency, items.length);
-  const results: PromiseSettledResult<AssetSummaryView>[] = Array.from({ length: items.length });
+  const results: PromiseSettledResult<unknown>[] = Array.from({ length: items.length });
 
   await Promise.all(
     Array.from({ length: workerCount }, async () => {
@@ -416,31 +592,76 @@ function createSuccessfulResults(count: number): PromiseSettledResult<void>[] {
   }));
 }
 
-function extractFulfilledValues<T>(results: PromiseSettledResult<T>[]): T[] {
-  return results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
-}
+function buildAssetCatalogQuery({
+  creatorFilter,
+  organizationFilter,
+  page,
+  pageSize,
+  searchQuery,
+  typeFilter,
+  typeMetadataFilters
+}: {
+  creatorFilter: string;
+  organizationFilter: string;
+  page: number;
+  pageSize: number;
+  searchQuery: string;
+  typeFilter: AssetLibraryTypeFilterView;
+  typeMetadataFilters: AssetTypeMetadataFilterStateView;
+}): AssetCatalogQueryView {
+  const query: AssetCatalogQueryView = {
+    page,
+    size: pageSize
+  };
 
-function mergeAssetSummaries(
-  currentAssets: AssetSummaryView[],
-  nextAssets: AssetSummaryView[]
-): AssetSummaryView[] {
-  if (nextAssets.length === 0) {
-    return currentAssets;
+  const normalizedSearchQuery = searchQuery.trim();
+  if (normalizedSearchQuery.length > 0) {
+    query.search = normalizedSearchQuery;
   }
 
-  const mergedAssets = new Map<number, AssetSummaryView>();
-  currentAssets.forEach((asset) => {
-    mergedAssets.set(asset.id, asset);
-  });
-  nextAssets.forEach((asset) => {
-    mergedAssets.set(asset.id, asset);
-  });
+  if (typeFilter !== "ALL") {
+    query.assetType = typeFilter;
+  }
+  if (organizationFilter !== "ALL") {
+    query.organizationId = Number(organizationFilter);
+  }
+  if (creatorFilter !== "ALL") {
+    query.creatorEmail = creatorFilter;
+  }
 
-  return Array.from(mergedAssets.values()).sort((left, right) => {
-    const createdAtCompare = Date.parse(right.createdAt) - Date.parse(left.createdAt);
-    if (createdAtCompare !== 0) {
-      return createdAtCompare;
-    }
-    return right.id - left.id;
-  });
+  switch (typeFilter) {
+    case "IMAGE":
+      if (typeMetadataFilters.imageArtStyle !== "ALL") {
+        query.imageArtStyle = typeMetadataFilters.imageArtStyle;
+      }
+      if (typeMetadataFilters.imageHasLayerFile === "INCLUDED") {
+        query.imageHasLayerFile = true;
+      }
+      if (typeMetadataFilters.imageHasLayerFile === "NOT_INCLUDED") {
+        query.imageHasLayerFile = false;
+      }
+      break;
+    case "AUDIO":
+      if (typeMetadataFilters.audioTtsVoice.trim().length > 0) {
+        query.audioTtsVoice = typeMetadataFilters.audioTtsVoice.trim();
+      }
+      if (typeMetadataFilters.audioRecordingType !== "ALL") {
+        query.audioRecordingType = typeMetadataFilters.audioRecordingType;
+      }
+      break;
+    case "VIDEO":
+      if (typeMetadataFilters.videoStage !== "ALL") {
+        query.videoStage = typeMetadataFilters.videoStage;
+      }
+      break;
+    case "DOCUMENT":
+      if (typeMetadataFilters.documentKind !== "ALL") {
+        query.documentKind = typeMetadataFilters.documentKind;
+      }
+      break;
+    default:
+      break;
+  }
+
+  return query;
 }

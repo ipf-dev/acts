@@ -40,6 +40,21 @@ export interface AssetTagOptionCatalogView {
   keywords: AssetTagValueOptionView[];
 }
 
+export interface AssetCatalogOrganizationOptionView {
+  id: number;
+  name: string;
+}
+
+export interface AssetCatalogCreatorOptionView {
+  email: string;
+  name: string;
+}
+
+export interface AssetCatalogFilterOptionsView {
+  organizations: AssetCatalogOrganizationOptionView[];
+  creators: AssetCatalogCreatorOptionView[];
+}
+
 export interface AdminCharacterTagView {
   id: number;
   name: string;
@@ -221,6 +236,31 @@ export interface AssetSummaryView {
   canDownload: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AssetCatalogPageView {
+  items: AssetSummaryView[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+export interface AssetCatalogQueryView {
+  page?: number;
+  size?: number;
+  search?: string;
+  assetType?: AssetTypeView;
+  organizationId?: number;
+  creatorEmail?: string;
+  imageArtStyle?: AssetImageArtStyleView;
+  imageHasLayerFile?: boolean;
+  audioTtsVoice?: string;
+  audioRecordingType?: AssetAudioRecordingTypeView;
+  videoStage?: AssetVideoStageView;
+  documentKind?: AssetDocumentKindView;
 }
 
 export interface AssetUploadInput {

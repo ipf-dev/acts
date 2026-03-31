@@ -1,5 +1,8 @@
 import type {
   AdminAssetTagCatalogView,
+  AssetCatalogFilterOptionsView,
+  AssetCatalogPageView,
+  AssetCatalogQueryView,
   AssetFileAccessModeView,
   AssetFileAccessUrlView,
   AssetTagOptionCatalogView,
@@ -38,10 +41,11 @@ export interface DashboardApi {
   getAsset(assetId: number): Promise<AssetDetailView>;
   getAssetFileAccessUrl(assetId: number, mode: AssetFileAccessModeView): Promise<AssetFileAccessUrlView>;
   getAdminAssetTagCatalog(): Promise<AdminAssetTagCatalogView>;
+  listAssetCatalogFilterOptions(): Promise<AssetCatalogFilterOptionsView>;
   getAssetRetentionPolicy(): Promise<AssetRetentionPolicyView>;
   listAssetTagOptions(): Promise<AssetTagOptionCatalogView>;
   listDeletedAssets(): Promise<DeletedAssetView[]>;
-  listAssets(): Promise<AssetSummaryView[]>;
+  listAssets(query?: AssetCatalogQueryView): Promise<AssetCatalogPageView>;
   listCharacterTagOptions(): Promise<CharacterTagOptionView[]>;
   registerAssetLinks(input: AssetLinkRegistrationInput): Promise<AssetSummaryView[]>;
   mergeAssetTags(input: AssetTagMergeInput): Promise<void>;
@@ -182,6 +186,9 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     async getAdminAssetTagCatalog() {
       return readJson<AdminAssetTagCatalogView>("/api/auth/admin/asset-tags");
     },
+    async listAssetCatalogFilterOptions() {
+      return readJson<AssetCatalogFilterOptionsView>("/api/assets/filter-options");
+    },
     async getAssetRetentionPolicy() {
       return readJson<AssetRetentionPolicyView>("/api/assets/policy");
     },
@@ -191,8 +198,10 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
     async listDeletedAssets() {
       return readJson<DeletedAssetView[]>("/api/assets/deleted");
     },
-    async listAssets() {
-      return readJson<AssetSummaryView[]>("/api/assets");
+    async listAssets(query = {}) {
+      const searchParams = createAssetCatalogSearchParams(query);
+      const requestPath = searchParams.toString() ? `/api/assets?${searchParams.toString()}` : "/api/assets";
+      return readJson<AssetCatalogPageView>(requestPath);
     },
     async listCharacterTagOptions() {
       return readJson<CharacterTagOptionView[]>("/api/assets/tags/characters");
@@ -425,6 +434,49 @@ function parseContentDispositionFileName(contentDisposition: string | null): str
   }
 
   return null;
+}
+
+function createAssetCatalogSearchParams(query: AssetCatalogQueryView): URLSearchParams {
+  const searchParams = new URLSearchParams();
+
+  if (query.page !== undefined) {
+    searchParams.set("page", String(query.page));
+  }
+  if (query.size !== undefined) {
+    searchParams.set("size", String(query.size));
+  }
+  if (query.search) {
+    searchParams.set("search", query.search);
+  }
+  if (query.assetType) {
+    searchParams.set("assetType", query.assetType);
+  }
+  if (query.organizationId !== undefined) {
+    searchParams.set("organizationId", String(query.organizationId));
+  }
+  if (query.creatorEmail) {
+    searchParams.set("creatorEmail", query.creatorEmail);
+  }
+  if (query.imageArtStyle) {
+    searchParams.set("imageArtStyle", query.imageArtStyle);
+  }
+  if (query.imageHasLayerFile !== undefined) {
+    searchParams.set("imageHasLayerFile", String(query.imageHasLayerFile));
+  }
+  if (query.audioTtsVoice) {
+    searchParams.set("audioTtsVoice", query.audioTtsVoice);
+  }
+  if (query.audioRecordingType) {
+    searchParams.set("audioRecordingType", query.audioRecordingType);
+  }
+  if (query.videoStage) {
+    searchParams.set("videoStage", query.videoStage);
+  }
+  if (query.documentKind) {
+    searchParams.set("documentKind", query.documentKind);
+  }
+
+  return searchParams;
 }
 
 interface MultipartIntentResponse {

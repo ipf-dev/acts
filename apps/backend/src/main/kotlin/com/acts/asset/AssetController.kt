@@ -35,22 +35,56 @@ class AssetController(
         @RequestParam(required = false) assetType: AssetType?,
         @RequestParam(required = false) organizationId: Long?,
         @RequestParam(required = false) creatorEmail: String?,
+        @RequestParam(required = false) imageArtStyle: AssetImageArtStyle?,
+        @RequestParam(required = false) imageHasLayerFile: Boolean?,
+        @RequestParam(required = false) audioTtsVoice: String?,
+        @RequestParam(required = false) audioRecordingType: AssetAudioRecordingType?,
+        @RequestParam(required = false) videoStage: AssetVideoStage?,
+        @RequestParam(required = false) documentKind: AssetDocumentKind?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "24") size: Int,
         authentication: Authentication?,
-    ): ResponseEntity<List<AssetSummaryResponse>> {
+    ): ResponseEntity<AssetCatalogPageResponse> {
         val actorEmail = currentActorEmail(authentication)
             ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
 
-        return ResponseEntity.ok(
-            assetLibraryService.listAssets(
-                actorEmail = actorEmail,
-                query = AssetListQuery(
-                    search = search,
-                    assetType = assetType,
-                    organizationId = organizationId,
-                    creatorEmail = creatorEmail,
+        return try {
+            ResponseEntity.ok(
+                assetLibraryService.listAssetCatalog(
+                    actorEmail = actorEmail,
+                    query = AssetListQuery(
+                        search = search,
+                        assetType = assetType,
+                        organizationId = organizationId,
+                        creatorEmail = creatorEmail,
+                        imageArtStyle = imageArtStyle,
+                        imageHasLayerFile = imageHasLayerFile,
+                        audioTtsVoice = audioTtsVoice,
+                        audioRecordingType = audioRecordingType,
+                        videoStage = videoStage,
+                        documentKind = documentKind,
+                    ),
+                    page = page,
+                    size = size,
                 ),
-            ),
-        )
+            )
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (_: IllegalArgumentException) {
+            ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+        }
+    }
+
+    @GetMapping("/filter-options")
+    fun listAssetFilterOptions(authentication: Authentication?): ResponseEntity<AssetCatalogFilterOptionsResponse> {
+        val actorEmail = currentActorEmail(authentication)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+
+        return try {
+            ResponseEntity.ok(assetLibraryService.listAssetCatalogFilterOptions(actorEmail))
+        } catch (_: SecurityException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        }
     }
 
     @GetMapping("/{assetId}")

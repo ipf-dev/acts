@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import type React from "react";
-import { Film } from "lucide-react";
 import type { AssetSourceKindView, AssetSummaryView } from "../../api/types";
 import { cn } from "../../lib/utils";
 import { buildAssetPreviewUrl } from "./asset-library-utils";
@@ -68,12 +67,6 @@ export function AssetPreviewPanel({
         onError={() => setHasPreviewError(true)}
         src={buildAssetPreviewUrl(assetId, `${cacheKey}-${retryCount}`)}
       />
-      {assetType === "VIDEO" ? (
-        <div className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-1 text-[11px] font-medium text-foreground shadow-sm">
-          <Film className="h-3.5 w-3.5" />
-          썸네일
-        </div>
-      ) : null}
     </div>
   );
 }
