@@ -1,0 +1,7 @@
+.git
+.gitignore
+.DS_Store
+**/.DS_Store
+**/.gradle
+**/build
+**/node_modules

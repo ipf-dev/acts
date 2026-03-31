@@ -11,10 +11,22 @@ Use `infra/docker-compose.yml` for the default local stack.
   - PostgreSQL
   - LocalStack S3
 - AWS runtime
-  - backend: `ECS`
+  - web app: `Elastic Beanstalk`
+  - runtime package: single web service for same-origin frontend + backend delivery
+  - relational database: `PostgreSQL` on managed AWS database service
   - asset storage: `S3`
   - video preview worker: `Lambda`
-  - lambda image registry: `ECR`
+  - image registry: `ECR` for Lambda worker images
+
+## Web App Runtime
+
+- deploy region target: `ap-northeast-2` (`Seoul`)
+- deploy target: a single containerized web service on `Elastic Beanstalk`
+- reason: keep Google SSO, session flow, and frontend `/api` calls on one origin
+- App Runner is excluded because Seoul region support is unavailable
+- selected Beanstalk shape: single-container Docker environment
+- recommended first rollout: public HTTPS endpoint, single running instance, custom domain added after the first successful deploy
+- network: attach private networking only when the database is placed in private subnets
 
 ## Preview Worker
 
@@ -27,6 +39,6 @@ Use `infra/docker-compose.yml` for the default local stack.
 ## Fill In Later
 
 - cloud account and region
-- network topology
-- frontend hosting target
+- managed database choice and subnet plan
+- custom domain
 - secret sources
