@@ -51,4 +51,54 @@ class AuthControllerTest @Autowired constructor(
                 jsonPath("$.deniedFeatures", hasSize<Any>(0))
             }
     }
+
+    @Test
+    @WithMockUser(username = "minsungkim@iportfolio.co.kr", roles = ["ADMIN"])
+    fun `manual assignment request body can be deserialized`() {
+        userDirectoryService.syncLogin(
+            email = "coco@iportfolio.co.kr",
+            displayName = "Coco",
+        )
+
+        mockMvc.put("/api/auth/admin/users/coco@iportfolio.co.kr/assignment") {
+            contentType = org.springframework.http.MediaType.APPLICATION_JSON
+            content = """{"organizationId":1}"""
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.email") { value("coco@iportfolio.co.kr") }
+                jsonPath("$.organizationId") { value(1) }
+            }
+    }
+
+    @Test
+    @WithMockUser(username = "minsungkim@iportfolio.co.kr", roles = ["ADMIN"])
+    fun `admin user can promote another user to admin`() {
+        userDirectoryService.syncLogin(
+            email = "coco@iportfolio.co.kr",
+            displayName = "Coco",
+        )
+
+        mockMvc.post("/api/auth/admin/users/coco@iportfolio.co.kr/promote")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.email") { value("coco@iportfolio.co.kr") }
+                jsonPath("$.role") { value("ADMIN") }
+                jsonPath("$.companyWideViewer") { value(true) }
+            }
+    }
+
+    @Test
+    @WithMockUser(username = "coco@iportfolio.co.kr", roles = ["USER"])
+    fun `non admin user cannot promote another user to admin`() {
+        userDirectoryService.syncLogin(
+            email = "leader@iportfolio.co.kr",
+            displayName = "Leader",
+        )
+
+        mockMvc.post("/api/auth/admin/users/leader@iportfolio.co.kr/promote")
+            .andExpect {
+                status { isForbidden() }
+            }
+    }
 }

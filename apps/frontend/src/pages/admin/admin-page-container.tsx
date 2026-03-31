@@ -9,7 +9,6 @@ import {
 import type {
   AdminAssetTagCatalogView,
   AppFeatureKeyView,
-  AppHealthView,
   AssetRetentionPolicyView,
   AssetTagTypeView,
   AuditLogView,
@@ -18,8 +17,7 @@ import type {
   CharacterTagUpsertInput,
   DeletedAssetView,
   OrganizationOptionView,
-  UserFeatureAuthorizationView,
-  ViewerAllowlistEntryView
+  UserFeatureAuthorizationView
 } from "../../api/types";
 import { AdminPage } from "./admin-page";
 
@@ -31,19 +29,15 @@ interface AdminPageState {
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   deletedAssets: DeletedAssetView[];
-  health: AppHealthView | null;
-  healthErrorMessage: string | null;
-  isLoading: boolean;
-  isSavingAllowlist: boolean;
   isSavingAssetTags: boolean;
   isSavingAssignment: boolean;
   isSavingFeatureAccess: boolean;
   isSavingPolicy: boolean;
   organizations: OrganizationOptionView[];
+  promotingUserEmail: string | null;
   processingDeletedAssetId: number | null;
   session: AuthSessionView;
   userFeatureAuthorizations: UserFeatureAuthorizationView[];
-  viewerAllowlist: ViewerAllowlistEntryView[];
 }
 
 interface LoadedAdminData {
@@ -54,7 +48,6 @@ interface LoadedAdminData {
   deletedAssets: DeletedAssetView[];
   featureAuthorizations: UserFeatureAuthorizationView[];
   organizations: OrganizationOptionView[];
-  viewerAllowlist: ViewerAllowlistEntryView[];
 }
 
 const dashboardApi = createDashboardApi();
@@ -64,7 +57,6 @@ async function loadAdminData(): Promise<LoadedAdminData> {
   const [
     adminUsers,
     organizations,
-    viewerAllowlist,
     auditLogs,
     assetRetentionPolicy,
     deletedAssets,
@@ -73,7 +65,6 @@ async function loadAdminData(): Promise<LoadedAdminData> {
   ] = await Promise.all([
     dashboardApi.listUsers(),
     dashboardApi.listOrganizations(),
-    dashboardApi.listViewerAllowlist(),
     dashboardApi.listAuditLogs(),
     dashboardApi.getAssetRetentionPolicy(),
     dashboardApi.listDeletedAssets(),
@@ -88,8 +79,7 @@ async function loadAdminData(): Promise<LoadedAdminData> {
     auditLogs,
     deletedAssets,
     featureAuthorizations,
-    organizations,
-    viewerAllowlist
+    organizations
   };
 }
 
@@ -106,19 +96,15 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
     deletedAssets: [],
-    health: null,
-    healthErrorMessage: null,
-    isLoading: true,
-    isSavingAllowlist: false,
     isSavingAssetTags: false,
     isSavingAssignment: false,
     isSavingFeatureAccess: false,
     isSavingPolicy: false,
     organizations: [],
+    promotingUserEmail: null,
     processingDeletedAssetId: null,
     session: initialSession,
-    userFeatureAuthorizations: [],
-    viewerAllowlist: []
+    userFeatureAuthorizations: []
   });
 
   useEffect(() => {
@@ -127,15 +113,6 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
 
     async function loadPage(): Promise<void> {
       try {
-        const healthResult = await dashboardApi.health().catch((error: unknown) => ({
-          errorMessage: error instanceof Error ? error.message : "Unknown error.",
-          health: null
-        }));
-
-        if (!isActive) {
-          return;
-        }
-
         let adminData: LoadedAdminData | null = null;
         let authErrorMessage = getLoginFailureMessage(initialLocationSearch);
         let authSuccessMessage = getLoginSuccessMessage(initialLocationSearch);
@@ -157,19 +134,15 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
           authErrorMessage,
           authSuccessMessage,
           deletedAssets: adminData?.deletedAssets ?? [],
-          health: "health" in healthResult ? healthResult.health : healthResult,
-          healthErrorMessage: "errorMessage" in healthResult ? healthResult.errorMessage : null,
-          isLoading: false,
-          isSavingAllowlist: false,
           isSavingAssetTags: false,
           isSavingAssignment: false,
           isSavingFeatureAccess: false,
           isSavingPolicy: false,
           organizations: adminData?.organizations ?? [],
+          promotingUserEmail: null,
           processingDeletedAssetId: null,
           session: initialSession,
-          userFeatureAuthorizations: adminData?.featureAuthorizations ?? [],
-          viewerAllowlist: adminData?.viewerAllowlist ?? []
+          userFeatureAuthorizations: adminData?.featureAuthorizations ?? []
         };
 
         if (isActive) {
@@ -183,8 +156,7 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
         setState((currentState) => ({
           ...currentState,
           authErrorMessage: error instanceof Error ? error.message : "Unknown error.",
-          authSuccessMessage: null,
-          isLoading: false
+          authSuccessMessage: null
         }));
       }
     }
@@ -212,7 +184,6 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
       organizations: adminData.organizations,
       session,
       userFeatureAuthorizations: adminData.featureAuthorizations,
-      viewerAllowlist: adminData.viewerAllowlist,
       ...overrides
     };
   }
@@ -249,11 +220,6 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
     }
   }
 
-  async function handleLogout(): Promise<void> {
-    await dashboardApi.logout();
-    window.location.assign("/");
-  }
-
   async function handleSaveManualAssignment(email: string, organizationId: number): Promise<void> {
     await runAdminMutation(
       { isSavingAssignment: true },
@@ -266,21 +232,12 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
     );
   }
 
-  async function handleAddViewerAllowlist(email: string): Promise<void> {
+  async function handlePromoteUserToAdmin(email: string): Promise<void> {
     await runAdminMutation(
-      { isSavingAllowlist: true },
-      { isSavingAllowlist: false },
-      "전사 열람 allowlist가 업데이트되었습니다.",
-      () => dashboardApi.addViewerAllowlist({ email }).then(() => undefined)
-    );
-  }
-
-  async function handleRemoveViewerAllowlist(email: string): Promise<void> {
-    await runAdminMutation(
-      { isSavingAllowlist: true },
-      { isSavingAllowlist: false },
-      "전사 열람 allowlist가 업데이트되었습니다.",
-      () => dashboardApi.removeViewerAllowlist(email).then(() => undefined)
+      { promotingUserEmail: email },
+      { promotingUserEmail: null },
+      "사용자를 ADMIN으로 승격했습니다.",
+      () => dashboardApi.promoteUserToAdmin(email).then(() => undefined)
     );
   }
 
@@ -399,21 +356,15 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
       authErrorMessage={state.authErrorMessage}
       authSuccessMessage={state.authSuccessMessage}
       deletedAssets={state.deletedAssets}
-      health={state.health}
-      healthErrorMessage={state.healthErrorMessage}
-      isLoading={state.isLoading}
-      isSavingAllowlist={state.isSavingAllowlist}
       isSavingAssetTags={state.isSavingAssetTags}
       isSavingAssignment={state.isSavingAssignment}
       isSavingFeatureAccess={state.isSavingFeatureAccess}
       isSavingPolicy={state.isSavingPolicy}
-      onAddViewerAllowlist={handleAddViewerAllowlist}
       onCreateCharacter={handleCreateCharacter}
       onDeleteAssetTagValue={handleDeleteAssetTagValue}
       onDeleteCharacter={handleDeleteCharacter}
-      onLogout={handleLogout}
       onMergeAssetTags={handleMergeAssetTags}
-      onRemoveViewerAllowlist={handleRemoveViewerAllowlist}
+      onPromoteUserToAdmin={handlePromoteUserToAdmin}
       onRenameAssetTag={handleRenameAssetTag}
       onRestoreDeletedAsset={handleRestoreDeletedAsset}
       onSaveAssetRetentionPolicy={handleSaveAssetRetentionPolicy}
@@ -421,10 +372,10 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
       onSaveUserFeatureAccess={handleSaveUserFeatureAccess}
       onUpdateCharacter={handleUpdateCharacter}
       organizations={state.organizations}
+      promotingUserEmail={state.promotingUserEmail}
       processingDeletedAssetId={state.processingDeletedAssetId}
       session={state.session}
       userFeatureAuthorizations={state.userFeatureAuthorizations}
-      viewerAllowlist={state.viewerAllowlist}
     />
   );
 }

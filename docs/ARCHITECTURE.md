@@ -41,8 +41,9 @@ Expected first-slice backend capabilities:
 - domain-restricted Google SSO and session identity lookup
 - auth success event logging at the SSO boundary
 - PostgreSQL-backed user directory plus single organization catalog
-- seeded internal account roster with stored role precedence over bootstrap admin emails
+- seeded internal account roster with roles persisted directly in PostgreSQL
 - user org assignment lookup with admin override support
+- admin role source of truth stored in PostgreSQL `user_accounts.role`, with admin-only role promotion and audit logging
 - authorization derived from user role and company-wide viewer status
 - company-wide viewer allowlist with immediate permission recalculation
 - per-user feature allow/deny overrides with audit logging
@@ -74,12 +75,12 @@ Expected first-slice frontend surfaces:
 - login entry, session status, and admin override screens
 - user-facing auth failure notification after login redirects
 - Figma Make 기준의 shell 레이아웃, 현재 사용자 프로필 메뉴, 자산 검색 헤더
-- searchable admin user table with per-user organization assignment, role visibility, and company-wide viewer state
-- admin allowlist management and audit log views
+- searchable admin user table with per-user organization assignment, role visibility, and admin-only promotion action
+- audit log views, with company-wide viewer and allowlist controls currently hidden in the frontend UI
 - admin feature authorization tab with searchable user selection, per-feature allow/deny matrix, and save flow for the currently implemented asset library feature
 - admin tag management tab with character create/edit/delete + alias support and location/keyword search, usage-sorted pagination, and unified rename/merge/delete dialogs
 - admin policy tab for retention settings and deleted asset restore status/actions
-- asset library page with file/link split upload modal, 확장자 기반 이미지/오디오/영상/문서 세부 메타데이터 입력, 링크의 `URL` 타입 분리, same-metadata-based image/audio/video/document filters, a background upload progress toast panel updated independently from the main library list render and calculated from uploaded bytes instead of completed file counts, character dropdown + location/keyword tag suggestion search, grouped tag display, search, org/creator filters, and company-wide viewer export action without a separate asset status filter
+- asset library page with file/link split upload modal, 확장자 기반 이미지/오디오/영상/문서 세부 메타데이터 입력, 링크의 `URL` 타입 분리, same-metadata-based image/audio/video/document filters, a background upload progress toast panel updated independently from the main library list render and calculated from uploaded bytes instead of completed file counts, character dropdown + location/keyword tag suggestion search, grouped tag display, search, org/creator filters, and company-wide viewer export UI currently hidden
 - shell-level feature gating so denied users cannot enter the implemented asset library surface
 - asset detail page with image/video preview or external link summary, history, 타입별 세부 메타데이터를 포함한 editable metadata, download/open-link action, and owner/admin delete action
 - generation request forms and result views

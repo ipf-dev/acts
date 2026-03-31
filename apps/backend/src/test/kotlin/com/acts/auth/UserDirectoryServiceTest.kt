@@ -40,8 +40,20 @@ class UserDirectoryServiceTest @Autowired constructor(
 
         assertThat(profile.mappingMode).isEqualTo(UserMappingMode.UNMAPPED)
         assertThat(profile.organizationName).isNull()
+        assertThat(profile.role).isEqualTo(UserRole.USER)
         assertThat(profile.companyWideViewer).isFalse()
         assertThat(profile.manualAssignmentRequired).isTrue()
+    }
+
+    @Test
+    fun `seeded admin role is loaded from the database`() {
+        val profile = userDirectoryService.syncLogin(
+            email = "sykim@iportfolio.co.kr",
+            displayName = "김성윤",
+        )
+
+        assertThat(profile.role).isEqualTo(UserRole.ADMIN)
+        assertThat(profile.companyWideViewer).isTrue()
     }
 
     @Test
@@ -134,6 +146,33 @@ class UserDirectoryServiceTest @Autowired constructor(
         assertThat(latestAuditLog.afterState)
             .contains("\"allowlisted\":false")
             .contains("\"effectiveCompanyWideViewer\":false")
+    }
+
+    @Test
+    fun `promoting a user to admin updates the role and records an audit log`() {
+        userDirectoryService.syncLogin(
+            email = "coco@iportfolio.co.kr",
+            displayName = "Coco",
+        )
+
+        val promotedProfile = userDirectoryService.promoteUserToAdmin(
+            email = "coco@iportfolio.co.kr",
+            actorEmail = "sykim@iportfolio.co.kr",
+            actorName = "김성윤",
+        )
+        val latestAuditLog = userDirectoryService.listAuditLogs().first()
+
+        assertThat(promotedProfile.role).isEqualTo(UserRole.ADMIN)
+        assertThat(promotedProfile.companyWideViewer).isTrue()
+        assertThat(latestAuditLog.actionType).isEqualTo(AdminAuditLogAction.USER_ROLE_PROMOTED.name)
+        assertThat(latestAuditLog.actorEmail).isEqualTo("sykim@iportfolio.co.kr")
+        assertThat(latestAuditLog.targetEmail).isEqualTo("coco@iportfolio.co.kr")
+        assertThat(latestAuditLog.beforeState)
+            .contains("\"role\":\"USER\"")
+            .contains("\"companyWideViewer\":false")
+        assertThat(latestAuditLog.afterState)
+            .contains("\"role\":\"ADMIN\"")
+            .contains("\"companyWideViewer\":true")
     }
 
     @Test

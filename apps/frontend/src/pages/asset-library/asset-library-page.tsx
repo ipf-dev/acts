@@ -2,7 +2,6 @@ import { memo, useDeferredValue, useEffect, useState } from "react";
 import type React from "react";
 import {
   Clock3,
-  Download,
   Grid2x2,
   List,
   RotateCcw,
@@ -54,10 +53,8 @@ interface AssetLibraryPageProps {
   authSuccessMessage: string | null;
   characterOptions: CharacterTagOptionView[];
   tagOptions: AssetTagOptionCatalogView;
-  isExporting: boolean;
   isLoading: boolean;
   isUploading: boolean;
-  onExportAssets: () => Promise<void>;
   onOpenAssetPage: (assetId: number) => void;
   onRegisterAssetLinks: (drafts: AssetLinkDraftView[]) => Promise<void>;
   onSearchQueryChange: (value: string) => void;
@@ -90,10 +87,8 @@ function AssetLibraryPageComponent({
   authSuccessMessage,
   characterOptions,
   tagOptions,
-  isExporting,
   isLoading,
   isUploading,
-  onExportAssets,
   onOpenAssetPage,
   onRegisterAssetLinks,
   onSearchQueryChange,
@@ -190,18 +185,6 @@ function AssetLibraryPageComponent({
 
         {session.authenticated ? (
           <div className="flex items-center gap-2">
-            {session.user?.companyWideViewer ? (
-              <Button
-                className="h-10 rounded-xl px-4 text-sm font-medium"
-                disabled={isExporting}
-                onClick={() => void onExportAssets()}
-                type="button"
-                variant="outline"
-              >
-                <Download className="h-4 w-4" />
-                {isExporting ? "내보내는 중" : "내보내기"}
-              </Button>
-            ) : null}
             <Button
               className="h-10 rounded-xl bg-primary px-4 text-sm font-medium hover:bg-primary/92"
               disabled={isUploading}
@@ -711,7 +694,6 @@ function areAssetLibraryPagePropsEqual(
     previousProps.authSuccessMessage === nextProps.authSuccessMessage &&
     previousProps.characterOptions === nextProps.characterOptions &&
     previousProps.tagOptions === nextProps.tagOptions &&
-    previousProps.isExporting === nextProps.isExporting &&
     previousProps.isLoading === nextProps.isLoading &&
     previousProps.isUploading === nextProps.isUploading &&
     previousProps.onOpenAssetPage === nextProps.onOpenAssetPage &&

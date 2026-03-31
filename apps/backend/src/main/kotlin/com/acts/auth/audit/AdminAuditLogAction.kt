@@ -3,6 +3,7 @@ package com.acts.auth.audit
 enum class AdminAuditLogAction {
     LOGIN_SUCCESS,
     USER_ASSIGNMENT_UPDATED,
+    USER_ROLE_PROMOTED,
     USER_FEATURE_ACCESS_UPDATED,
     VIEWER_ALLOWLIST_ADDED,
     VIEWER_ALLOWLIST_REMOVED,

@@ -61,6 +61,7 @@ export interface DashboardApi {
   removeViewerAllowlist(email: string): Promise<ViewerAllowlistEntryView[]>;
   listAuditLogs(): Promise<AuditLogView[]>;
   logout(): Promise<void>;
+  promoteUserToAdmin(email: string): Promise<AuthUserView>;
   saveManualAssignment(email: string, input: ManualAssignmentInput): Promise<AuthUserView>;
   saveUserFeatureAccess(
     email: string,
@@ -376,6 +377,11 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       if (!response.ok) {
         throw new ApiError(response.status, `Logout failed with status ${response.status}.`);
       }
+    },
+    async promoteUserToAdmin(email) {
+      return readJson<AuthUserView>(`/api/auth/admin/users/${encodeURIComponent(email)}/promote`, {
+        method: "POST"
+      });
     },
     async saveManualAssignment(email, input) {
       return readJson<AuthUserView>(`/api/auth/admin/users/${encodeURIComponent(email)}/assignment`, {

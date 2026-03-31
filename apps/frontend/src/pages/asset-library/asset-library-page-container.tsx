@@ -12,7 +12,7 @@ import type {
   AuthSessionView,
   CharacterTagOptionView
 } from "../../api/types";
-import { assetTagDraftToInput, getAssetApiErrorMessage, triggerFileDownload } from "./asset-library-utils";
+import { assetTagDraftToInput, getAssetApiErrorMessage } from "./asset-library-utils";
 import { AssetLibraryPage } from "./asset-library-page";
 import { AssetUploadToastPanel } from "./asset-upload-toast-panel";
 import type {
@@ -27,7 +27,6 @@ interface AssetLibraryPageState {
   authSuccessMessage: string | null;
   characterOptions: CharacterTagOptionView[];
   tagOptions: AssetTagOptionCatalogView;
-  isExporting: boolean;
   isUploading: boolean;
   isLoading: boolean;
   session: AuthSessionView;
@@ -60,7 +59,6 @@ export function AssetLibraryPageContainer({
     authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
     characterOptions: [],
     tagOptions: emptyTagOptions,
-    isExporting: false,
     isUploading: false,
     isLoading: true,
     session: initialSession,
@@ -350,43 +348,6 @@ export function AssetLibraryPageContainer({
     dismissUploadBatch();
   }
 
-  async function handleExportAssets(): Promise<void> {
-    setState((currentState) => ({
-      ...currentState,
-      authErrorMessage: null,
-      authSuccessMessage: null,
-      isExporting: true
-    }));
-
-    try {
-      const file = await dashboardApi.exportAssets();
-      triggerFileDownload(file);
-
-      if (!isMountedRef.current) {
-        return;
-      }
-
-      setState((currentState) => ({
-        ...currentState,
-        authSuccessMessage: "내보내기 ZIP 다운로드가 시작되었습니다.",
-        isExporting: false
-      }));
-    } catch (error: unknown) {
-      if (!isMountedRef.current) {
-        return;
-      }
-
-      setState((currentState) => ({
-        ...currentState,
-        authErrorMessage: getAssetApiErrorMessage(error, {
-          denied: "전사 열람 권한이 있는 사용자만 전체 자산을 내보낼 수 있습니다.",
-          fallback: "자산 내보내기에 실패했습니다."
-        }),
-        isExporting: false
-      }));
-    }
-  }
-
   return (
     <>
       <AssetLibraryPage
@@ -395,10 +356,8 @@ export function AssetLibraryPageContainer({
         authSuccessMessage={state.authSuccessMessage}
         characterOptions={state.characterOptions}
         tagOptions={state.tagOptions}
-        isExporting={state.isExporting}
         isLoading={state.isLoading}
         isUploading={state.isUploading}
-        onExportAssets={handleExportAssets}
         onOpenAssetPage={onOpenAssetPage}
         onRegisterAssetLinks={handleRegisterAssetLinks}
         onSearchQueryChange={onSearchQueryChange}

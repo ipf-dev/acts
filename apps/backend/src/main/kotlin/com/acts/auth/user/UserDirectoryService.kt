@@ -27,7 +27,7 @@ class UserDirectoryService(
     fun syncLogin(email: String, displayName: String): AuthUserProfile {
         val normalizedEmail = email.lowercase()
         val existingAccount = userAccountRepository.findById(normalizedEmail).orElse(null)
-        val resolvedRole = existingAccount?.role ?: resolveBootstrapRole(normalizedEmail)
+        val resolvedRole = existingAccount?.role ?: UserRole.USER
         val account = existingAccount ?: UserAccountEntity(
             email = normalizedEmail,
             displayName = displayName,
@@ -66,7 +66,7 @@ class UserDirectoryService(
     ): AuthUserProfile {
         val normalizedEmail = email.lowercase()
         val existingAccount = userAccountRepository.findById(normalizedEmail).orElse(null)
-        val resolvedRole = existingAccount?.role ?: resolveBootstrapRole(normalizedEmail)
+        val resolvedRole = existingAccount?.role ?: UserRole.USER
         val account = existingAccount ?: UserAccountEntity(
             email = normalizedEmail,
             displayName = normalizedEmail.substringBefore("@"),
@@ -95,6 +95,35 @@ class UserDirectoryService(
     }
 
     @Transactional
+    fun promoteUserToAdmin(
+        email: String,
+        actorEmail: String,
+        actorName: String?,
+    ): AuthUserProfile {
+        val normalizedEmail = email.lowercase()
+        val account = userAccountRepository.findById(normalizedEmail)
+            .orElseThrow { IllegalArgumentException("승격할 사용자를 찾을 수 없습니다.") }
+        val beforeProfile = account.toProfile()
+
+        if (account.role == UserRole.ADMIN) {
+            return beforeProfile
+        }
+
+        account.role = UserRole.ADMIN
+        account.companyWideViewer = true
+
+        val savedProfile = userAccountRepository.save(account).toProfile()
+        adminAuditLogService.recordUserRolePromoted(
+            actorEmail = actorEmail,
+            actorName = actorName,
+            beforeProfile = beforeProfile,
+            afterProfile = savedProfile,
+        )
+
+        return savedProfile
+    }
+
+    @Transactional
     fun listViewerAllowlist(): List<ViewerAllowlistEntryResponse> = viewerAllowlistRepository.findAllByOrderByEmailAsc()
         .map { entry ->
             val account = userAccountRepository.findById(entry.email).orElse(null)
@@ -102,7 +131,7 @@ class UserDirectoryService(
                 email = entry.email,
                 effectiveCompanyWideViewer = resolveCompanyWideViewer(
                     email = entry.email,
-                    role = account?.role ?: resolveBootstrapRole(entry.email),
+                    role = account?.role ?: UserRole.USER,
                 ),
                 createdAt = entry.createdAt,
             )
@@ -173,14 +202,6 @@ class UserDirectoryService(
     @Transactional
     fun listAuditLogs(): List<AuditLogResponse> = adminAuditLogService.listRecentLogs()
 
-    private fun resolveBootstrapRole(email: String): UserRole = if (
-        authProperties.adminEmails.any { it.equals(email, ignoreCase = true) }
-    ) {
-        UserRole.ADMIN
-    } else {
-        UserRole.USER
-    }
-
     private fun resolveCompanyWideViewer(
         email: String,
         role: UserRole,
@@ -205,7 +226,7 @@ class UserDirectoryService(
         email = email,
         allowlisted = viewerAllowlistRepository.existsById(email),
         effectiveCompanyWideViewer = account?.let { resolveCompanyWideViewer(email, it.role) }
-            ?: resolveCompanyWideViewer(email, resolveBootstrapRole(email)),
+            ?: resolveCompanyWideViewer(email, UserRole.USER),
     )
 }
 

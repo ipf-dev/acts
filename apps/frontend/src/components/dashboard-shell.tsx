@@ -11,12 +11,10 @@ import {
 } from "lucide-react";
 import { createDashboardApi } from "../api/client";
 import type { AuthSessionView } from "../api/types";
-import { Badge } from "./ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "./ui/dropdown-menu";
@@ -82,6 +80,38 @@ export function DashboardShell({
     visibleNavigationItems.find((item) => item.key === activeNavigationKey) ?? visibleNavigationItems[0];
   const currentUser = session.user;
   const showAssetSearch = activeNavigationKey === "assets" && hasAssetLibraryAccess;
+  const roleLabel = currentUser?.role === "ADMIN" ? "관리자" : currentUser?.role === "USER" ? "일반 사용자" : "게스트";
+  const accountSummaryItems = [
+    { label: "이름", value: currentUser?.displayName ?? "게스트" },
+    { label: "역할", value: roleLabel },
+    { label: "조직", value: currentUser?.organizationName ?? "조직 미지정" }
+  ];
+
+  function renderAccountMenuContent(): React.JSX.Element {
+    return (
+      <>
+        <div className="space-y-3 px-3 py-3">
+          <div>
+            <p className="text-sm font-semibold">{currentUser?.displayName ?? "게스트"}</p>
+            <p className="mt-1 text-xs text-muted-foreground">계정 정보</p>
+          </div>
+          <div className="space-y-2 text-sm">
+            {accountSummaryItems.map((item) => (
+              <div className="flex items-center justify-between gap-3" key={item.label}>
+                <span className="text-muted-foreground">{item.label}</span>
+                <span className="text-right font-medium">{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => void handleLogout()}>
+          <LogOut className="h-4 w-4" />
+          {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
+        </DropdownMenuItem>
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -155,31 +185,14 @@ export function DashboardShell({
                         {currentUser?.displayName ?? "게스트"}
                       </p>
                       <p className="truncate text-[11px] text-muted-foreground">
-                        {currentUser?.organizationName ?? currentUser?.email ?? "로그인이 필요합니다"}
+                        {currentUser ? "이름을 눌러 계정 정보 보기" : "로그인이 필요합니다"}
                       </p>
                     </div>
                   ) : null}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top">
-                <div className="px-3 py-2">
-                  <p className="text-sm font-medium">{currentUser?.displayName ?? "게스트"}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{currentUser?.email ?? "-"}</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {currentUser?.role === "ADMIN" ? <Badge>Admin</Badge> : null}
-                    {currentUser?.companyWideViewer ? <Badge variant="success">전사 열람자</Badge> : null}
-                  </div>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>현재 세션</DropdownMenuLabel>
-                <DropdownMenuItem className="cursor-default flex-col items-start gap-1" disabled>
-                  <span>{currentUser?.organizationName ?? "조직 미지정"}</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => void handleLogout()}>
-                  <LogOut className="h-4 w-4" />
-                  {isLoggingOut ? "로그아웃 중..." : "로그아웃"}
-                </DropdownMenuItem>
+              <DropdownMenuContent align="start" className="w-64 rounded-2xl" side="top">
+                {renderAccountMenuContent()}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -192,10 +205,23 @@ export function DashboardShell({
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm">
                   <Sparkles className="h-4 w-4" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold uppercase">{title}</p>
                   <p className="truncate text-xs text-muted-foreground">AI Contents Tech Studio</p>
                 </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-sm font-medium"
+                      type="button"
+                    >
+                      {(currentUser?.displayName ?? "A").slice(0, 1)}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64 rounded-2xl" side="bottom">
+                    {renderAccountMenuContent()}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

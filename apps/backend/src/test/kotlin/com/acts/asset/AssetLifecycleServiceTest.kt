@@ -30,6 +30,11 @@ class AssetLifecycleServiceTest @Autowired constructor(
     private val organizationRepository: OrganizationRepository,
     private val userDirectoryService: UserDirectoryService,
 ) {
+    companion object {
+        private const val SEEDED_ADMIN_EMAIL = "sykim@iportfolio.co.kr"
+        private const val SEEDED_ADMIN_NAME = "김성윤"
+    }
+
     @MockBean
     private lateinit var assetBinaryStorage: AssetBinaryStorage
 
@@ -54,19 +59,19 @@ class AssetLifecycleServiceTest @Autowired constructor(
         userDirectoryService.saveManualAssignment(
             email = "coco@iportfolio.co.kr",
             organizationId = organizationId,
-            actorEmail = "admin@iportfolio.co.kr",
-            actorName = "Admin",
+            actorEmail = SEEDED_ADMIN_EMAIL,
+            actorName = SEEDED_ADMIN_NAME,
         )
 
         userDirectoryService.syncLogin(
-            email = "admin@iportfolio.co.kr",
-            displayName = "Admin",
+            email = SEEDED_ADMIN_EMAIL,
+            displayName = SEEDED_ADMIN_NAME,
         )
         userDirectoryService.saveManualAssignment(
-            email = "admin@iportfolio.co.kr",
+            email = SEEDED_ADMIN_EMAIL,
             organizationId = organizationId,
-            actorEmail = "admin@iportfolio.co.kr",
-            actorName = "Admin",
+            actorEmail = SEEDED_ADMIN_EMAIL,
+            actorName = SEEDED_ADMIN_NAME,
         )
 
         whenever(assetBinaryStorage.presignUploadUrl(any(), any(), any())).thenReturn(
@@ -94,15 +99,15 @@ class AssetLifecycleServiceTest @Autowired constructor(
                 trashRetentionDays = 14,
                 restoreEnabled = true,
             ),
-            actorEmail = "admin@iportfolio.co.kr",
-            actorName = "Admin",
+            actorEmail = SEEDED_ADMIN_EMAIL,
+            actorName = SEEDED_ADMIN_NAME,
         )
 
         val auditLog = adminAuditLogRepository.findTop50ByOrderByCreatedAtDescIdDesc()
             .first { log -> log.actionType == AdminAuditLogAction.ASSET_RETENTION_POLICY_UPDATED }
 
         assertThat(updatedPolicy.trashRetentionDays).isEqualTo(14)
-        assertThat(updatedPolicy.updatedByEmail).isEqualTo("admin@iportfolio.co.kr")
+        assertThat(updatedPolicy.updatedByEmail).isEqualTo(SEEDED_ADMIN_EMAIL)
         assertThat(auditLog.detail).contains("휴지통 보관 정책")
         assertThat(auditLog.beforeState).contains("trashRetentionDays")
         assertThat(auditLog.afterState).contains("14")

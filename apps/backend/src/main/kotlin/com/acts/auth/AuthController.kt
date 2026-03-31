@@ -165,6 +165,22 @@ class AuthController(
         }
     }
 
+    @PostMapping("/admin/users/{email}/promote")
+    fun promoteUserToAdmin(
+        @PathVariable email: String,
+        authentication: Authentication?,
+    ): ResponseEntity<AuthUserProfile> = try {
+        ResponseEntity.ok(
+            userDirectoryService.promoteUserToAdmin(
+                email = email,
+                actorEmail = currentActorEmail(authentication),
+                actorName = currentActorName(authentication),
+            ),
+        )
+    } catch (_: IllegalArgumentException) {
+        ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+    }
+
     @PutMapping("/admin/users/{email}/feature-access")
     fun updateUserFeatureAccess(
         @PathVariable email: String,

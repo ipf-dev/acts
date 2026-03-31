@@ -58,6 +58,30 @@ class AdminAuditLogService(
         )
     }
 
+    fun recordUserRolePromoted(
+        actorEmail: String,
+        actorName: String?,
+        beforeProfile: AuthUserProfile,
+        afterProfile: AuthUserProfile,
+    ) {
+        if (beforeProfile == afterProfile) {
+            return
+        }
+
+        saveAuditLog(
+            category = AuditLogCategory.PERMISSION,
+            outcome = AuditLogOutcome.SUCCESS,
+            actorEmail = actorEmail,
+            actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.USER_ROLE_PROMOTED,
+            targetEmail = afterProfile.email,
+            targetName = afterProfile.displayName,
+            detail = buildUserRolePromotionDetail(beforeProfile, afterProfile),
+            beforeState = objectMapper.writeValueAsString(UserAssignmentAuditSnapshot.from(beforeProfile)),
+            afterState = objectMapper.writeValueAsString(UserAssignmentAuditSnapshot.from(afterProfile)),
+        )
+    }
+
     fun recordUserFeatureAccessUpdated(
         actorEmail: String,
         actorName: String?,
@@ -299,6 +323,11 @@ class AdminAuditLogService(
         val afterOrg = afterProfile.organizationName ?: "미지정"
         return "${afterProfile.displayName}: ${beforeOrg} -> ${afterOrg}"
     }
+
+    private fun buildUserRolePromotionDetail(
+        beforeProfile: AuthUserProfile,
+        afterProfile: AuthUserProfile,
+    ): String = "${afterProfile.displayName}: ${beforeProfile.role.name} -> ${afterProfile.role.name}"
 
     private fun buildUserFeatureAccessDetail(
         targetName: String?,

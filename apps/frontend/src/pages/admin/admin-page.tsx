@@ -7,7 +7,6 @@ import {
   Search,
   Settings2,
   SlidersHorizontal,
-  Shield,
   Tags,
   Users
 } from "lucide-react";
@@ -23,21 +22,18 @@ import {
   SelectValue
 } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { GOOGLE_LOGIN_PATH } from "../../api/auth";
 import { cn, isBlank } from "../../lib/utils";
 import type {
   AdminAssetTagCatalogView,
   AssetRetentionPolicyView,
   DeletedAssetView,
-  AppHealthView,
   AppFeatureKeyView,
   AppFeatureView,
   AuditLogView,
   AuthSessionView,
   AuthUserView,
   OrganizationOptionView,
-  UserFeatureAuthorizationView,
-  ViewerAllowlistEntryView
+  UserFeatureAuthorizationView
 } from "../../api/types";
 import { AdminAssetTagManagement } from "./admin-asset-tag-management-panel";
 
@@ -49,25 +45,19 @@ interface AdminPageProps {
   authErrorMessage: string | null;
   authSuccessMessage: string | null;
   deletedAssets: DeletedAssetView[];
-  health: AppHealthView | null;
-  healthErrorMessage: string | null;
-  isLoading: boolean;
   isSavingPolicy: boolean;
   isSavingAssignment: boolean;
-  isSavingAllowlist: boolean;
   isSavingAssetTags: boolean;
   isSavingFeatureAccess: boolean;
+  onPromoteUserToAdmin: (email: string) => Promise<void>;
   onCreateCharacter: (name: { name: string; aliases: string[] }) => Promise<void>;
   onDeleteAssetTagValue: (tagType: "CHARACTER" | "LOCATION" | "KEYWORD", value: string) => Promise<void>;
   onDeleteCharacter: (characterId: number) => Promise<void>;
-  onAddViewerAllowlist: (email: string) => Promise<void>;
   onMergeAssetTags: (
     tagType: "CHARACTER" | "LOCATION" | "KEYWORD",
     sourceValue: string,
     targetValue: string
   ) => Promise<void>;
-  onLogout: () => Promise<void>;
-  onRemoveViewerAllowlist: (email: string) => Promise<void>;
   onRenameAssetTag: (
     tagType: "CHARACTER" | "LOCATION" | "KEYWORD",
     currentValue: string,
@@ -79,10 +69,10 @@ interface AdminPageProps {
   onSaveUserFeatureAccess: (email: string, allowedFeatureKeys: AppFeatureKeyView[]) => Promise<void>;
   onSaveManualAssignment: (email: string, organizationId: number) => Promise<void>;
   organizations: OrganizationOptionView[];
+  promotingUserEmail: string | null;
   processingDeletedAssetId: number | null;
   session: AuthSessionView;
   userFeatureAuthorizations: UserFeatureAuthorizationView[];
-  viewerAllowlist: ViewerAllowlistEntryView[];
 }
 
 interface UserAssignmentDraft {
@@ -109,6 +99,7 @@ const auditActionLabelMap: Record<string, string> = {
   LOGIN_SUCCESS: "로그인 성공",
   USER_FEATURE_ACCESS_UPDATED: "기능 권한 변경",
   USER_ASSIGNMENT_UPDATED: "사용자 조직 변경",
+  USER_ROLE_PROMOTED: "관리자 승격",
   VIEWER_ALLOWLIST_ADDED: "전사 열람자 추가",
   VIEWER_ALLOWLIST_REMOVED: "전사 열람자 제거"
 };
@@ -127,21 +118,15 @@ export function AdminPage({
   authErrorMessage,
   authSuccessMessage,
   deletedAssets,
-  health,
-  healthErrorMessage,
-  isLoading,
   isSavingPolicy,
   isSavingAssignment,
-  isSavingAllowlist,
   isSavingAssetTags,
   isSavingFeatureAccess,
+  onPromoteUserToAdmin,
   onCreateCharacter,
   onDeleteAssetTagValue,
   onDeleteCharacter,
-  onAddViewerAllowlist,
   onMergeAssetTags,
-  onLogout,
-  onRemoveViewerAllowlist,
   onRenameAssetTag,
   onRestoreDeletedAsset,
   onSaveAssetRetentionPolicy,
@@ -149,12 +134,11 @@ export function AdminPage({
   onSaveUserFeatureAccess,
   onSaveManualAssignment,
   organizations,
+  promotingUserEmail,
   processingDeletedAssetId,
   session,
-  userFeatureAuthorizations,
-  viewerAllowlist
+  userFeatureAuthorizations
 }: AdminPageProps): React.JSX.Element {
-  const [allowlistEmail, setAllowlistEmail] = useState("");
   const [auditFilter, setAuditFilter] = useState("ALL");
   const [draftsByEmail, setDraftsByEmail] = useState<Record<string, UserAssignmentDraft>>({});
   const [featureDraftsByEmail, setFeatureDraftsByEmail] = useState<Record<string, UserFeatureAccessDraft>>({});
@@ -164,12 +148,6 @@ export function AdminPage({
   const [policyDraft, setPolicyDraft] = useState<AssetRetentionPolicyView | null>(assetRetentionPolicy);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFeatureUserEmail, setSelectedFeatureUserEmail] = useState("");
-  const healthLabel = isLoading ? "Checking" : health?.ok ? "Connected" : "Unavailable";
-  const healthMessage = isLoading
-    ? "Calling the Spring Boot backend."
-    : healthErrorMessage
-      ? healthErrorMessage
-      : `Connected to ${health?.service}.`;
   const currentUser = session.user;
 
   useEffect(() => {
@@ -188,47 +166,6 @@ export function AdminPage({
     }
   }, [selectedFeatureUserEmail, userFeatureAuthorizations]);
 
-  const permissionRules = [
-    {
-      description:
-        "Google SSO는 @iportfolio.co.kr 도메인으로 제한하고, 로그인 성공은 시스템 로그와 감사 로그에 함께 저장합니다.",
-      title: "로그인 정책",
-      tone: "bg-sky-100 text-sky-700"
-    },
-    {
-      description: "최초 로그인 사용자는 미지정 상태로 저장하고, 조직은 관리자 화면에서 수동으로 지정합니다.",
-      title: "수동 지정",
-      tone: "bg-violet-100 text-violet-700"
-    },
-    {
-      description: "사용자 권한은 역할과 전사 열람자 여부로 관리하며, 전사 열람자는 이메일 allowlist로 제어합니다.",
-      title: "권한 기준",
-      tone: "bg-emerald-100 text-emerald-700"
-    },
-    {
-      description: "사용자별 기능 권한은 Allow/Deny로 분리해 저장하며, 현재 운영 중인 자산 라이브러리부터 실제 권한에 반영합니다.",
-      title: "기능 권한",
-      tone: "bg-indigo-100 text-indigo-700"
-    },
-    {
-      description: "모든 로그인 사용자는 모든 자산을 열람하고 다운로드할 수 있으며, 전사 열람자는 추가로 전체 내보내기가 가능합니다.",
-      title: "자산 접근",
-      tone: "bg-amber-100 text-amber-700"
-    },
-    {
-      description: "조직 지정, allowlist, 정책 변경, 자산 편집/삭제/내보내기 차단 이력은 모두 감사 로그에 남깁니다.",
-      title: "감사 로그",
-      tone: "bg-rose-100 text-rose-700"
-    }
-  ];
-
-  const signedInSummary = [
-    { label: "이름", value: currentUser?.displayName ?? "미로그인" },
-    { label: "역할", value: currentUser?.role ?? "게스트" },
-    { label: "조직", value: currentUser?.organizationName ?? "지정 전" },
-    { label: "전사 열람", value: currentUser?.companyWideViewer ? "허용" : "미허용" }
-  ];
-
   const visibleUsers = adminUsers.filter((user) => {
     if (isBlank(searchQuery)) {
       return true;
@@ -241,7 +178,12 @@ export function AdminPage({
     );
   });
 
+  const hiddenAuditActionTypes = new Set(["VIEWER_ALLOWLIST_ADDED", "VIEWER_ALLOWLIST_REMOVED", "ASSET_EXPORTED"]);
   const visibleAuditLogs = auditLogs.filter((log) => {
+    if (hiddenAuditActionTypes.has(log.actionType)) {
+      return false;
+    }
+
     if (auditFilter === "ALL") {
       return true;
     }
@@ -410,21 +352,29 @@ export function AdminPage({
     });
   }
 
+  async function handleRoleSelectChange(user: AuthUserView, nextRole: AuthUserView["role"]): Promise<void> {
+    if (nextRole === user.role) {
+      return;
+    }
+
+    if (nextRole !== "ADMIN") {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `${user.displayName} (${user.email}) 사용자를 ADMIN으로 승격하시겠습니까?\n다음 로그인부터 관리자 권한이 반영됩니다.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    await onPromoteUserToAdmin(user.email);
+  }
+
   async function handleFeatureAccessSave(user: UserFeatureAuthorizationView): Promise<void> {
     const draft = getFeatureDraft(user);
     await onSaveUserFeatureAccess(user.email, draft.allowedFeatureKeys);
     resetFeatureDraft(user.email);
-  }
-
-  async function handleViewerAllowlistSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-
-    if (isBlank(allowlistEmail)) {
-      return;
-    }
-
-    await onAddViewerAllowlist(allowlistEmail.trim());
-    setAllowlistEmail("");
   }
 
   async function handlePolicySave(): Promise<void> {
@@ -455,6 +405,19 @@ export function AdminPage({
         </div>
       </div>
 
+      {authSuccessMessage ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+          <p>{authSuccessMessage}</p>
+        </div>
+      ) : null}
+
+      {authErrorMessage ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
+          <p>{authErrorMessage}</p>
+        </div>
+      ) : null}
+
       <Tabs className="space-y-6" defaultValue="users">
         <TabsList className="h-auto flex-wrap justify-start gap-1 rounded-full bg-muted p-1">
           <TabsTrigger
@@ -463,13 +426,6 @@ export function AdminPage({
           >
             <Users className="mr-2 h-4 w-4" />
             사용자 관리
-          </TabsTrigger>
-          <TabsTrigger
-            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-            value="allowlist"
-          >
-            <Shield className="mr-2 h-4 w-4" />
-            권한/Allowlist
           </TabsTrigger>
           <TabsTrigger
             className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
@@ -504,68 +460,6 @@ export function AdminPage({
         <TabsContent value="users">
           <div className="space-y-6">
             <Card className="rounded-[24px] border-border shadow-none">
-              <CardHeader>
-                <CardTitle>현재 로그인 상태</CardTitle>
-                <CardDescription>
-                  Google SSO 세션과 현재 사용자에 계산된 조직/권한 상태를 확인합니다.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge variant={session.authenticated ? "success" : "warning"}>
-                    {session.authenticated ? "Signed in" : "로그인 필요"}
-                  </Badge>
-                  <Badge variant="outline">@{session.allowedDomain}</Badge>
-                  <Badge variant={health?.ok ? "success" : "warning"}>
-                    Backend {healthLabel}
-                  </Badge>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {signedInSummary.map((item) => (
-                    <div className="rounded-2xl border border-border bg-muted/50 p-4" key={item.label}>
-                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                        {item.label}
-                      </p>
-                      <p className="mt-2 text-sm font-medium">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-                  {session.authenticated
-                    ? `로그인 계정 ${currentUser?.email} 로 접속 중입니다. ${healthMessage}`
-                    : `현재는 ${session.allowedDomain} 도메인 계정만 로그인할 수 있습니다.`}
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  {session.authenticated ? (
-                    <Button onClick={() => void onLogout()} variant="secondary">
-                      Sign out
-                    </Button>
-                  ) : (
-                    <Button asChild>
-                      <a href={GOOGLE_LOGIN_PATH}>Continue with Google</a>
-                    </Button>
-                  )}
-                </div>
-
-                {authSuccessMessage ? (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                    <p>{authSuccessMessage}</p>
-                  </div>
-                ) : null}
-
-                {authErrorMessage ? (
-                  <div className="flex items-start gap-3 rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
-                    <p>{authErrorMessage}</p>
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-[24px] border-border shadow-none">
               <CardHeader className="space-y-4">
                 <div>
                   <CardTitle>사용자 관리</CardTitle>
@@ -585,9 +479,6 @@ export function AdminPage({
                       value={searchQuery}
                     />
                   </div>
-                  <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                    조직은 단일 `organizations` 테이블 기준으로 운영합니다.
-                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -595,13 +486,12 @@ export function AdminPage({
                   <div className="overflow-hidden rounded-[20px] border border-border">
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-border text-sm">
-                        <thead className="bg-muted/70 text-left text-muted-foreground">
+                        <thead className="bg-muted/70 text-left text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                           <tr>
                             <th className="px-4 py-3 font-medium">사용자</th>
                             <th className="px-4 py-3 font-medium">이메일</th>
                             <th className="px-4 py-3 font-medium">조직</th>
                             <th className="px-4 py-3 font-medium">역할</th>
-                            <th className="px-4 py-3 font-medium">전사 열람자</th>
                             <th className="px-4 py-3 font-medium">액션</th>
                           </tr>
                         </thead>
@@ -609,26 +499,23 @@ export function AdminPage({
                           {visibleUsers.length > 0 ? (
                             visibleUsers.map((user) => {
                               const draft = getDraft(user);
+                              const currentOrganizationId = user.organizationId?.toString() ?? "";
                               const canSaveAssignment =
-                                !isSavingAssignment && !isBlank(draft.organizationId);
+                                !isSavingAssignment &&
+                                !promotingUserEmail &&
+                                !isBlank(draft.organizationId) &&
+                                draft.organizationId !== currentOrganizationId;
+                              const isPromotingUser = promotingUserEmail === user.email;
 
                               return (
-                                <tr className="align-top" key={user.email}>
-                                  <td className="px-4 py-4">
-                                    <div className="flex items-center gap-3">
-                                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                                        {user.displayName.slice(0, 1)}
-                                      </div>
-                                      <div>
-                                        <p className="font-medium">{user.displayName}</p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                          {user.mappingMode === "MANUAL" ? "수동 지정됨" : "지정 필요"}
-                                        </p>
-                                      </div>
+                                <tr className="align-middle" key={user.email}>
+                                  <td className="px-4 py-3.5">
+                                    <div className="space-y-1">
+                                      <p className="text-sm font-semibold leading-5">{user.displayName}</p>
                                     </div>
                                   </td>
-                                  <td className="px-4 py-4 text-muted-foreground">{user.email}</td>
-                                  <td className="min-w-48 px-4 py-4">
+                                  <td className="px-4 py-3.5 text-sm text-muted-foreground">{user.email}</td>
+                                  <td className="min-w-48 px-4 py-3.5">
                                     <Select
                                       onValueChange={(value) =>
                                         updateDraft(user.email, { organizationId: value })
@@ -650,17 +537,26 @@ export function AdminPage({
                                       </SelectContent>
                                     </Select>
                                   </td>
-                                  <td className="px-4 py-4">
-                                    <Badge variant={user.role === "ADMIN" ? "default" : "outline"}>
-                                      {user.role === "ADMIN" ? "Admin" : "일반"}
-                                    </Badge>
+                                  <td className="min-w-40 px-4 py-3.5">
+                                    <Select
+                                      disabled={Boolean(promotingUserEmail) || user.role === "ADMIN"}
+                                      onValueChange={(value) =>
+                                        void handleRoleSelectChange(user, value as AuthUserView["role"])
+                                      }
+                                      value={user.role}
+                                    >
+                                      <SelectTrigger className="h-10 rounded-xl">
+                                        <SelectValue placeholder="역할을 선택하세요" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="USER">일반 사용자</SelectItem>
+                                        <SelectItem value="ADMIN">
+                                          {isPromotingUser ? "승격 중..." : "ADMIN"}
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
                                   </td>
-                                  <td className="px-4 py-4">
-                                    <Badge variant={user.companyWideViewer ? "success" : "outline"}>
-                                      {user.companyWideViewer ? "허용" : "미허용"}
-                                    </Badge>
-                                  </td>
-                                  <td className="px-4 py-4">
+                                  <td className="px-4 py-3.5">
                                     <Button
                                       className="h-9 rounded-xl px-3"
                                       disabled={!canSaveAssignment}
@@ -669,7 +565,7 @@ export function AdminPage({
                                       type="button"
                                       variant="secondary"
                                     >
-                                      {isSavingAssignment ? "저장 중..." : "저장"}
+                                      {isSavingAssignment ? "저장 중..." : "조직 저장"}
                                     </Button>
                                   </td>
                                 </tr>
@@ -677,7 +573,7 @@ export function AdminPage({
                             })
                           ) : (
                             <tr>
-                              <td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>
+                              <td className="px-4 py-8 text-center text-muted-foreground" colSpan={5}>
                                 검색 조건에 맞는 사용자가 없습니다. 먼저 사용자가 로그인하면 여기에 나타납니다.
                               </td>
                             </tr>
@@ -691,98 +587,6 @@ export function AdminPage({
                     관리자 권한이 있는 계정으로 로그인하면 여기서 사용자별 조직을 저장할 수 있습니다.
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="allowlist">
-          <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-            <Card className="rounded-[24px] border-border shadow-none">
-              <CardHeader>
-                <CardTitle>전사 열람자 Allowlist</CardTitle>
-                <CardDescription>
-                  전사 열람 권한이 필요한 계정을 이메일 allowlist로 관리합니다.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                {session.authenticated && currentUser?.role === "ADMIN" ? (
-                  <>
-                    <form
-                      className="grid gap-3 md:grid-cols-[1fr_auto]"
-                      onSubmit={(event) => void handleViewerAllowlistSubmit(event)}
-                    >
-                      <Input
-                        className="h-11 rounded-xl border-0 bg-muted shadow-none"
-                        onChange={(event) => setAllowlistEmail(event.target.value)}
-                        placeholder="이메일 주소 (예: leader@iportfolio.co.kr)"
-                        type="email"
-                        value={allowlistEmail}
-                      />
-                      <Button
-                        className="h-11 rounded-xl px-4"
-                        disabled={isSavingAllowlist || isBlank(allowlistEmail)}
-                        type="submit"
-                      >
-                        {isSavingAllowlist ? "추가 중..." : "추가"}
-                      </Button>
-                    </form>
-
-                    <div className="space-y-3">
-                      {viewerAllowlist.length > 0 ? (
-                        viewerAllowlist.map((entry) => (
-                          <div
-                            className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/30 p-4 md:flex-row md:items-center md:justify-between"
-                            key={entry.email}
-                          >
-                            <div>
-                              <p className="font-medium">{entry.email}</p>
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                등록일 {auditTimeFormatter.format(new Date(entry.createdAt))}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Badge variant={entry.effectiveCompanyWideViewer ? "success" : "outline"}>
-                                {entry.effectiveCompanyWideViewer ? "전사 열람 허용" : "미허용"}
-                              </Badge>
-                              <Button
-                                disabled={isSavingAllowlist}
-                                onClick={() => void onRemoveViewerAllowlist(entry.email)}
-                                type="button"
-                                variant="destructive"
-                              >
-                                제거
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                          아직 등록된 전사 열람자 allowlist가 없습니다.
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                    관리자 권한이 있는 계정으로 로그인하면 여기서 allowlist를 수정할 수 있습니다.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-[24px] border-border shadow-none">
-              <CardHeader>
-                <CardTitle>권한 규칙 요약</CardTitle>
-                <CardDescription>현재 구현된 조직/권한 규칙만 요약합니다.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {permissionRules.map((rule) => (
-                  <div className={cn("rounded-2xl p-4", rule.tone)} key={rule.title}>
-                    <p className="font-medium">{rule.title}</p>
-                    <p className="mt-2 text-sm leading-6">{rule.description}</p>
-                  </div>
-                ))}
               </CardContent>
             </Card>
           </div>
@@ -1304,7 +1108,7 @@ export function AdminPage({
               <div>
                 <CardTitle>감사 로그</CardTitle>
                 <CardDescription>
-                  로그인, 사용자 조직 변경, 자산 정책 변경, 복구 이력을 저장하고 조회합니다.
+                  로그인, 사용자 조직/역할 변경, 자산 정책 변경, 복구 이력을 저장하고 조회합니다.
                 </CardDescription>
               </div>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
