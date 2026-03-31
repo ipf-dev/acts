@@ -23,6 +23,7 @@ Problem definition -> small, safe change -> change review -> refactor.
 
 ### Available skills
 
+- `acts-aws-runtime-ops`: Handle ACTS production deploy/troubleshooting across Elastic Beanstalk, RDS, S3 direct uploads, custom domain/SSL, and preview Lambda rollouts. (file: `.agents/skills/acts-aws-runtime-ops/SKILL.md`)
 - `project-brief-sync`: Keep `docs/BRIEF.md`, `docs/ARCHITECTURE.md`, and scope decisions aligned. (file: `.agents/skills/project-brief-sync/SKILL.md`)
 - `react-feature-conventions`: Create frontend files that match the repo naming, layering, and React state/effect rules. (file: `apps/frontend/.agents/skills/react-feature-conventions/SKILL.md`)
 - `spring-boot-kotlin-conventions`: Create backend feature slices that match the repo package layout, DTO boundaries, configuration, and test rules. (file: `apps/backend/.agents/skills/spring-boot-kotlin-conventions/SKILL.md`)

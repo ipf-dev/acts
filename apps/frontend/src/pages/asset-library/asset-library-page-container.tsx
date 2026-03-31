@@ -38,6 +38,11 @@ interface AssetLibraryPageState {
   session: AuthSessionView;
 }
 
+interface RefreshableSupportingData {
+  catalogFilterOptions: AssetCatalogFilterOptionsView;
+  tagOptions: AssetTagOptionCatalogView;
+}
+
 interface AssetLibraryPageContainerProps {
   onOpenAssetPage: (assetId: number) => void;
   onSearchQueryChange: (value: string) => void;
@@ -140,10 +145,9 @@ export function AssetLibraryPageContainer({
       }
 
       try {
-        const [characterOptions, tagOptions, catalogFilterOptions] = await Promise.all([
+        const [characterOptions, supportingData] = await Promise.all([
           dashboardApi.listCharacterTagOptions(),
-          dashboardApi.listAssetTagOptions().catch(() => emptyTagOptions),
-          dashboardApi.listAssetCatalogFilterOptions().catch(() => emptyCatalogFilterOptions)
+          loadRefreshableSupportingData()
         ]);
 
         if (!isActive) {
@@ -152,9 +156,9 @@ export function AssetLibraryPageContainer({
 
         setState((currentState) => ({
           ...currentState,
-          catalogFilterOptions,
+          catalogFilterOptions: supportingData.catalogFilterOptions,
           characterOptions,
-          tagOptions,
+          tagOptions: supportingData.tagOptions,
           session: initialSession
         }));
       } catch (error: unknown) {
@@ -284,12 +288,7 @@ export function AssetLibraryPageContainer({
 
     const uploadBatchId = crypto.randomUUID();
     startFileBatch(uploadBatchId, drafts);
-    setState((currentState) => ({
-      ...currentState,
-      authErrorMessage: null,
-      authSuccessMessage: null,
-      isUploading: true
-    }));
+    beginUploadFlow();
 
     const results = await runWithConcurrency(drafts, 3, async (draft) => {
       try {
@@ -335,12 +334,7 @@ export function AssetLibraryPageContainer({
 
     const uploadBatchId = crypto.randomUUID();
     startLinkBatch(uploadBatchId, drafts);
-    setState((currentState) => ({
-      ...currentState,
-      authErrorMessage: null,
-      authSuccessMessage: null,
-      isUploading: true
-    }));
+    beginUploadFlow();
 
     try {
       markAllTasks(uploadBatchId, {
@@ -394,10 +388,7 @@ export function AssetLibraryPageContainer({
   }
 
   async function refreshSupportingData(): Promise<void> {
-    const [tagOptionsResult, catalogFilterOptionsResult] = await Promise.allSettled([
-      dashboardApi.listAssetTagOptions(),
-      dashboardApi.listAssetCatalogFilterOptions()
-    ]);
+    const supportingData = await loadRefreshableSupportingData();
 
     if (!isMountedRef.current) {
       return;
@@ -405,11 +396,8 @@ export function AssetLibraryPageContainer({
 
     setState((currentState) => ({
       ...currentState,
-      catalogFilterOptions:
-        catalogFilterOptionsResult.status === "fulfilled"
-          ? catalogFilterOptionsResult.value
-          : currentState.catalogFilterOptions,
-      tagOptions: tagOptionsResult.status === "fulfilled" ? tagOptionsResult.value : currentState.tagOptions
+      catalogFilterOptions: supportingData.catalogFilterOptions,
+      tagOptions: supportingData.tagOptions
     }));
   }
 
@@ -467,6 +455,15 @@ export function AssetLibraryPageContainer({
 
   function handleDismissUploadBatch(): void {
     dismissUploadBatch();
+  }
+
+  function beginUploadFlow(): void {
+    setState((currentState) => ({
+      ...currentState,
+      authErrorMessage: null,
+      authSuccessMessage: null,
+      isUploading: true
+    }));
   }
 
   function handleSearchQueryChange(nextValue: string): void {
@@ -590,6 +587,18 @@ function createSuccessfulResults(count: number): PromiseSettledResult<void>[] {
     status: "fulfilled",
     value: undefined
   }));
+}
+
+async function loadRefreshableSupportingData(): Promise<RefreshableSupportingData> {
+  const [tagOptions, catalogFilterOptions] = await Promise.all([
+    dashboardApi.listAssetTagOptions().catch(() => emptyTagOptions),
+    dashboardApi.listAssetCatalogFilterOptions().catch(() => emptyCatalogFilterOptions)
+  ]);
+
+  return {
+    catalogFilterOptions,
+    tagOptions
+  };
 }
 
 function buildAssetCatalogQuery({

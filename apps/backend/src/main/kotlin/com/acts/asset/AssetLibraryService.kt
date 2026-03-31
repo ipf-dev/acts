@@ -796,6 +796,8 @@ class AssetLibraryService(
 
     private fun AssetEntity.matches(query: AssetListQuery): Boolean {
         val normalizedSearchTerms = query.normalizedSearchTerms()
+        val normalizedCreatorEmail = query.normalizedCreatorEmail()
+        val normalizedAudioTtsVoice = query.normalizedAudioTtsVoice()
         if (normalizedSearchTerms.any { searchTerm -> !searchText.contains(searchTerm) }) {
             return false
         }
@@ -808,7 +810,7 @@ class AssetLibraryService(
             return false
         }
 
-        if (query.normalizedCreatorEmail() != null && !ownerEmail.equals(query.normalizedCreatorEmail(), ignoreCase = true)) {
+        if (normalizedCreatorEmail != null && !ownerEmail.equals(normalizedCreatorEmail, ignoreCase = true)) {
             return false
         }
 
@@ -820,10 +822,7 @@ class AssetLibraryService(
             return false
         }
 
-        if (
-            query.normalizedAudioTtsVoice() != null &&
-            !(audioTtsVoice?.lowercase()?.contains(query.normalizedAudioTtsVoice()!!) ?: false)
-        ) {
+        if (normalizedAudioTtsVoice != null && !(audioTtsVoice?.lowercase()?.contains(normalizedAudioTtsVoice) ?: false)) {
             return false
         }
 

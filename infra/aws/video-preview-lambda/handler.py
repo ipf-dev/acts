@@ -32,15 +32,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "previewObjectKey": preview_object_key,
         }
 
-    source_url = s3.generate_presigned_url(
-        "get_object",
-        Params={"Bucket": bucket, "Key": object_key},
-        ExpiresIn=SOURCE_URL_EXPIRATION_SECONDS,
-    )
-
     with tempfile.TemporaryDirectory(prefix="acts-video-preview-") as temp_dir:
+        source_path = Path(temp_dir) / "source"
         output_path = Path(temp_dir) / "preview.jpg"
-        run_ffmpeg(source_url=source_url, output_path=output_path, context=context)
+        download_source_object(bucket=bucket, object_key=object_key, output_path=source_path)
+        run_ffmpeg(source_path=source_path, output_path=output_path, context=context)
 
         with output_path.open("rb") as preview_file:
             s3.put_object(
@@ -63,7 +59,25 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     }
 
 
-def run_ffmpeg(source_url: str, output_path: Path, context: Any) -> None:
+def download_source_object(bucket: str, object_key: str, output_path: Path) -> None:
+    try:
+        s3.download_file(bucket, object_key, str(output_path))
+    except ClientError as exception:
+        raise RuntimeError(
+            json.dumps(
+                {
+                    "message": "failed to download source object",
+                    "bucket": bucket,
+                    "objectKey": object_key,
+                    "errorCode": exception.response.get("Error", {}).get("Code"),
+                    "errorMessage": exception.response.get("Error", {}).get("Message"),
+                },
+                ensure_ascii=False,
+            ),
+        ) from exception
+
+
+def run_ffmpeg(source_path: Path, output_path: Path, context: Any) -> None:
     timeout_seconds = 55
     if context is not None and hasattr(context, "get_remaining_time_in_millis"):
         timeout_seconds = max(5, int(context.get_remaining_time_in_millis() / 1000) - 3)
@@ -78,7 +92,7 @@ def run_ffmpeg(source_url: str, output_path: Path, context: Any) -> None:
         "-ss",
         THUMBNAIL_AT,
         "-i",
-        source_url,
+        str(source_path),
         "-frames:v",
         "1",
         "-vf",

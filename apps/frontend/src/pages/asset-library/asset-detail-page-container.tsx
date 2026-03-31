@@ -33,6 +33,12 @@ interface AssetDetailPageState {
   session: AuthSessionView;
 }
 
+interface LoadedAssetPageData {
+  asset: AssetDetailView;
+  characterOptions: CharacterTagOptionView[];
+  relatedAssets: AssetSummaryView[];
+}
+
 interface AssetDetailPageContainerProps {
   assetId: number;
   onBack: () => void;
@@ -105,7 +111,7 @@ export function AssetDetailPageContainer({
           dashboardApi.getAsset(assetId),
           dashboardApi.listCharacterTagOptions()
         ]);
-        const relatedAssets = await loadRelatedAssets(asset);
+        const loadedPageData = await buildLoadedAssetPageData(asset, characterOptions);
 
         if (!isActive) {
           return;
@@ -113,20 +119,20 @@ export function AssetDetailPageContainer({
 
         setState((currentState) => ({
           ...currentState,
-          asset,
+          asset: loadedPageData.asset,
           authErrorMessage: getLoginFailureMessage(initialLocationSearch),
           authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
-          characterOptions,
+          characterOptions: loadedPageData.characterOptions,
           isLoading: false,
-          isLoadingPlayback: shouldLoadPlaybackUrl(asset),
+          isLoadingPlayback: shouldLoadPlaybackUrl(loadedPageData.asset),
           playbackErrorMessage: null,
           playbackUrl: null,
-          relatedAssets,
+          relatedAssets: loadedPageData.relatedAssets,
           session: initialSession
         }));
 
-        if (shouldLoadPlaybackUrl(asset)) {
-          void loadPlaybackUrl(asset.id);
+        if (shouldLoadPlaybackUrl(loadedPageData.asset)) {
+          void loadPlaybackUrl(loadedPageData.asset.id);
         }
       } catch (error: unknown) {
         if (!isActive) {
@@ -207,15 +213,15 @@ export function AssetDetailPageContainer({
         dashboardApi.updateAsset(assetId, input),
         dashboardApi.listCharacterTagOptions()
       ]);
-      const relatedAssets = await loadRelatedAssets(asset);
+      const loadedPageData = await buildLoadedAssetPageData(asset, characterOptions);
 
       setState((currentState) => ({
         ...currentState,
-        asset,
+        asset: loadedPageData.asset,
         authSuccessMessage: "애셋 정보가 업데이트되었습니다.",
-        characterOptions,
+        characterOptions: loadedPageData.characterOptions,
         isSaving: false,
-        relatedAssets
+        relatedAssets: loadedPageData.relatedAssets
       }));
     } catch (error: unknown) {
       setState((currentState) => ({
@@ -349,6 +355,17 @@ async function loadRelatedAssets(asset: AssetDetailView): Promise<AssetSummaryVi
   });
 
   return buildRelatedAssets(asset, relatedCatalog.items);
+}
+
+async function buildLoadedAssetPageData(
+  asset: AssetDetailView,
+  characterOptions: CharacterTagOptionView[]
+): Promise<LoadedAssetPageData> {
+  return {
+    asset,
+    characterOptions,
+    relatedAssets: await loadRelatedAssets(asset)
+  };
 }
 
 function buildRelatedAssets(asset: AssetDetailView, candidates: AssetSummaryView[]): AssetSummaryView[] {
