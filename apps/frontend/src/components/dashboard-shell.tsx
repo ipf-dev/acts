@@ -5,7 +5,6 @@ import {
   ChevronRight,
   FolderOpen,
   LogOut,
-  Search,
   ShieldCheck,
   Sparkles
 } from "lucide-react";
@@ -18,17 +17,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "./ui/dropdown-menu";
-import { Input } from "./ui/input";
 import { cn } from "../lib/utils";
 
 export type DashboardNavigationKey = "assets" | "admin";
 
 interface DashboardShellProps {
   activeNavigationKey: DashboardNavigationKey;
-  assetSearchQuery: string;
   children: React.ReactNode;
   onNavigate: (navigationKey: DashboardNavigationKey) => void;
-  onSearchAssetLibrary: (value: string) => void;
   session: AuthSessionView;
   title: string;
 }
@@ -42,10 +38,8 @@ const navigationItems = [
 
 export function DashboardShell({
   activeNavigationKey,
-  assetSearchQuery,
   children,
   onNavigate,
-  onSearchAssetLibrary,
   session,
   title
 }: DashboardShellProps): React.JSX.Element {
@@ -76,10 +70,7 @@ export function DashboardShell({
       (item.key !== "admin" || session.user?.role === "ADMIN") &&
       (item.key !== "assets" || hasAssetLibraryAccess)
   );
-  const activeNavigationItem =
-    visibleNavigationItems.find((item) => item.key === activeNavigationKey) ?? visibleNavigationItems[0];
   const currentUser = session.user;
-  const showAssetSearch = activeNavigationKey === "assets" && hasAssetLibraryAccess;
   const roleLabel = currentUser?.role === "ADMIN" ? "관리자" : currentUser?.role === "USER" ? "일반 사용자" : "게스트";
   const accountSummaryItems = [
     { label: "이름", value: currentUser?.displayName ?? "게스트" },
@@ -199,79 +190,6 @@ export function DashboardShell({
         </aside>
 
         <div className="flex min-h-screen flex-col">
-          <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-            <div className="flex flex-col gap-3 px-4 py-4 lg:px-6">
-              <div className="flex items-center gap-3 lg:hidden">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold uppercase">{title}</p>
-                  <p className="truncate text-xs text-muted-foreground">AI Contents Tech Studio</p>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-sm font-medium"
-                      type="button"
-                    >
-                      {(currentUser?.displayName ?? "A").slice(0, 1)}
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64 rounded-2xl" side="bottom">
-                    {renderAccountMenuContent()}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                {showAssetSearch ? (
-                  <div className="relative w-full max-w-[450px]">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      className="h-11 rounded-xl border-0 bg-muted pl-9 shadow-none"
-                      onChange={(event) => onSearchAssetLibrary(event.target.value)}
-                      placeholder="애셋 검색... (캐릭터, 태그, 키워드)"
-                      value={assetSearchQuery}
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Workspace</p>
-                    <p className="mt-1 text-sm font-medium">{activeNavigationItem?.label ?? "접근 불가"}</p>
-                  </div>
-                )}
-
-                {currentUser ? (
-                  <div className="hidden text-right lg:block">
-                    <p className="text-sm font-medium">{currentUser.organizationName ?? "조직 미지정"}</p>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:hidden">
-                {visibleNavigationItems.map((item) => {
-                  const Icon = item.icon;
-
-                  return (
-                    <button
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm",
-                        item.key === activeNavigationKey && "border-primary/20 bg-primary text-primary-foreground"
-                      )}
-                      key={item.key}
-                      onClick={() => onNavigate(item.key)}
-                      type="button"
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </header>
-
           <main className="flex-1 px-4 py-6 lg:px-6 lg:py-6">
             {visibleNavigationItems.length === 0 ? (
               <div className="flex min-h-[60vh] items-center justify-center">

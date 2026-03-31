@@ -121,9 +121,7 @@ export function App(): React.JSX.Element {
   return (
     <DashboardShell
       activeNavigationKey={locationState.activeNavigationKey}
-      assetSearchQuery={assetSearchQuery}
       onNavigate={handleNavigation}
-      onSearchAssetLibrary={setAssetSearchQuery}
       session={session ?? createAnonymousSession()}
       title="acts"
     >

@@ -83,8 +83,6 @@ interface UserFeatureAccessDraft {
   allowedFeatureKeys: AppFeatureKeyView[];
 }
 
-type FeatureAccessFilter = "ALL" | "ALLOWED" | "DENIED" | "CHANGED";
-
 const auditTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "short",
   timeStyle: "short"
@@ -109,6 +107,10 @@ const auditCategoryLabelMap: Record<string, string> = {
   PERMISSION: "권한",
   POLICY: "정책"
 };
+
+function formatUserRoleLabel(role: AuthUserView["role"] | UserFeatureAuthorizationView["role"]): string {
+  return role === "ADMIN" ? "관리자" : "일반 사용자";
+}
 
 export function AdminPage({
   adminUsers,
@@ -142,8 +144,6 @@ export function AdminPage({
   const [auditFilter, setAuditFilter] = useState("ALL");
   const [draftsByEmail, setDraftsByEmail] = useState<Record<string, UserAssignmentDraft>>({});
   const [featureDraftsByEmail, setFeatureDraftsByEmail] = useState<Record<string, UserFeatureAccessDraft>>({});
-  const [featureSearchQuery, setFeatureSearchQuery] = useState("");
-  const [featureStatusFilter, setFeatureStatusFilter] = useState<FeatureAccessFilter>("ALL");
   const [featureUserQuery, setFeatureUserQuery] = useState("");
   const [policyDraft, setPolicyDraft] = useState<AssetRetentionPolicyView | null>(assetRetentionPolicy);
   const [searchQuery, setSearchQuery] = useState("");
@@ -225,34 +225,15 @@ export function AdminPage({
   const selectedAllowedCount = selectedFeatureDraft?.allowedFeatureKeys.length ?? 0;
   const selectedDeniedCount = selectedFeatureCatalog.length - selectedAllowedCount;
   const selectedFeatureChangeCount = selectedChangedFeatureKeySet.size;
-  const changedFeatureUserCount = visibleFeatureUsers.filter((user) => countChangedFeatures(user) > 0).length;
-  const visibleSelectedFeatures = selectedFeatureCatalog
-    .filter((feature) => {
-      const normalizedQuery = featureSearchQuery.trim().toLowerCase();
-      const matchesQuery =
-        normalizedQuery.length === 0 ||
-        feature.label.toLowerCase().includes(normalizedQuery) ||
-        feature.description.toLowerCase().includes(normalizedQuery) ||
-        feature.key.toLowerCase().includes(normalizedQuery);
-
-      if (!matchesQuery) {
-        return false;
-      }
-
-      const isAllowed = selectedFeatureDraft?.allowedFeatureKeys.includes(feature.key) ?? false;
-      const isChanged = selectedChangedFeatureKeySet.has(feature.key);
-
-      switch (featureStatusFilter) {
-        case "ALLOWED":
-          return isAllowed;
-        case "DENIED":
-          return !isAllowed;
-        case "CHANGED":
-          return isChanged;
-        default:
-          return true;
-      }
-    })
+  const selectedFeatureLocked = selectedFeatureUser?.featureAccessLocked ?? false;
+  const selectedFeatureRoleLabel = selectedFeatureUser ? formatUserRoleLabel(selectedFeatureUser.role) : null;
+  const canResetSelectedFeatureAccess =
+    Boolean(selectedFeatureUser) &&
+    !isSavingFeatureAccess &&
+    !selectedFeatureLocked &&
+    selectedFeatureChangeCount > 0;
+  const canSaveSelectedFeatureAccess = canResetSelectedFeatureAccess;
+  const visibleSelectedFeatures = [...selectedFeatureCatalog]
     .sort((left, right) => {
       const changedDelta =
         Number(selectedChangedFeatureKeySet.has(right.key)) - Number(selectedChangedFeatureKeySet.has(left.key));
@@ -595,12 +576,8 @@ export function AdminPage({
         <TabsContent value="features">
           <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
             <Card className="rounded-[24px] border-border shadow-none">
-              <CardHeader>
+              <CardHeader className="space-y-4">
                 <CardTitle>권한 대상 사용자</CardTitle>
-                <CardDescription>
-                  사용자를 먼저 찾고 선택한 뒤, 오른쪽에서 기능별 Allow/Deny를 한 번에
-                  조정합니다.
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 {session.authenticated && currentUser?.role === "ADMIN" ? (
@@ -617,60 +594,54 @@ export function AdminPage({
                         />
                       </div>
 
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <p>총 {visibleFeatureUsers.length}명 표시</p>
-                        <p>저장 전 변경 {changedFeatureUserCount}명</p>
-                      </div>
-
                       {visibleFeatureUsers.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="max-h-[760px] space-y-3 overflow-y-auto pr-1">
                           {visibleFeatureUsers.map((user) => {
                             const isSelected = user.email === selectedFeatureUserEmail;
                             const changedCount = countChangedFeatures(user);
                             const featureCount = user.allowedFeatures.length + user.deniedFeatures.length;
+                            const userRoleLabel = formatUserRoleLabel(user.role);
 
                             return (
                               <button
                                 aria-pressed={isSelected}
                                 className={cn(
-                                  "w-full rounded-[20px] border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                  "w-full rounded-[22px] border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                                   isSelected
-                                    ? "border-primary bg-primary/5 shadow-sm"
-                                    : "border-border bg-muted/20 hover:border-primary/40 hover:bg-muted/35"
+                                    ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/10"
+                                    : "border-border bg-muted/15 hover:border-primary/40 hover:bg-muted/30"
                                 )}
                                 key={user.email}
                                 onClick={() => setSelectedFeatureUserEmail(user.email)}
                                 type="button"
                               >
                                 <span className="flex items-start justify-between gap-3">
-                                  <span className="min-w-0">
-                                    <span className="block truncate font-semibold">{user.displayName}</span>
-                                    <span className="mt-1 block truncate text-sm text-muted-foreground">
+                                  <span className="min-w-0 flex-1">
+                                    <span className="flex flex-wrap items-center gap-2">
+                                      <span className="truncate text-sm font-semibold leading-5">
+                                        {user.displayName}
+                                      </span>
+                                      <Badge variant={user.role === "ADMIN" ? "default" : "outline"}>
+                                        {userRoleLabel}
+                                      </Badge>
+                                    </span>
+                                    <span className="mt-1 block truncate text-[13px] leading-5 text-muted-foreground">
                                       {user.email}
                                     </span>
                                   </span>
-                                  <span className="flex shrink-0 flex-col items-end gap-2">
-                                    <span
-                                      className={cn(
-                                        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                                        user.role === "ADMIN"
-                                          ? "border-transparent bg-primary text-primary-foreground"
-                                          : "border-border text-foreground"
-                                      )}
-                                    >
-                                      {user.role === "ADMIN" ? "Admin" : "User"}
-                                    </span>
+                                  <span className="flex shrink-0 items-center">
                                     {changedCount > 0 ? (
-                                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                                      <Badge variant="warning">
                                         변경 {changedCount}
-                                      </span>
+                                      </Badge>
                                     ) : null}
                                   </span>
                                 </span>
-                                <span className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                  <span>{user.organizationName ?? "조직 미지정"}</span>
-                                  <span aria-hidden="true">·</span>
-                                  <span>
+                                <span className="mt-3 flex flex-wrap items-center gap-2 text-[13px] leading-5 text-muted-foreground">
+                                  <span className="inline-flex items-center rounded-full border border-border bg-background px-2.5 py-1">
+                                    {user.organizationName ?? "조직 미지정"}
+                                  </span>
+                                  <span className="inline-flex items-center rounded-full border border-border bg-background px-2.5 py-1">
                                     {user.featureAccessLocked
                                       ? "모든 기능 Allow 고정"
                                       : `관리 대상 기능 ${featureCount}개`}
@@ -700,93 +671,37 @@ export function AdminPage({
             </Card>
 
             <Card className="rounded-[24px] border-border shadow-none">
-              <CardHeader>
-                <CardTitle>기능 권한 매트릭스</CardTitle>
+              <CardHeader className="space-y-4">
+                <CardTitle>기능 권한</CardTitle>
                 <CardDescription>
-                  기능별 상태, 저장 전 변경 여부, 실제 연결 여부를 같은 행에서 확인하고 바로
-                  Allow/Deny를 바꿉니다.
+                  기능별 상태를 확인하고 해당 사용자의 기능별 Allow/Deny를 바꿉니다.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 {session.authenticated && currentUser?.role === "ADMIN" ? (
                   selectedFeatureUser ? (
-                  <>
-                    <div className="space-y-4 rounded-[24px] border border-border bg-muted/20 p-5">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div>
-                          <p className="text-lg font-semibold">{selectedFeatureUser.displayName}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">
+                    <>
+                    <div className="space-y-5 rounded-[24px] border border-border bg-muted/20 p-5">
+                      <div className="flex flex-col gap-4 border-b border-border/70 pb-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xl font-semibold leading-7">{selectedFeatureUser.displayName}</p>
+                            <Badge variant={selectedFeatureUser.role === "ADMIN" ? "default" : "outline"}>
+                              {selectedFeatureRoleLabel}
+                            </Badge>
+                            {selectedFeatureLocked ? <Badge variant="warning">고정 권한</Badge> : null}
+                            {selectedFeatureChangeCount > 0 ? (
+                              <Badge variant="warning">저장 전 변경 {selectedFeatureChangeCount}</Badge>
+                            ) : null}
+                          </div>
+                          <p className="text-[13px] leading-5 text-muted-foreground">
                             {selectedFeatureUser.email}
                           </p>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant={selectedFeatureUser.role === "ADMIN" ? "default" : "outline"}>
-                            {selectedFeatureUser.role === "ADMIN" ? "Admin" : "일반 사용자"}
-                          </Badge>
-                          <Badge variant={selectedFeatureUser.featureAccessLocked ? "warning" : "secondary"}>
-                            {selectedFeatureUser.featureAccessLocked ? "모든 기능 Allow 고정" : "개별 편집 가능"}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div className="rounded-2xl border border-border bg-card p-4">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                            조직
-                          </p>
-                          <p className="mt-2 text-sm font-medium">
-                            {selectedFeatureUser.organizationName ?? "조직 미지정"}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-border bg-card p-4">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                            현재 상태
-                          </p>
-                          <p className="mt-2 text-sm font-medium">
-                            Allow {selectedAllowedCount}개 · Deny {selectedDeniedCount}개
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-border bg-card p-4">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                            저장 전 변경
-                          </p>
-                          <p className="mt-2 text-sm font-medium">
-                            {selectedFeatureChangeCount === 0
-                              ? "없음"
-                              : `${selectedFeatureChangeCount}개 기능이 바뀌었습니다.`}
-                          </p>
-                        </div>
-                        <div className="rounded-2xl border border-border bg-card p-4">
-                          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                            반영 방식
-                          </p>
-                          <p className="mt-2 text-sm font-medium">
-                            {selectedFeatureUser.featureAccessLocked
-                              ? "Admin은 저장 없이 항상 전체 접근"
-                              : "저장하면 즉시 API 권한에 반영"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <p className="text-sm font-medium">기능별 Allow/Deny를 한 화면에서 조정합니다.</p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {selectedFeatureUser.featureAccessLocked
-                              ? "Admin 계정은 기능 권한을 별도로 저장하지 않습니다."
-                              : selectedFeatureChangeCount > 0
-                                ? `저장 전 변경 ${selectedFeatureChangeCount}개를 검토한 뒤 저장하세요.`
-                                : "변경된 기능이 없습니다."}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 lg:justify-end">
                           <Button
                             className="h-10 rounded-xl px-4"
-                            disabled={
-                              isSavingFeatureAccess ||
-                              selectedFeatureUser.featureAccessLocked ||
-                              selectedFeatureChangeCount === 0
-                            }
+                            disabled={!canResetSelectedFeatureAccess}
                             onClick={() => resetFeatureDraft(selectedFeatureUser.email)}
                             type="button"
                             variant="outline"
@@ -795,15 +710,11 @@ export function AdminPage({
                           </Button>
                           <Button
                             className="h-10 rounded-xl px-4"
-                            disabled={
-                              isSavingFeatureAccess ||
-                              selectedFeatureUser.featureAccessLocked ||
-                              selectedFeatureChangeCount === 0
-                            }
+                            disabled={!canSaveSelectedFeatureAccess}
                             onClick={() => void handleFeatureAccessSave(selectedFeatureUser)}
                             type="button"
                           >
-                            {selectedFeatureUser.featureAccessLocked
+                            {selectedFeatureLocked
                               ? "Admin 고정"
                               : isSavingFeatureAccess
                                 ? "저장 중..."
@@ -811,33 +722,25 @@ export function AdminPage({
                           </Button>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-                      <div className="relative">
-                        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          aria-label="기능 검색"
-                          className="h-11 rounded-xl border-0 bg-muted pl-11 shadow-none"
-                          onChange={(event) => setFeatureSearchQuery(event.target.value)}
-                          placeholder="기능 이름, 설명, 키로 검색"
-                          value={featureSearchQuery}
-                        />
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-[20px] border border-border bg-card p-4">
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                            조직
+                          </p>
+                          <p className="mt-2 text-sm font-semibold leading-5">
+                            {selectedFeatureUser.organizationName ?? "조직 미지정"}
+                          </p>
+                        </div>
+                        <div className="rounded-[20px] border border-border bg-card p-4">
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                            현재 상태
+                          </p>
+                          <p className="mt-2 text-sm font-semibold leading-5">
+                            Allow {selectedAllowedCount}개 · Deny {selectedDeniedCount}개
+                          </p>
+                        </div>
                       </div>
-                      <Select
-                        onValueChange={(value) => setFeatureStatusFilter(value as FeatureAccessFilter)}
-                        value={featureStatusFilter}
-                      >
-                        <SelectTrigger className="h-11 rounded-xl border-border bg-background">
-                          <SelectValue placeholder="상태 필터" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ALL">전체 기능</SelectItem>
-                          <SelectItem value="ALLOWED">Allow만</SelectItem>
-                          <SelectItem value="DENIED">Deny만</SelectItem>
-                          <SelectItem value="CHANGED">변경된 항목만</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
 
                     {visibleSelectedFeatures.length > 0 ? (
@@ -846,17 +749,16 @@ export function AdminPage({
                           const isAllowed =
                             selectedFeatureDraft?.allowedFeatureKeys.includes(feature.key) ?? false;
                           const isChanged = selectedChangedFeatureKeySet.has(feature.key);
-                          const actionDisabled =
-                            isSavingFeatureAccess || selectedFeatureUser.featureAccessLocked;
+                          const actionDisabled = isSavingFeatureAccess || selectedFeatureLocked;
 
                           return (
                             <div
-                              className="flex flex-col gap-4 rounded-[22px] border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between"
+                              className="flex flex-col gap-4 rounded-[22px] border border-border bg-card p-5 lg:flex-row lg:items-start lg:justify-between"
                               key={feature.key}
                             >
-                              <div className="space-y-2">
+                              <div className="min-w-0 space-y-3">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <p className="font-semibold">{feature.label}</p>
+                                  <p className="text-sm font-semibold leading-6">{feature.label}</p>
                                   <Badge variant={isAllowed ? "success" : "outline"}>
                                     {isAllowed ? "Allow" : "Deny"}
                                   </Badge>
@@ -868,16 +770,18 @@ export function AdminPage({
                                 <p className="text-sm leading-6 text-muted-foreground">
                                   {feature.description}
                                 </p>
-                                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                                  {feature.key}
-                                </p>
+                                <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                                  <span>{feature.key}</span>
+                                  <span aria-hidden="true">•</span>
+                                  <span>{isAllowed ? "현재 Allow" : "현재 Deny"}</span>
+                                </div>
                               </div>
 
-                              <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-border bg-muted/20 p-1">
+                              <div className="flex shrink-0 items-center gap-2 self-start rounded-2xl border border-border bg-muted/20 p-1.5">
                                 <button
                                   aria-pressed={isAllowed}
                                   className={cn(
-                                    "rounded-xl px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                    "min-w-[92px] rounded-xl px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                                     isAllowed
                                       ? "bg-emerald-500 text-white shadow-sm"
                                       : "text-muted-foreground hover:bg-background"
@@ -891,7 +795,7 @@ export function AdminPage({
                                 <button
                                   aria-pressed={!isAllowed}
                                   className={cn(
-                                    "rounded-xl px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                    "min-w-[92px] rounded-xl px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                                     !isAllowed
                                       ? "bg-slate-900 text-white shadow-sm"
                                       : "text-muted-foreground hover:bg-background"
