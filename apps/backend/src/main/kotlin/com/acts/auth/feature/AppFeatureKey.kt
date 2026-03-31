@@ -8,7 +8,7 @@ enum class AppFeatureKey(
 ) {
     ASSET_LIBRARY(
         label = "자산 라이브러리",
-        description = "업로드된 자산을 검색하고 상세를 확인하는 현재 운영 기능입니다.",
+        description = "자산을 업로드/조회/검색하고 상세를 확인하는 기능입니다.",
         defaultAllowed = true,
         implemented = true,
     ),
