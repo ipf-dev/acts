@@ -49,6 +49,7 @@ AI 기반 콘텐츠 제작 및 관리 플랫폼이다. 이 문서는 왜 지금 
 
 - `@iportfolio.co.kr` 도메인으로 제한된 Google SSO 로그인
 - 프로젝트 진입 전 branded landing page에서 Google SSO 로그인 진입과 실패 안내
+- 로그인 이후 사이드바에서 새 탭으로 열 수 있는 내부 사용 메뉴얼 링크
 - Google SSO 로그인 성공 이벤트 로깅과 실패 사유 알림
 - PostgreSQL 클러스터 기반 사용자 디렉터리, 단일 조직 마스터, 관리자 감사 로그
 - 운영 사용자/조직 bootstrap은 저장소 밖에서 수동 관리하고, 역할은 PostgreSQL에 직접 반영

@@ -85,6 +85,7 @@ Default directory direction:
 Expected first-slice frontend surfaces:
 
 - branded landing page as the pre-auth entry, then authenticated shell navigation for assets/admin
+- authenticated shell navigation에서 새 탭으로 여는 정적 사용 메뉴얼 링크
 - login entry, session status, and admin override screens
 - user-facing auth failure notification after login redirects
 - Figma Make 기준의 shell 레이아웃, 현재 사용자 프로필 메뉴, 자산 검색 헤더

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import type React from "react";
 import {
+  BookOpenText,
   ChevronLeft,
   ChevronRight,
   FolderOpen,
+  type LucideIcon,
   LogOut,
   ShieldCheck
 } from "lucide-react";
@@ -30,10 +32,21 @@ interface DashboardShellProps {
 
 const dashboardApi = createDashboardApi();
 
+type NavigationItem =
+  | { icon: LucideIcon; key: DashboardNavigationKey; label: string; type: "internal" }
+  | { href: string; icon: LucideIcon; key: "manual"; label: string; type: "external" };
+
 const navigationItems = [
-  { icon: FolderOpen, key: "assets" as const, label: "자산 라이브러리" },
-  { icon: ShieldCheck, key: "admin" as const, label: "관리자 설정" }
-];
+  { icon: FolderOpen, key: "assets", label: "자산 라이브러리", type: "internal" },
+  {
+    href: "/acts-user-manual.html",
+    icon: BookOpenText,
+    key: "manual",
+    label: "사용 메뉴얼",
+    type: "external"
+  },
+  { icon: ShieldCheck, key: "admin", label: "관리자 설정", type: "internal" }
+] satisfies NavigationItem[];
 
 export function DashboardShell({
   activeNavigationKey,
@@ -65,8 +78,9 @@ export function DashboardShell({
 
   const visibleNavigationItems = navigationItems.filter(
     (item) =>
-      (item.key !== "admin" || session.user?.role === "ADMIN") &&
-      (item.key !== "assets" || hasAssetLibraryAccess)
+      item.key === "manual" ||
+      ((item.key !== "admin" || session.user?.role === "ADMIN") &&
+        (item.key !== "assets" || hasAssetLibraryAccess))
   );
   const currentUser = session.user;
   const roleLabel = currentUser?.role === "ADMIN" ? "관리자" : currentUser?.role === "USER" ? "일반 사용자" : "게스트";
@@ -140,6 +154,26 @@ export function DashboardShell({
           <nav className="flex-1 space-y-1 px-2 py-3">
             {visibleNavigationItems.map((item) => {
               const Icon = item.icon;
+              const navigationBody = (
+                <>
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {!collapsed ? <span>{item.label}</span> : null}
+                </>
+              );
+
+              if (item.type === "external") {
+                return (
+                  <a
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground"
+                    href={item.href}
+                    key={item.key}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {navigationBody}
+                  </a>
+                );
+              }
 
               return (
                 <button
@@ -151,8 +185,7 @@ export function DashboardShell({
                   onClick={() => onNavigate(item.key)}
                   type="button"
                 >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  {!collapsed ? <span>{item.label}</span> : null}
+                  {navigationBody}
                 </button>
               );
             })}
