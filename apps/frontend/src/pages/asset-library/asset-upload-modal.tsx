@@ -289,7 +289,7 @@ export function AssetUploadModal({
         <DialogHeader className="border-b border-border px-6 py-5 text-left">
           <DialogTitle className="text-xl tracking-tight">애셋 업로드</DialogTitle>
           <DialogDescription className="mt-1">
-            파일 업로드는 기존 경로를 유지하고, 링크 등록은 S3 없이 라이브러리에 바로 반영됩니다.
+            가지고 있는 파일은 업로드로, 유투브 영상이나 작업중인 구글 Docs 시나리오는 링크 등록으로 간편하게 추가해 보세요.
           </DialogDescription>
         </DialogHeader>
 

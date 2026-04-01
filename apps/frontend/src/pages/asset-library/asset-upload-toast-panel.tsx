@@ -218,5 +218,5 @@ const taskStatusLabelMap: Record<AssetUploadTaskStatusView, string> = {
   FAILED: "업로드에 실패했습니다.",
   FINALIZING: "애셋 등록을 마무리하는 중입니다.",
   PENDING: "업로드를 준비하는 중입니다.",
-  UPLOADING: "S3에 파일을 업로드하는 중입니다."
+  UPLOADING: "파일을 업로드하는 중입니다."
 };
