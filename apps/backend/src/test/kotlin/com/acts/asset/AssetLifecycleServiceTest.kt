@@ -9,6 +9,11 @@ import com.acts.auth.audit.AdminAuditLogAction
 import com.acts.auth.audit.AdminAuditLogRepository
 import com.acts.auth.org.OrganizationRepository
 import com.acts.auth.user.UserDirectoryService
+import com.acts.support.TEST_ADMIN_EMAIL
+import com.acts.support.TEST_ADMIN_NAME
+import com.acts.support.TEST_CREATOR_EMAIL
+import com.acts.support.TEST_CREATOR_NAME
+import com.acts.support.TEST_MARKETING_ORG_NAME
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -30,11 +35,6 @@ class AssetLifecycleServiceTest @Autowired constructor(
     private val organizationRepository: OrganizationRepository,
     private val userDirectoryService: UserDirectoryService,
 ) {
-    companion object {
-        private const val SEEDED_ADMIN_EMAIL = "sykim@iportfolio.co.kr"
-        private const val SEEDED_ADMIN_NAME = "김성윤"
-    }
-
     @MockBean
     private lateinit var assetBinaryStorage: AssetBinaryStorage
 
@@ -48,30 +48,30 @@ class AssetLifecycleServiceTest @Autowired constructor(
     fun prepareUsers() {
         val organizationId = requireNotNull(
             organizationRepository.findAllByOrderByNameAsc()
-                .first { organization -> organization.name == "마케팅팀" }
+                .first { organization -> organization.name == TEST_MARKETING_ORG_NAME }
                 .id,
         )
 
         userDirectoryService.syncLogin(
-            email = "coco@iportfolio.co.kr",
-            displayName = "Coco",
+            email = TEST_CREATOR_EMAIL,
+            displayName = TEST_CREATOR_NAME,
         )
         userDirectoryService.saveManualAssignment(
-            email = "coco@iportfolio.co.kr",
+            email = TEST_CREATOR_EMAIL,
             organizationId = organizationId,
-            actorEmail = SEEDED_ADMIN_EMAIL,
-            actorName = SEEDED_ADMIN_NAME,
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
 
         userDirectoryService.syncLogin(
-            email = SEEDED_ADMIN_EMAIL,
-            displayName = SEEDED_ADMIN_NAME,
+            email = TEST_ADMIN_EMAIL,
+            displayName = TEST_ADMIN_NAME,
         )
         userDirectoryService.saveManualAssignment(
-            email = SEEDED_ADMIN_EMAIL,
+            email = TEST_ADMIN_EMAIL,
             organizationId = organizationId,
-            actorEmail = SEEDED_ADMIN_EMAIL,
-            actorName = SEEDED_ADMIN_NAME,
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
 
         whenever(assetBinaryStorage.presignUploadUrl(any(), any(), any())).thenReturn(
@@ -99,15 +99,15 @@ class AssetLifecycleServiceTest @Autowired constructor(
                 trashRetentionDays = 14,
                 restoreEnabled = true,
             ),
-            actorEmail = SEEDED_ADMIN_EMAIL,
-            actorName = SEEDED_ADMIN_NAME,
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
 
         val auditLog = adminAuditLogRepository.findTop50ByOrderByCreatedAtDescIdDesc()
             .first { log -> log.actionType == AdminAuditLogAction.ASSET_RETENTION_POLICY_UPDATED }
 
         assertThat(updatedPolicy.trashRetentionDays).isEqualTo(14)
-        assertThat(updatedPolicy.updatedByEmail).isEqualTo(SEEDED_ADMIN_EMAIL)
+        assertThat(updatedPolicy.updatedByEmail).isEqualTo(TEST_ADMIN_EMAIL)
         assertThat(auditLog.detail).contains("휴지통 보관 정책")
         assertThat(auditLog.beforeState).contains("trashRetentionDays")
         assertThat(auditLog.afterState).contains("14")
@@ -119,24 +119,24 @@ class AssetLifecycleServiceTest @Autowired constructor(
 
         assetLibraryService.deleteAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "coco@iportfolio.co.kr",
-            actorName = "Coco",
+            actorEmail = TEST_CREATOR_EMAIL,
+            actorName = TEST_CREATOR_NAME,
         )
 
         assetLifecycleService.restoreAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "coco@iportfolio.co.kr",
-            actorName = "Coco",
+            actorEmail = TEST_CREATOR_EMAIL,
+            actorName = TEST_CREATOR_NAME,
         )
 
         val restoredAsset = assetLibraryService.getAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
         val auditLog = adminAuditLogRepository.findTop50ByOrderByCreatedAtDescIdDesc()
             .first { log -> log.actionType == AdminAuditLogAction.ASSET_RESTORED }
 
-        assertThat(assetLibraryService.listAssets(actorEmail = "coco@iportfolio.co.kr"))
+        assertThat(assetLibraryService.listAssets(actorEmail = TEST_CREATOR_EMAIL))
             .anyMatch { asset -> asset.id == uploadedAsset.id }
         assertThat(restoredAsset.events.first().eventType).isEqualTo(AssetEventType.RESTORED)
         assertThat(auditLog.detail).contains("복구")
@@ -154,8 +154,8 @@ class AssetLifecycleServiceTest @Autowired constructor(
                     keywords = listOf("태그"),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
-            actorName = "Coco",
+            actorEmail = TEST_CREATOR_EMAIL,
+            actorName = TEST_CREATOR_NAME,
         )
         return assetLibraryService.completeUpload(
             assetId = intentResponse.assetId,
@@ -163,7 +163,7 @@ class AssetLifecycleServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
     }
 }

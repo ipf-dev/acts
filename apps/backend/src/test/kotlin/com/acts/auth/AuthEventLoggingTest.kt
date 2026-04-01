@@ -8,6 +8,7 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import com.acts.support.TEST_ADMIN_EMAIL
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -50,7 +51,7 @@ class AuthEventLoggingTest @Autowired constructor(
         }
         val response = MockHttpServletResponse()
         val authentication = TestingAuthenticationToken(
-            "minsungkim@iportfolio.co.kr",
+            TEST_ADMIN_EMAIL,
             null,
             "ROLE_ADMIN",
         )
@@ -65,14 +66,14 @@ class AuthEventLoggingTest @Autowired constructor(
         assertThat(listAppender.list.single().formattedMessage)
             .contains("event=auth_login")
             .contains("outcome=success")
-            .contains("email=minsungkim@iportfolio.co.kr")
+            .contains("email=$TEST_ADMIN_EMAIL")
             .contains("role=ADMIN")
 
         assertThat(auditLog.category).isEqualTo(AuditLogCategory.AUTH)
         assertThat(auditLog.outcome).isEqualTo(AuditLogOutcome.SUCCESS)
         assertThat(auditLog.actionType).isEqualTo(AdminAuditLogAction.LOGIN_SUCCESS)
-        assertThat(auditLog.actorEmail).isEqualTo("minsungkim@iportfolio.co.kr")
-        assertThat(auditLog.targetEmail).isEqualTo("minsungkim@iportfolio.co.kr")
+        assertThat(auditLog.actorEmail).isEqualTo(TEST_ADMIN_EMAIL)
+        assertThat(auditLog.targetEmail).isEqualTo(TEST_ADMIN_EMAIL)
         assertThat(auditLog.detail).contains("Google SSO 로그인 성공")
     }
 

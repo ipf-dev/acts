@@ -15,6 +15,16 @@ import com.acts.asset.tag.CharacterTagUpsertRequest
 import com.acts.auth.feature.UserFeatureAccessService
 import com.acts.auth.org.OrganizationRepository
 import com.acts.auth.user.UserDirectoryService
+import com.acts.support.TEST_ADMIN_EMAIL
+import com.acts.support.TEST_ADMIN_NAME
+import com.acts.support.TEST_CONTENT_ORG_NAME
+import com.acts.support.TEST_CREATOR_EMAIL
+import com.acts.support.TEST_MARKETING_ORG_NAME
+import com.acts.support.TEST_RESTRICTED_EMAIL
+import com.acts.support.TEST_RESTRICTED_NAME
+import com.acts.support.TEST_REVIEWER_EMAIL
+import com.acts.support.TEST_STRATEGY_ORG_NAME
+import com.acts.support.TEST_VIEWER_EMAIL
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -54,46 +64,46 @@ class AssetLibraryServiceTest @Autowired constructor(
     @BeforeEach
     fun prepareUser() {
         val marketingOrganization = organizationRepository.findAllByOrderByNameAsc()
-            .first { organization -> organization.name == "마케팅팀" }
+            .first { organization -> organization.name == TEST_MARKETING_ORG_NAME }
         val contentOrganization = organizationRepository.findAllByOrderByNameAsc()
-            .first { organization -> organization.name == "콘텐츠개발1팀" }
+            .first { organization -> organization.name == TEST_CONTENT_ORG_NAME }
         val strategyOrganization = organizationRepository.findAllByOrderByNameAsc()
-            .first { organization -> organization.name == "AI전략사업팀" }
+            .first { organization -> organization.name == TEST_STRATEGY_ORG_NAME }
 
         userDirectoryService.syncLogin(
-            email = "coco@iportfolio.co.kr",
+            email = TEST_CREATOR_EMAIL,
             displayName = "Coco",
         )
         userDirectoryService.saveManualAssignment(
-            email = "coco@iportfolio.co.kr",
+            email = TEST_CREATOR_EMAIL,
             organizationId = requireNotNull(marketingOrganization.id),
-            actorEmail = "minsungkim@iportfolio.co.kr",
-            actorName = "Min Sung Kim",
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
         userDirectoryService.syncLogin(
-            email = "tony@iportfolio.co.kr",
+            email = TEST_REVIEWER_EMAIL,
             displayName = "Tony",
         )
         userDirectoryService.saveManualAssignment(
-            email = "tony@iportfolio.co.kr",
+            email = TEST_REVIEWER_EMAIL,
             organizationId = requireNotNull(contentOrganization.id),
-            actorEmail = "minsungkim@iportfolio.co.kr",
-            actorName = "Min Sung Kim",
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
         userDirectoryService.syncLogin(
-            email = "leader@iportfolio.co.kr",
+            email = TEST_VIEWER_EMAIL,
             displayName = "Leader",
         )
         userDirectoryService.saveManualAssignment(
-            email = "leader@iportfolio.co.kr",
+            email = TEST_VIEWER_EMAIL,
             organizationId = requireNotNull(strategyOrganization.id),
-            actorEmail = "minsungkim@iportfolio.co.kr",
-            actorName = "Min Sung Kim",
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
         userDirectoryService.addViewerAllowlist(
-            email = "leader@iportfolio.co.kr",
-            actorEmail = "minsungkim@iportfolio.co.kr",
-            actorName = "Min Sung Kim",
+            email = TEST_VIEWER_EMAIL,
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
         whenever(assetBinaryStorage.presignUploadUrl(any(), any(), any())).thenReturn(
             "https://s3.example.com/presigned-url",
@@ -130,7 +140,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                     keywords = listOf("코코", "축제"),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
         val uploadedAsset = assetLibraryService.completeUpload(
@@ -139,18 +149,18 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         val listedAssets = assetLibraryService.listAssets(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             query = AssetListQuery(search = "코코 축제"),
         )
 
         assertThat(uploadedAsset.type).isEqualTo(AssetType.DOCUMENT)
         assertThat(uploadedAsset.typeMetadata.documentKind).isEqualTo(AssetDocumentKind.SCENARIO)
-        assertThat(uploadedAsset.organizationName).isEqualTo("마케팅팀")
-        assertThat(uploadedAsset.ownerEmail).isEqualTo("coco@iportfolio.co.kr")
+        assertThat(uploadedAsset.organizationName).isEqualTo(TEST_MARKETING_ORG_NAME)
+        assertThat(uploadedAsset.ownerEmail).isEqualTo(TEST_CREATOR_EMAIL)
         assertThat(uploadedAsset.tags.keywords).contains("코코", "축제")
         assertThat(uploadedAsset.canEdit).isTrue()
         assertThat(uploadedAsset.canDelete).isTrue()
@@ -163,11 +173,11 @@ class AssetLibraryServiceTest @Autowired constructor(
     fun `lists asset catalog page with server side pagination and filters`() {
         val marketingOrganizationId = requireNotNull(
             organizationRepository.findAllByOrderByNameAsc()
-                .first { organization -> organization.name == "마케팅팀" }
+                .first { organization -> organization.name == TEST_MARKETING_ORG_NAME }
                 .id,
         )
         val firstImage = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "코코 배경 1",
             fileName = "coco-background-1.png",
@@ -178,7 +188,7 @@ class AssetLibraryServiceTest @Autowired constructor(
             ),
         )
         val secondImage = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "코코 배경 2",
             fileName = "coco-background-2.png",
@@ -189,7 +199,7 @@ class AssetLibraryServiceTest @Autowired constructor(
             ),
         )
         uploadAsset(
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
             actorName = "Tony",
             title = "토니 러프",
             fileName = "tony-draft.png",
@@ -201,11 +211,11 @@ class AssetLibraryServiceTest @Autowired constructor(
         )
 
         val firstPage = assetLibraryService.listAssetCatalog(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             query = AssetListQuery(
                 assetType = AssetType.IMAGE,
                 organizationId = marketingOrganizationId,
-                creatorEmail = "COCO@iportfolio.co.kr",
+                creatorEmail = TEST_CREATOR_EMAIL.uppercase(),
                 imageArtStyle = AssetImageArtStyle.BACKGROUND,
                 imageHasLayerFile = true,
             ),
@@ -213,11 +223,11 @@ class AssetLibraryServiceTest @Autowired constructor(
             size = 1,
         )
         val secondPage = assetLibraryService.listAssetCatalog(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             query = AssetListQuery(
                 assetType = AssetType.IMAGE,
                 organizationId = marketingOrganizationId,
-                creatorEmail = "coco@iportfolio.co.kr",
+                creatorEmail = TEST_CREATOR_EMAIL,
                 imageArtStyle = AssetImageArtStyle.BACKGROUND,
                 imageHasLayerFile = true,
             ),
@@ -238,13 +248,13 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `lists asset catalog filter options from ready assets only`() {
         uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "마케팅 자산",
             fileName = "marketing-filter.txt",
         )
         uploadAsset(
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
             actorName = "Tony",
             title = "콘텐츠 자산",
             fileName = "content-filter.txt",
@@ -258,15 +268,15 @@ class AssetLibraryServiceTest @Autowired constructor(
                 description = "아직 완료되지 않은 자산",
                 tags = AssetStructuredTagsRequest(),
             ),
-            actorEmail = "leader@iportfolio.co.kr",
+            actorEmail = TEST_VIEWER_EMAIL,
             actorName = "Leader",
         )
 
-        val filterOptions = assetLibraryService.listAssetCatalogFilterOptions("coco@iportfolio.co.kr")
+        val filterOptions = assetLibraryService.listAssetCatalogFilterOptions(TEST_CREATOR_EMAIL)
 
-        assertThat(filterOptions.organizations).extracting("name").containsExactly("마케팅팀", "콘텐츠개발1팀")
+        assertThat(filterOptions.organizations).extracting("name").containsExactly(TEST_CONTENT_ORG_NAME, TEST_MARKETING_ORG_NAME)
         assertThat(filterOptions.creators).extracting("email")
-            .containsExactly("coco@iportfolio.co.kr", "tony@iportfolio.co.kr")
+            .containsExactly(TEST_CREATOR_EMAIL, TEST_REVIEWER_EMAIL)
     }
 
     @Test
@@ -280,7 +290,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 description = "람다 썸네일 생성 테스트",
                 tags = AssetStructuredTagsRequest(),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
 
@@ -290,7 +300,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         verify(assetPreviewDispatcher, timeout(3000)).requestVideoPreview(
@@ -313,7 +323,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 description = "람다 예외 허용 테스트",
                 tags = AssetStructuredTagsRequest(),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
 
@@ -323,11 +333,11 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         val listedAssets = assetLibraryService.listAssets(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             query = AssetListQuery(search = "코코 영상"),
         )
 
@@ -349,7 +359,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 description = "람다 재요청 테스트",
                 tags = AssetStructuredTagsRequest(),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
         assetLibraryService.completeUpload(
@@ -358,14 +368,14 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
         whenever(assetBinaryStorage.loadOrNull(any(), eq("${intentResponse.objectKey}.preview.jpg"))).thenReturn(null)
 
         assertThatThrownBy {
             assetLibraryService.loadPreview(
                 assetId = intentResponse.assetId,
-                actorEmail = "coco@iportfolio.co.kr",
+                actorEmail = TEST_CREATOR_EMAIL,
             )
         }.isInstanceOf(IllegalArgumentException::class.java)
 
@@ -385,12 +395,12 @@ class AssetLibraryServiceTest @Autowired constructor(
                 description = "아직 완료되지 않은 자산",
                 tags = AssetStructuredTagsRequest(),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
 
         val listedAssets = assetLibraryService.listAssets(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             query = AssetListQuery(search = "업로드 중 영상"),
         )
 
@@ -398,7 +408,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThatThrownBy {
             assetLibraryService.getAsset(
                 assetId = intentResponse.assetId,
-                actorEmail = "coco@iportfolio.co.kr",
+                actorEmail = TEST_CREATOR_EMAIL,
             )
         }.isInstanceOf(IllegalArgumentException::class.java)
     }
@@ -416,7 +426,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                     locations = listOf("서울 도서관"),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
         val uploadedAsset = assetLibraryService.completeUpload(
@@ -425,15 +435,15 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         val assetDetail = assetLibraryService.getAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
         val searchedAssets = assetLibraryService.listAssets(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             query = AssetListQuery(search = "서울 도서관"),
         )
 
@@ -445,7 +455,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `lists reusable location and keyword tag options sorted by usage count`() {
         uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "광장 장면 1",
             fileName = "village-square-1.txt",
@@ -455,7 +465,7 @@ class AssetLibraryServiceTest @Autowired constructor(
             ),
         )
         uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "광장 장면 2",
             fileName = "village-square-2.txt",
@@ -465,7 +475,7 @@ class AssetLibraryServiceTest @Autowired constructor(
             ),
         )
         uploadAsset(
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
             actorName = "Tony",
             title = "숲 장면",
             fileName = "forest-school.txt",
@@ -475,7 +485,7 @@ class AssetLibraryServiceTest @Autowired constructor(
             ),
         )
 
-        val tagOptions = assetTagManagementService.listTagOptions("coco@iportfolio.co.kr")
+        val tagOptions = assetTagManagementService.listTagOptions(TEST_CREATOR_EMAIL)
 
         assertThat(tagOptions.locations).extracting("value").containsExactly("마을 광장", "숲속 학교")
         assertThat(tagOptions.locations).extracting("usageCount").containsExactly(2L, 1L)
@@ -496,7 +506,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 description = "한글 파일명 검색 테스트",
                 tags = AssetStructuredTagsRequest(),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
         val uploadedAsset = assetLibraryService.completeUpload(
@@ -505,15 +515,15 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         val partialMatch = assetLibraryService.listAssets(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             query = AssetListQuery(search = "폴"),
         )
         val fullMatch = assetLibraryService.listAssets(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             query = AssetListQuery(search = "폴리17"),
         )
 
@@ -524,13 +534,13 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `matches character alias terms in asset library search`() {
         val character = characterTagRepository.save(
-            CharacterTagEntity(
-                name = "코코",
-                normalizedName = "코코",
-                createdByEmail = "minsungkim@iportfolio.co.kr",
-                updatedByEmail = "minsungkim@iportfolio.co.kr",
-            ),
-        )
+                CharacterTagEntity(
+                    name = "코코",
+                    normalizedName = "코코",
+                    createdByEmail = TEST_ADMIN_EMAIL,
+                    updatedByEmail = TEST_ADMIN_EMAIL,
+                ),
+            )
         characterTagAliasRepository.save(
             CharacterTagAliasEntity(
                 characterTag = character,
@@ -551,7 +561,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                     keywords = listOf("레퍼런스"),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
 
@@ -561,11 +571,11 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         val searchedAssets = assetLibraryService.listAssets(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             query = AssetListQuery(search = "cocohero"),
         )
 
@@ -575,7 +585,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `updates unused character metadata without requiring existing asset tags`() {
         val createdCharacter = assetTagManagementService.createCharacterTag(
-            actorEmail = "bson@iportfolio.co.kr",
+            actorEmail = TEST_ADMIN_EMAIL,
             request = CharacterTagUpsertRequest(
                 name = "베키",
                 aliases = listOf("beki"),
@@ -583,7 +593,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         )
 
         val updatedCharacter = assetTagManagementService.updateCharacterTag(
-            actorEmail = "bson@iportfolio.co.kr",
+            actorEmail = TEST_ADMIN_EMAIL,
             characterId = createdCharacter.id,
             request = CharacterTagUpsertRequest(
                 name = "베키 리뉴얼",
@@ -598,7 +608,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `updates character while retaining existing alias values`() {
         val createdCharacter = assetTagManagementService.createCharacterTag(
-            actorEmail = "bson@iportfolio.co.kr",
+            actorEmail = TEST_ADMIN_EMAIL,
             request = CharacterTagUpsertRequest(
                 name = "베키",
                 aliases = listOf("becky", "beki"),
@@ -606,7 +616,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         )
 
         val updatedCharacter = assetTagManagementService.updateCharacterTag(
-            actorEmail = "bson@iportfolio.co.kr",
+            actorEmail = TEST_ADMIN_EMAIL,
             characterId = createdCharacter.id,
             request = CharacterTagUpsertRequest(
                 name = "베키",
@@ -620,7 +630,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `refreshes asset search text when character aliases change without renaming character`() {
         val createdCharacter = assetTagManagementService.createCharacterTag(
-            actorEmail = "bson@iportfolio.co.kr",
+            actorEmail = TEST_ADMIN_EMAIL,
             request = CharacterTagUpsertRequest(
                 name = "베키",
                 aliases = listOf("beki"),
@@ -638,7 +648,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                     characterTagIds = listOf(createdCharacter.id),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
         val uploadedAsset = assetLibraryService.completeUpload(
@@ -647,11 +657,11 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         assetTagManagementService.updateCharacterTag(
-            actorEmail = "bson@iportfolio.co.kr",
+            actorEmail = TEST_ADMIN_EMAIL,
             characterId = createdCharacter.id,
             request = CharacterTagUpsertRequest(
                 name = "베키",
@@ -660,7 +670,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         )
 
         val searchedAssets = assetLibraryService.listAssets(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             query = AssetListQuery(search = "becky"),
         )
 
@@ -690,18 +700,18 @@ class AssetLibraryServiceTest @Autowired constructor(
                     ),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
 
         val youtubeAsset = registeredLinks.first { asset -> asset.linkType == "YouTube" }
         val searchedAssets = assetLibraryService.listAssets(
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
             query = AssetListQuery(search = "youtube 레퍼런스"),
         )
         val assetDetail = assetLibraryService.getAsset(
             assetId = youtubeAsset.id,
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
         )
 
         assertThat(registeredLinks).hasSize(2)
@@ -730,7 +740,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                     keywords = listOf("코코", "축제"),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
         val uploadedAsset = assetLibraryService.completeUpload(
@@ -739,16 +749,16 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         val assetDetail = assetLibraryService.getAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
         val downloadResult = assetLibraryService.downloadAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         assertThat(assetDetail.currentFile).isNotNull
@@ -767,7 +777,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `issues presigned file access urls for download and playback`() {
         val uploadedAsset = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "파일 접근 URL 테스트",
             fileName = "downloadable-video.mp4",
@@ -775,12 +785,12 @@ class AssetLibraryServiceTest @Autowired constructor(
 
         val downloadAccess = assetLibraryService.issueFileAccessUrl(
             assetId = uploadedAsset.id,
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
             mode = AssetFileAccessMode.DOWNLOAD,
         )
         val playbackAccess = assetLibraryService.issueFileAccessUrl(
             assetId = uploadedAsset.id,
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
             mode = AssetFileAccessMode.PLAYBACK,
         )
 
@@ -825,7 +835,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                     keywords = listOf("이미지"),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
         val uploadedAsset = assetLibraryService.completeUpload(
@@ -834,12 +844,12 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         val previewResult = assetLibraryService.loadPreview(
             assetId = uploadedAsset.id,
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
         )
 
         assertThat(previewResult.contentType).isEqualTo("image/png")
@@ -866,7 +876,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                     keywords = listOf("영상"),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
         val uploadedAsset = assetLibraryService.completeUpload(
@@ -875,12 +885,12 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 12L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         val previewResult = assetLibraryService.loadPreview(
             assetId = uploadedAsset.id,
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
         )
 
         assertThat(previewResult.contentType).isEqualTo("image/jpeg")
@@ -890,7 +900,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `stores image type metadata and exposes it in detail`() {
         val uploadedAsset = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "축제 배경 이미지",
             fileName = "festival-background.png",
@@ -903,7 +913,7 @@ class AssetLibraryServiceTest @Autowired constructor(
 
         val assetDetail = assetLibraryService.getAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         assertThat(uploadedAsset.type).isEqualTo(AssetType.IMAGE)
@@ -916,7 +926,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `updates video type metadata and records an update history event`() {
         val uploadedAsset = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "영상 세부 정보 애셋",
             fileName = "metadata-video.mp4",
@@ -933,7 +943,7 @@ class AssetLibraryServiceTest @Autowired constructor(
             requestedTypeMetadata = AssetTypeMetadataRequest(
                 videoStage = AssetVideoStage.FINAL,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
 
@@ -946,7 +956,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `stores document type metadata and exposes it in detail`() {
         val uploadedAsset = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "축제 기획서",
             fileName = "festival-plan.pdf",
@@ -958,7 +968,7 @@ class AssetLibraryServiceTest @Autowired constructor(
 
         val assetDetail = assetLibraryService.getAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         assertThat(uploadedAsset.type).isEqualTo(AssetType.DOCUMENT)
@@ -979,7 +989,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                     keywords = listOf("코코", "축제"),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
         val uploadedAsset = assetLibraryService.completeUpload(
@@ -988,7 +998,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 objectKey = intentResponse.objectKey,
                 fileSizeBytes = 5L,
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
         )
 
         val updatedAsset = assetLibraryService.updateAsset(
@@ -998,7 +1008,7 @@ class AssetLibraryServiceTest @Autowired constructor(
             requestedTags = AssetStructuredTagsRequest(
                 keywords = listOf("코코", "친구들", "축제"),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
 
@@ -1013,7 +1023,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `soft deletes asset and excludes it from library queries`() {
         val uploadedAsset = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "삭제 테스트 애셋",
             fileName = "delete_test.txt",
@@ -1021,17 +1031,17 @@ class AssetLibraryServiceTest @Autowired constructor(
 
         assetLibraryService.deleteAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
 
-        val listedAssets = assetLibraryService.listAssets(actorEmail = "coco@iportfolio.co.kr")
+        val listedAssets = assetLibraryService.listAssets(actorEmail = TEST_CREATOR_EMAIL)
 
         assertThat(listedAssets).noneMatch { asset -> asset.id == uploadedAsset.id }
         assertThatThrownBy {
             assetLibraryService.getAsset(
                 assetId = uploadedAsset.id,
-                actorEmail = "coco@iportfolio.co.kr",
+                actorEmail = TEST_CREATOR_EMAIL,
             )
         }
             .isInstanceOf(IllegalArgumentException::class.java)
@@ -1041,7 +1051,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `rejects delete request from non owner non admin`() {
         val uploadedAsset = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "삭제 권한 테스트 애셋",
             fileName = "delete_permission_test.txt",
@@ -1049,7 +1059,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         assertThatThrownBy {
             assetLibraryService.deleteAsset(
                 assetId = uploadedAsset.id,
-                actorEmail = "tony@iportfolio.co.kr",
+                actorEmail = TEST_REVIEWER_EMAIL,
                 actorName = "Tony",
             )
         }
@@ -1060,20 +1070,20 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `shows all assets to every authenticated user`() {
         val marketingAsset = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "마케팅 전용 애셋",
             fileName = "marketing.txt",
         )
         val contentAsset = uploadAsset(
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
             actorName = "Tony",
             title = "콘텐츠 전용 애셋",
             fileName = "content.txt",
         )
 
-        val contentUserVisibleAssets = assetLibraryService.listAssets(actorEmail = "tony@iportfolio.co.kr")
-        val companyWideVisibleAssets = assetLibraryService.listAssets(actorEmail = "leader@iportfolio.co.kr")
+        val contentUserVisibleAssets = assetLibraryService.listAssets(actorEmail = TEST_REVIEWER_EMAIL)
+        val companyWideVisibleAssets = assetLibraryService.listAssets(actorEmail = TEST_VIEWER_EMAIL)
 
         assertThat(contentUserVisibleAssets).extracting("id").contains(marketingAsset.id, contentAsset.id)
         assertThat(companyWideVisibleAssets).extracting("id").contains(marketingAsset.id, contentAsset.id)
@@ -1082,7 +1092,7 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `allows detail and download across organizations`() {
         val uploadedAsset = uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "마케팅 전용 애셋",
             fileName = "marketing-detail.txt",
@@ -1090,11 +1100,11 @@ class AssetLibraryServiceTest @Autowired constructor(
 
         val assetDetail = assetLibraryService.getAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
         )
         val downloadResult = assetLibraryService.downloadAsset(
             assetId = uploadedAsset.id,
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
         )
 
         assertThat(assetDetail.id).isEqualTo(uploadedAsset.id)
@@ -1104,13 +1114,13 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `allows company wide viewer export and blocks regular users`() {
         uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "마케팅 애셋",
             fileName = "marketing-export.txt",
         )
         uploadAsset(
-            actorEmail = "tony@iportfolio.co.kr",
+            actorEmail = TEST_REVIEWER_EMAIL,
             actorName = "Tony",
             title = "콘텐츠 애셋",
             fileName = "content-export.txt",
@@ -1127,17 +1137,17 @@ class AssetLibraryServiceTest @Autowired constructor(
                     ),
                 ),
             ),
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
         )
 
-        val exportResult = assetLibraryService.exportAssets("leader@iportfolio.co.kr")
+        val exportResult = assetLibraryService.exportAssets(TEST_VIEWER_EMAIL)
 
         assertThat(exportResult.contentType).isEqualTo("application/zip")
         assertThat(exportResult.fileName).endsWith(".zip")
         assertThat(exportResult.content).isNotEmpty
 
-        assertThatThrownBy { assetLibraryService.exportAssets("tony@iportfolio.co.kr") }
+        assertThatThrownBy { assetLibraryService.exportAssets(TEST_REVIEWER_EMAIL) }
             .isInstanceOf(SecurityException::class.java)
             .hasMessageContaining("내보내기 권한")
     }
@@ -1145,24 +1155,24 @@ class AssetLibraryServiceTest @Autowired constructor(
     @Test
     fun `denied asset library feature blocks asset access`() {
         uploadAsset(
-            actorEmail = "coco@iportfolio.co.kr",
+            actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
             title = "권한 테스트 애셋",
             fileName = "permission.txt",
         )
         userDirectoryService.syncLogin(
-            email = "sohee.han@iportfolio.co.kr",
-            displayName = "한소희",
+            email = TEST_RESTRICTED_EMAIL,
+            displayName = TEST_RESTRICTED_NAME,
         )
         userFeatureAccessService.saveUserFeatureAccess(
-            email = "sohee.han@iportfolio.co.kr",
+            email = TEST_RESTRICTED_EMAIL,
             allowedFeatureKeys = emptyList(),
-            actorEmail = "minsungkim@iportfolio.co.kr",
-            actorName = "Min Sung Kim",
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
 
         assertThatThrownBy {
-            assetLibraryService.listAssets(actorEmail = "sohee.han@iportfolio.co.kr")
+            assetLibraryService.listAssets(actorEmail = TEST_RESTRICTED_EMAIL)
         }
             .isInstanceOf(SecurityException::class.java)
             .hasMessageContaining("자산 라이브러리")

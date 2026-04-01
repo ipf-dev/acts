@@ -6,6 +6,21 @@ import com.acts.auth.org.OrganizationEntity
 import com.acts.auth.org.OrganizationRepository
 import com.acts.auth.user.UserDirectoryService
 import com.acts.auth.user.UserMappingMode
+import com.acts.support.TEST_ADMIN_EMAIL
+import com.acts.support.TEST_ADMIN_NAME
+import com.acts.support.TEST_CONTENT_ORG_NAME
+import com.acts.support.TEST_CREATOR_EMAIL
+import com.acts.support.TEST_CREATOR_NAME
+import com.acts.support.TEST_MARKETING_ORG_NAME
+import com.acts.support.TEST_NEW_USER_EMAIL
+import com.acts.support.TEST_NEW_USER_NAME
+import com.acts.support.TEST_SEEDED_MEMBER_EMAIL
+import com.acts.support.TEST_SEEDED_MEMBER_NAME
+import com.acts.support.TEST_STRATEGY_ORG_NAME
+import com.acts.support.TEST_TEMP_VIEWER_EMAIL
+import com.acts.support.TEST_TEMP_VIEWER_NAME
+import com.acts.support.TEST_VIEWER_EMAIL
+import com.acts.support.TEST_VIEWER_NAME
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -26,16 +41,16 @@ class UserDirectoryServiceTest @Autowired constructor(
     @BeforeEach
     fun loadOrganizations() {
         strategyOrganization = organizationRepository.findAllByOrderByNameAsc()
-            .first { organization -> organization.name == "AI전략사업팀" }
+            .first { organization -> organization.name == TEST_STRATEGY_ORG_NAME }
         marketingOrganization = organizationRepository.findAllByOrderByNameAsc()
-            .first { organization -> organization.name == "마케팅팀" }
+            .first { organization -> organization.name == TEST_MARKETING_ORG_NAME }
     }
 
     @Test
     fun `requires manual assignment until an admin sets an organization`() {
         val profile = userDirectoryService.syncLogin(
-            email = "unknown@iportfolio.co.kr",
-            displayName = "Unknown",
+            email = TEST_NEW_USER_EMAIL,
+            displayName = TEST_NEW_USER_NAME,
         )
 
         assertThat(profile.mappingMode).isEqualTo(UserMappingMode.UNMAPPED)
@@ -46,10 +61,10 @@ class UserDirectoryServiceTest @Autowired constructor(
     }
 
     @Test
-    fun `seeded admin role is loaded from the database`() {
+    fun `seeded admin role is loaded from the test bootstrap`() {
         val profile = userDirectoryService.syncLogin(
-            email = "sykim@iportfolio.co.kr",
-            displayName = "김성윤",
+            email = TEST_ADMIN_EMAIL,
+            displayName = TEST_ADMIN_NAME,
         )
 
         assertThat(profile.role).isEqualTo(UserRole.ADMIN)
@@ -57,57 +72,67 @@ class UserDirectoryServiceTest @Autowired constructor(
     }
 
     @Test
+    fun `seeded directory display name is preserved on login`() {
+        val profile = userDirectoryService.syncLogin(
+            email = TEST_SEEDED_MEMBER_EMAIL,
+            displayName = "Overridden Display Name",
+        )
+
+        assertThat(profile.displayName).isEqualTo(TEST_SEEDED_MEMBER_NAME)
+    }
+
+    @Test
     fun `manual assignment stores organization and records an audit log`() {
         userDirectoryService.syncLogin(
-            email = "coco@iportfolio.co.kr",
-            displayName = "Coco",
+            email = TEST_CREATOR_EMAIL,
+            displayName = TEST_CREATOR_NAME,
         )
 
         val profile = userDirectoryService.saveManualAssignment(
-            email = "coco@iportfolio.co.kr",
+            email = TEST_CREATOR_EMAIL,
             organizationId = marketingOrganization.id!!,
-            actorEmail = "minsungkim@iportfolio.co.kr",
-            actorName = "Min Sung Kim",
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
 
         val auditLogs = userDirectoryService.listAuditLogs()
 
         assertThat(profile.mappingMode).isEqualTo(UserMappingMode.MANUAL)
         assertThat(profile.organizationId).isEqualTo(marketingOrganization.id)
-        assertThat(profile.organizationName).isEqualTo("마케팅팀")
+        assertThat(profile.organizationName).isEqualTo(TEST_MARKETING_ORG_NAME)
         assertThat(profile.manualAssignmentRequired).isFalse()
 
         assertThat(auditLogs).hasSize(1)
         assertThat(auditLogs.single().actionType).isEqualTo(AdminAuditLogAction.USER_ASSIGNMENT_UPDATED.name)
-        assertThat(auditLogs.single().actorEmail).isEqualTo("minsungkim@iportfolio.co.kr")
-        assertThat(auditLogs.single().targetEmail).isEqualTo("coco@iportfolio.co.kr")
+        assertThat(auditLogs.single().actorEmail).isEqualTo(TEST_ADMIN_EMAIL)
+        assertThat(auditLogs.single().targetEmail).isEqualTo(TEST_CREATOR_EMAIL)
         assertThat(auditLogs.single().beforeState).contains("\"organizationName\":null")
         assertThat(auditLogs.single().afterState)
-            .contains("\"organizationName\":\"마케팅팀\"")
+            .contains("\"organizationName\":\"$TEST_MARKETING_ORG_NAME\"")
     }
 
     @Test
     fun `viewer allowlist grants company wide viewer and records an audit log`() {
         userDirectoryService.syncLogin(
-            email = "leader@iportfolio.co.kr",
-            displayName = "Leader",
+            email = TEST_VIEWER_EMAIL,
+            displayName = TEST_VIEWER_NAME,
         )
 
         val allowlistEntries = userDirectoryService.addViewerAllowlist(
-            email = "leader@iportfolio.co.kr",
-            actorEmail = "minsungkim@iportfolio.co.kr",
-            actorName = "Min Sung Kim",
+            email = TEST_VIEWER_EMAIL,
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
         val refreshedProfile = userDirectoryService.listKnownUsers()
-            .first { user -> user.email == "leader@iportfolio.co.kr" }
+            .first { user -> user.email == TEST_VIEWER_EMAIL }
 
-        assertThat(allowlistEntries).extracting("email").contains("leader@iportfolio.co.kr")
+        assertThat(allowlistEntries).extracting("email").contains(TEST_VIEWER_EMAIL)
         assertThat(refreshedProfile.companyWideViewer).isTrue()
 
         val latestAuditLog = userDirectoryService.listAuditLogs().first()
         assertThat(latestAuditLog.actionType).isEqualTo(AdminAuditLogAction.VIEWER_ALLOWLIST_ADDED.name)
-        assertThat(latestAuditLog.actorEmail).isEqualTo("minsungkim@iportfolio.co.kr")
-        assertThat(latestAuditLog.targetEmail).isEqualTo("leader@iportfolio.co.kr")
+        assertThat(latestAuditLog.actorEmail).isEqualTo(TEST_ADMIN_EMAIL)
+        assertThat(latestAuditLog.targetEmail).isEqualTo(TEST_VIEWER_EMAIL)
         assertThat(latestAuditLog.beforeState).contains("\"allowlisted\":false")
         assertThat(latestAuditLog.afterState)
             .contains("\"allowlisted\":true")
@@ -117,29 +142,29 @@ class UserDirectoryServiceTest @Autowired constructor(
     @Test
     fun `removing viewer allowlist recalculates company wide viewer and records an audit log`() {
         userDirectoryService.syncLogin(
-            email = "viewer@iportfolio.co.kr",
-            displayName = "Viewer",
+            email = TEST_TEMP_VIEWER_EMAIL,
+            displayName = TEST_TEMP_VIEWER_NAME,
         )
         userDirectoryService.addViewerAllowlist(
-            email = "viewer@iportfolio.co.kr",
-            actorEmail = "minsungkim@iportfolio.co.kr",
-            actorName = "Min Sung Kim",
+            email = TEST_TEMP_VIEWER_EMAIL,
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
         adminAuditLogRepository.deleteAll()
 
         userDirectoryService.removeViewerAllowlist(
-            email = "viewer@iportfolio.co.kr",
-            actorEmail = "minsungkim@iportfolio.co.kr",
-            actorName = "Min Sung Kim",
+            email = TEST_TEMP_VIEWER_EMAIL,
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
 
         val refreshedProfile = userDirectoryService.listKnownUsers()
-            .first { user -> user.email == "viewer@iportfolio.co.kr" }
+            .first { user -> user.email == TEST_TEMP_VIEWER_EMAIL }
         val latestAuditLog = userDirectoryService.listAuditLogs().first()
 
         assertThat(refreshedProfile.companyWideViewer).isFalse()
         assertThat(latestAuditLog.actionType).isEqualTo(AdminAuditLogAction.VIEWER_ALLOWLIST_REMOVED.name)
-        assertThat(latestAuditLog.targetEmail).isEqualTo("viewer@iportfolio.co.kr")
+        assertThat(latestAuditLog.targetEmail).isEqualTo(TEST_TEMP_VIEWER_EMAIL)
         assertThat(latestAuditLog.beforeState)
             .contains("\"allowlisted\":true")
             .contains("\"effectiveCompanyWideViewer\":true")
@@ -151,22 +176,22 @@ class UserDirectoryServiceTest @Autowired constructor(
     @Test
     fun `promoting a user to admin updates the role and records an audit log`() {
         userDirectoryService.syncLogin(
-            email = "coco@iportfolio.co.kr",
-            displayName = "Coco",
+            email = TEST_CREATOR_EMAIL,
+            displayName = TEST_CREATOR_NAME,
         )
 
         val promotedProfile = userDirectoryService.promoteUserToAdmin(
-            email = "coco@iportfolio.co.kr",
-            actorEmail = "sykim@iportfolio.co.kr",
-            actorName = "김성윤",
+            email = TEST_CREATOR_EMAIL,
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
         val latestAuditLog = userDirectoryService.listAuditLogs().first()
 
         assertThat(promotedProfile.role).isEqualTo(UserRole.ADMIN)
         assertThat(promotedProfile.companyWideViewer).isTrue()
         assertThat(latestAuditLog.actionType).isEqualTo(AdminAuditLogAction.USER_ROLE_PROMOTED.name)
-        assertThat(latestAuditLog.actorEmail).isEqualTo("sykim@iportfolio.co.kr")
-        assertThat(latestAuditLog.targetEmail).isEqualTo("coco@iportfolio.co.kr")
+        assertThat(latestAuditLog.actorEmail).isEqualTo(TEST_ADMIN_EMAIL)
+        assertThat(latestAuditLog.targetEmail).isEqualTo(TEST_CREATOR_EMAIL)
         assertThat(latestAuditLog.beforeState)
             .contains("\"role\":\"USER\"")
             .contains("\"companyWideViewer\":false")
@@ -176,14 +201,14 @@ class UserDirectoryServiceTest @Autowired constructor(
     }
 
     @Test
-    fun `lists seeded organizations for manual assignment options`() {
+    fun `lists test organizations for manual assignment options`() {
         val organizations = userDirectoryService.listOrganizations()
 
         assertThat(organizations).extracting("name")
-            .contains("AI전략사업팀", "콘텐츠개발1팀", "마케팅팀")
+            .contains(TEST_STRATEGY_ORG_NAME, TEST_CONTENT_ORG_NAME, TEST_MARKETING_ORG_NAME)
 
         assertThat(
-            organizations.first { organization -> organization.name == "AI전략사업팀" }.id,
+            organizations.first { organization -> organization.name == TEST_STRATEGY_ORG_NAME }.id,
         ).isEqualTo(strategyOrganization.id)
     }
 }

@@ -18,11 +18,4 @@ create table user_accounts (
     last_login_at timestamp
 );
 
-insert into departments (name) values
-    ('AI전략사업팀'),
-    ('콘텐츠개발1팀'),
-    ('콘텐츠개발2팀'),
-    ('디자인팀'),
-    ('경영지원팀'),
-    ('영상팀'),
-    ('마케팅팀');
+-- Department bootstrap is managed outside this repository.

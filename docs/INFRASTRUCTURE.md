@@ -13,7 +13,7 @@ Use `infra/docker-compose.yml` for the default local stack.
 - AWS runtime
   - web app: `Elastic Beanstalk`
   - runtime package: single web service for same-origin frontend + backend delivery
-  - relational database: `PostgreSQL` on managed AWS database service
+  - relational database: `PostgreSQL cluster` on managed AWS database service
   - asset storage: `S3`
   - video preview worker: `Lambda`
   - image registry: `ECR` for Lambda worker images
@@ -27,6 +27,7 @@ Use `infra/docker-compose.yml` for the default local stack.
 - selected Beanstalk shape: single-container Docker environment
 - recommended first rollout: public HTTPS endpoint, single running instance, custom domain added after the first successful deploy
 - network: attach private networking only when the database is placed in private subnets
+- user and organization bootstrap data is applied outside the repository after schema migration
 
 ## Preview Worker
 

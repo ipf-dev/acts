@@ -26,17 +26,20 @@ class UserDirectoryService(
     @Transactional
     fun syncLogin(email: String, displayName: String): AuthUserProfile {
         val normalizedEmail = email.lowercase()
+        val resolvedDisplayName = displayName.trim().ifBlank { normalizedEmail.substringBefore("@") }
         val existingAccount = userAccountRepository.findById(normalizedEmail).orElse(null)
         val resolvedRole = existingAccount?.role ?: UserRole.USER
         val account = existingAccount ?: UserAccountEntity(
             email = normalizedEmail,
-            displayName = displayName,
+            displayName = resolvedDisplayName,
             role = resolvedRole,
             mappingMode = UserMappingMode.UNMAPPED,
             companyWideViewer = resolveCompanyWideViewer(normalizedEmail, resolvedRole),
         )
 
-        account.displayName = displayName.trim()
+        if (account.displayName.isBlank()) {
+            account.displayName = resolvedDisplayName
+        }
         account.role = resolvedRole
         account.companyWideViewer = resolveCompanyWideViewer(normalizedEmail, resolvedRole)
         account.lastLoginAt = Instant.now()

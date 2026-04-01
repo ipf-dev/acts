@@ -173,7 +173,7 @@ function AssetLibraryPageComponent({
             <div className="space-y-1">
               <h2 className="text-xl font-semibold">사내 Google 계정으로 로그인하세요.</h2>
               <p className="text-sm text-muted-foreground">
-                자산 업로드와 검색은 `@iportfolio.co.kr` 계정으로만 사용할 수 있습니다.
+                자산 업로드와 검색은 <code>@{session.allowedDomain}</code> 계정으로만 사용할 수 있습니다.
               </p>
             </div>
             <Button asChild className="h-10 rounded-xl px-4">

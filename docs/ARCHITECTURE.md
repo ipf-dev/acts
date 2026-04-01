@@ -34,7 +34,7 @@ The first product slice should support a single internal production loop:
 - `Elastic Beanstalk` is selected for the fastest first deployment path
 - `App Runner` is excluded because Seoul region support is unavailable
 - background preview generation remains a separate Lambda container worker
-- asset binaries remain in S3 and metadata remains in PostgreSQL
+- asset binaries remain in S3 and metadata remains in a PostgreSQL cluster
 
 ## Backend Shape
 
@@ -51,8 +51,8 @@ Expected first-slice backend capabilities:
 
 - domain-restricted Google SSO and session identity lookup
 - auth success event logging at the SSO boundary
-- PostgreSQL-backed user directory plus single organization catalog
-- seeded internal account roster with roles persisted directly in PostgreSQL
+- PostgreSQL-cluster-backed user directory plus single organization catalog
+- manual user and organization bootstrap handled outside the repo, with roles persisted directly in PostgreSQL
 - user org assignment lookup with admin override support
 - admin role source of truth stored in PostgreSQL `user_accounts.role`, with admin-only role promotion and audit logging
 - authorization derived from user role and company-wide viewer status

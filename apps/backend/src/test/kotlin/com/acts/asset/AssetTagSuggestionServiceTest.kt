@@ -4,6 +4,7 @@ import com.acts.asset.tag.AssetTagSuggestionService
 import com.acts.asset.tag.AssetTagType
 import com.acts.asset.tag.CharacterTagEntity
 import com.acts.asset.tag.CharacterTagRepository
+import com.acts.support.TEST_ADMIN_EMAIL
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
@@ -21,8 +22,8 @@ class AssetTagSuggestionServiceTest {
                     id = 1L,
                     name = "코코",
                     normalizedName = "코코",
-                    createdByEmail = "admin@iportfolio.co.kr",
-                    updatedByEmail = "admin@iportfolio.co.kr",
+                    createdByEmail = TEST_ADMIN_EMAIL,
+                    updatedByEmail = TEST_ADMIN_EMAIL,
                 ),
             ),
         )

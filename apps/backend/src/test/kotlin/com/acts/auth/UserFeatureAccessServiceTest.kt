@@ -4,6 +4,12 @@ import com.acts.auth.feature.AppFeatureKey
 import com.acts.auth.feature.UserFeatureAccessService
 import com.acts.auth.user.UserAccountRepository
 import com.acts.auth.user.UserDirectoryService
+import com.acts.support.TEST_ADMIN_EMAIL
+import com.acts.support.TEST_ADMIN_NAME
+import com.acts.support.TEST_CREATOR_EMAIL
+import com.acts.support.TEST_CREATOR_NAME
+import com.acts.support.TEST_RESTRICTED_EMAIL
+import com.acts.support.TEST_RESTRICTED_NAME
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -20,12 +26,12 @@ class UserFeatureAccessServiceTest @Autowired constructor(
     @Test
     fun `non admin users get default allow deny split`() {
         userDirectoryService.syncLogin(
-            email = "coco@iportfolio.co.kr",
-            displayName = "Coco",
+            email = TEST_CREATOR_EMAIL,
+            displayName = TEST_CREATOR_NAME,
         )
 
         val authorization = userFeatureAccessService.listUserFeatureAuthorizations()
-            .first { user -> user.email == "coco@iportfolio.co.kr" }
+            .first { user -> user.email == TEST_CREATOR_EMAIL }
 
         assertThat(authorization.allowedFeatures).extracting("key")
             .containsExactly(AppFeatureKey.ASSET_LIBRARY)
@@ -36,15 +42,15 @@ class UserFeatureAccessServiceTest @Autowired constructor(
     @Test
     fun `admin users are locked to all features`() {
         userDirectoryService.syncLogin(
-            email = "minsungkim@iportfolio.co.kr",
-            displayName = "Min Sung Kim",
+            email = TEST_ADMIN_EMAIL,
+            displayName = TEST_ADMIN_NAME,
         )
-        val account = requireNotNull(userAccountRepository.findById("minsungkim@iportfolio.co.kr").orElse(null))
+        val account = requireNotNull(userAccountRepository.findById(TEST_ADMIN_EMAIL).orElse(null))
         account.role = UserRole.ADMIN
         userAccountRepository.save(account)
 
         val authorization = userFeatureAccessService.listUserFeatureAuthorizations()
-            .first { user -> user.email == "minsungkim@iportfolio.co.kr" }
+            .first { user -> user.email == TEST_ADMIN_EMAIL }
 
         assertThat(authorization.featureAccessLocked).isTrue()
         assertThat(authorization.allowedFeatures).extracting("key")
@@ -55,18 +61,18 @@ class UserFeatureAccessServiceTest @Autowired constructor(
     @Test
     fun `saving feature access stores overrides and resolves effective features`() {
         userDirectoryService.syncLogin(
-            email = "sohee.han@iportfolio.co.kr",
-            displayName = "한소희",
+            email = TEST_RESTRICTED_EMAIL,
+            displayName = TEST_RESTRICTED_NAME,
         )
 
         val savedAuthorization = userFeatureAccessService.saveUserFeatureAccess(
-            email = "sohee.han@iportfolio.co.kr",
+            email = TEST_RESTRICTED_EMAIL,
             allowedFeatureKeys = listOf(AppFeatureKey.ASSET_LIBRARY),
-            actorEmail = "minsungkim@iportfolio.co.kr",
-            actorName = "Min Sung Kim",
+            actorEmail = TEST_ADMIN_EMAIL,
+            actorName = TEST_ADMIN_NAME,
         )
         val effectiveFeatures = userFeatureAccessService.resolveAllowedFeatureKeys(
-            email = "sohee.han@iportfolio.co.kr",
+            email = TEST_RESTRICTED_EMAIL,
             role = UserRole.USER,
         )
 

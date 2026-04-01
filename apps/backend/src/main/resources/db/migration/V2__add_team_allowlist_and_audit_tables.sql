@@ -10,39 +10,7 @@ create table departments (
     updated_at timestamp not null default current_timestamp
 );
 
-insert into departments (name) values
-    ('전략본부'),
-    ('콘텐츠개발본부'),
-    ('디자인본부'),
-    ('경영지원본부'),
-    ('영상본부'),
-    ('마케팅본부');
-
 alter table teams add column department_id bigint;
-
-update teams
-set department_id = (select id from departments where name = '전략본부')
-where name = 'AI전략사업팀';
-
-update teams
-set department_id = (select id from departments where name = '콘텐츠개발본부')
-where name in ('콘텐츠개발1팀', '콘텐츠개발2팀');
-
-update teams
-set department_id = (select id from departments where name = '디자인본부')
-where name = '디자인팀';
-
-update teams
-set department_id = (select id from departments where name = '경영지원본부')
-where name = '경영지원팀';
-
-update teams
-set department_id = (select id from departments where name = '영상본부')
-where name = '영상팀';
-
-update teams
-set department_id = (select id from departments where name = '마케팅본부')
-where name = '마케팅팀';
 
 alter table teams alter column department_id set not null;
 alter table teams add constraint teams_department_id_fkey foreign key (department_id) references departments(id);
@@ -53,6 +21,8 @@ update user_accounts ua
 set department_id = t.department_id
 from teams t
 where ua.team_id = t.id;
+
+-- Department and team bootstrap is managed outside this repository.
 
 alter table user_accounts add constraint user_accounts_team_id_fkey foreign key (team_id) references teams(id);
 alter table user_accounts add constraint user_accounts_department_id_fkey foreign key (department_id) references departments(id);
