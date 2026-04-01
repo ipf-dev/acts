@@ -5,8 +5,7 @@ import {
   ChevronRight,
   FolderOpen,
   LogOut,
-  ShieldCheck,
-  Sparkles
+  ShieldCheck
 } from "lucide-react";
 import { createDashboardApi } from "../api/client";
 import type { AuthSessionView } from "../api/types";
@@ -17,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "./ui/dropdown-menu";
+import { ActsLogo } from "./acts-logo";
 import { cn } from "../lib/utils";
 
 export type DashboardNavigationKey = "assets" | "admin";
@@ -26,7 +26,6 @@ interface DashboardShellProps {
   children: React.ReactNode;
   onNavigate: (navigationKey: DashboardNavigationKey) => void;
   session: AuthSessionView;
-  title: string;
 }
 
 const dashboardApi = createDashboardApi();
@@ -40,8 +39,7 @@ export function DashboardShell({
   activeNavigationKey,
   children,
   onNavigate,
-  session,
-  title
+  session
 }: DashboardShellProps): React.JSX.Element {
   const [collapsed, setCollapsed] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -113,20 +111,30 @@ export function DashboardShell({
             collapsed ? "lg:w-[68px]" : "lg:w-[250px]"
           )}
         >
-          <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-4">
+          <div className="border-b border-sidebar-border px-2.5 py-2">
             <button
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-white"
+              className={cn(
+                "flex w-full items-center rounded-2xl transition-colors hover:bg-accent/60",
+                collapsed ? "justify-center px-0 py-0.5" : "gap-2 px-2.5 py-1.5"
+              )}
               onClick={() => onNavigate("assets")}
               type="button"
             >
-              <Sparkles className="h-4 w-4" />
+              {collapsed ? (
+                <div className="flex h-12 w-12 items-center justify-center p-1">
+                  <img alt="ACTS" className="h-full w-full object-contain" src="/acts-logo.svg" />
+                </div>
+              ) : (
+                <>
+                  <ActsLogo imageClassName="h-9" />
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-bold uppercase tracking-[0.2em]">
+                      ACTS
+                    </p>
+                  </div>
+                </>
+              )}
             </button>
-            {!collapsed ? (
-              <div className="min-w-0">
-                <p className="truncate text-[15px] font-medium uppercase">{title}</p>
-                <p className="truncate text-[11px] text-muted-foreground">AI Contents Tech Studio</p>
-              </div>
-            ) : null}
           </div>
 
           <nav className="flex-1 space-y-1 px-2 py-3">

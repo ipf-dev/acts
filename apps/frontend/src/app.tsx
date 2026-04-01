@@ -6,6 +6,7 @@ import type { AuthSessionView } from "./api/types";
 import { AssetDetailPageContainer } from "./pages/asset-library/asset-detail-page-container";
 import { AssetLibraryPageContainer } from "./pages/asset-library/asset-library-page-container";
 import { AdminPageContainer } from "./pages/admin/admin-page-container";
+import { LandingPage } from "./pages/landing/landing-page";
 import { type DashboardNavigationKey, DashboardShell } from "./components/dashboard-shell";
 
 interface AppLocationState {
@@ -118,35 +119,39 @@ export function App(): React.JSX.Element {
     });
   }
 
+  if (session === null || !session.authenticated) {
+    const resolvedSession = session ?? createAnonymousSession();
+
+    return (
+      <LandingPage
+        isLoading={session === null}
+        loginConfigured={resolvedSession.loginConfigured}
+      />
+    );
+  }
+
   return (
-    <DashboardShell
-      activeNavigationKey={locationState.activeNavigationKey}
-      onNavigate={handleNavigation}
-      session={session ?? createAnonymousSession()}
-      title="acts"
-    >
-      {session !== null ? (
-        locationState.activeNavigationKey === "assets" ? (
-          locationState.selectedAssetId ? (
-            <AssetDetailPageContainer
-              assetId={locationState.selectedAssetId}
-              onBack={handleCloseAssetDetail}
-              onDeleted={handleCloseAssetDetail}
-              onOpenRelatedAsset={handleOpenAssetDetailPage}
-              session={session}
-            />
-          ) : (
-            <AssetLibraryPageContainer
-              onOpenAssetPage={handleOpenAssetDetailPage}
-              onSearchQueryChange={setAssetSearchQuery}
-              searchQuery={assetSearchQuery}
-              session={session}
-            />
-          )
+    <DashboardShell activeNavigationKey={locationState.activeNavigationKey} onNavigate={handleNavigation} session={session}>
+      {locationState.activeNavigationKey === "assets" ? (
+        locationState.selectedAssetId ? (
+          <AssetDetailPageContainer
+            assetId={locationState.selectedAssetId}
+            onBack={handleCloseAssetDetail}
+            onDeleted={handleCloseAssetDetail}
+            onOpenRelatedAsset={handleOpenAssetDetailPage}
+            session={session}
+          />
         ) : (
-          <AdminPageContainer session={session} />
+          <AssetLibraryPageContainer
+            onOpenAssetPage={handleOpenAssetDetailPage}
+            onSearchQueryChange={setAssetSearchQuery}
+            searchQuery={assetSearchQuery}
+            session={session}
+          />
         )
-      ) : null}
+      ) : (
+        <AdminPageContainer session={session} />
+      )}
     </DashboardShell>
   );
 }

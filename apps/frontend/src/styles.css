@@ -54,6 +54,99 @@
   --radius: 0.875rem;
 }
 
+@keyframes landing-sheen-sweep {
+  0% {
+    transform: translate3d(-140%, 0, 0) rotate(14deg);
+    opacity: 0;
+  }
+
+  18% {
+    opacity: 0.18;
+  }
+
+  45% {
+    opacity: 0.3;
+  }
+
+  72% {
+    opacity: 0.08;
+  }
+
+  100% {
+    transform: translate3d(180%, 0, 0) rotate(14deg);
+    opacity: 0;
+  }
+}
+
+@keyframes landing-ambient-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(0, -18px, 0) scale(1.04);
+  }
+}
+
+.landing-shell {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at top, rgba(109, 74, 226, 0.16), transparent 34%),
+    linear-gradient(180deg, #ece7f7 0%, #f1edf8 30%, #f6f2fb 64%, #fcfbfe 100%);
+}
+
+.landing-shell::before,
+.landing-shell::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+}
+
+.landing-shell::before {
+  inset: -28%;
+  background: linear-gradient(
+    112deg,
+    transparent 22%,
+    rgba(146, 125, 214, 0.05) 33%,
+    rgba(255, 255, 255, 0.22) 41%,
+    rgba(255, 255, 255, 0.82) 48%,
+    rgba(255, 255, 255, 1) 50%,
+    rgba(230, 222, 247, 0.34) 56%,
+    rgba(144, 121, 213, 0.08) 64%,
+    transparent 74%
+  );
+  animation: landing-sheen-sweep 6.2s ease-in-out infinite;
+  mix-blend-mode: screen;
+  opacity: 0.82;
+}
+
+.landing-shell::after {
+  inset: 0;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(255, 255, 255, 0.72), transparent 24%),
+    radial-gradient(circle at 82% 16%, rgba(165, 148, 220, 0.24), transparent 25%),
+    radial-gradient(circle at 50% 82%, rgba(255, 255, 255, 0.4), transparent 30%),
+    linear-gradient(180deg, rgba(109, 74, 226, 0.04), rgba(255, 255, 255, 0));
+  opacity: 1;
+}
+
+.landing-orb {
+  animation: landing-ambient-float 8s ease-in-out infinite;
+  filter: blur(60px);
+}
+
+.landing-orb--delayed {
+  animation-delay: -4s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-orb,
+  .landing-shell::before {
+    animation: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
