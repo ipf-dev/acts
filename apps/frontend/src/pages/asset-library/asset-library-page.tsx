@@ -456,9 +456,7 @@ function AssetLibraryPageComponent({
                           <AssetTypeIcon assetType={asset.type} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs text-muted-foreground">
-                            {typeLabelMap[asset.type]} · v{asset.versionNumber}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{typeLabelMap[asset.type]}</p>
                           <h2 className="mt-1 line-clamp-1 text-[15px] font-medium">{asset.title}</h2>
                         </div>
                       </div>
@@ -512,7 +510,6 @@ function AssetLibraryPageComponent({
                           <th className="px-4 py-3 font-medium">부서</th>
                           <th className="px-4 py-3 font-medium">제작자</th>
                           <th className="px-4 py-3 font-medium">수정일</th>
-                          <th className="px-4 py-3 font-medium">버전</th>
                           <th className="px-4 py-3 font-medium">액션</th>
                         </tr>
                       </thead>
@@ -555,7 +552,6 @@ function AssetLibraryPageComponent({
                             <td className="px-4 py-4 text-muted-foreground">
                               {cardDateFormatter.format(new Date(asset.updatedAt))}
                             </td>
-                            <td className="px-4 py-4 text-muted-foreground">v{asset.versionNumber}</td>
                             <td className="px-4 py-4">
                               <Button
                                 className="h-8 rounded-xl px-3 text-xs"

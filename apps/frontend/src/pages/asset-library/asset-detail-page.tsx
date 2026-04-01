@@ -254,7 +254,7 @@ export function AssetDetailPage({
                   <h1 className="text-[34px] font-semibold tracking-tight">{asset.title}</h1>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {typeLabelMap[asset.type]} · v{asset.versionNumber} · {asset.organizationName ?? "조직 미지정"}
+                  {typeLabelMap[asset.type]} · {asset.organizationName ?? "조직 미지정"}
                 </p>
               </div>
             </div>
@@ -421,14 +421,9 @@ export function AssetDetailPage({
                           label="소스"
                           value={asset.sourceKind === "FILE" ? "파일 업로드" : "외부 링크"}
                         />
-                        <AssetDataField label="현재 버전" value={`v${asset.versionNumber}`} />
                         {asset.currentFile ? (
                           <>
                             <AssetDataField label="MIME" value={asset.currentFile.mimeType} />
-                            <AssetDataField
-                              label="체크섬"
-                              value={asset.currentFile.checksumSha256?.slice(0, 12) ?? "계산 중"}
-                            />
                           </>
                         ) : (
                           <>
@@ -615,8 +610,6 @@ export function AssetDetailPage({
                   <CardTitle className="text-sm">기본 정보</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <SidebarField label="버전" value={`v${asset.versionNumber}`} />
-                  <SidebarDivider />
                   <SidebarField label="유형" value={typeLabelMap[asset.type]} />
                   <SidebarDivider />
                   <SidebarField label="생성일" value={detailDateFormatter.format(new Date(asset.createdAt))} />

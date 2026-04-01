@@ -95,6 +95,7 @@ Expected first-slice frontend surfaces:
 - admin tag management tab with character create/edit/delete + alias support and location/keyword search, usage-sorted pagination, and unified rename/merge/delete dialogs
 - admin policy tab for retention settings and deleted asset restore status/actions
 - asset library page with file/link split upload modal, 확장자 기반 이미지/오디오/영상/문서 세부 메타데이터 입력, 링크의 `URL` 타입 분리, same-metadata-based image/audio/video/document filters, a background upload progress toast panel updated independently from the main library list render and calculated from uploaded bytes instead of completed file counts, character dropdown + location/keyword tag suggestion search, grouped tag display, server-backed search, org/creator filters, page controls, and company-wide viewer export UI currently hidden
+- current frontend keeps version comparison, current-version labels, and checksum display hidden until those capabilities are implemented end-to-end
 - shell-level feature gating so denied users cannot enter the implemented asset library surface
 - asset detail page with image/video preview or external link summary, history, 타입별 세부 메타데이터를 포함한 editable metadata, download/open-link action, and owner/admin delete action
 - generation request forms and result views
