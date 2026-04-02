@@ -1,6 +1,6 @@
 package com.acts.auth.feature
 
-import com.acts.auth.UserRole
+import com.acts.auth.domain.UserRole
 import com.acts.auth.audit.AdminAuditLogService
 import com.acts.auth.audit.UserFeatureAccessAuditSnapshot
 import com.acts.auth.user.UserAccountEntity

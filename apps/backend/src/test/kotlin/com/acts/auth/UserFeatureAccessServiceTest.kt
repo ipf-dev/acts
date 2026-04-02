@@ -1,5 +1,6 @@
 package com.acts.auth
 
+import com.acts.auth.domain.UserRole
 import com.acts.auth.feature.AppFeatureKey
 import com.acts.auth.feature.UserFeatureAccessService
 import com.acts.auth.user.UserAccountRepository

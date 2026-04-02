@@ -1,6 +1,6 @@
 package com.acts.auth.user
 
-import com.acts.auth.UserRole
+import com.acts.auth.domain.UserRole
 import com.acts.auth.org.OrganizationEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

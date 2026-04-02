@@ -2,6 +2,7 @@ package com.acts.auth
 
 import com.acts.auth.audit.AdminAuditLogAction
 import com.acts.auth.audit.AdminAuditLogRepository
+import com.acts.auth.domain.UserRole
 import com.acts.auth.org.OrganizationEntity
 import com.acts.auth.org.OrganizationRepository
 import com.acts.auth.user.UserDirectoryService

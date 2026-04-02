@@ -1,6 +1,6 @@
 package com.acts.asset.tag
 
-import com.acts.asset.AssetEntity
+import com.acts.asset.domain.AssetEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType

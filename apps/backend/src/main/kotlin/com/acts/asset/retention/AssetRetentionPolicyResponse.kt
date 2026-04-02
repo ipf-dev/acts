@@ -1,6 +1,6 @@
 package com.acts.asset.retention
 
-import com.acts.asset.AssetType
+import com.acts.asset.domain.AssetType
 import java.time.Instant
 
 data class AssetRetentionPolicyResponse(

@@ -1,6 +1,6 @@
 package com.acts.auth.feature
 
-import com.acts.auth.UserRole
+import com.acts.auth.domain.UserRole
 
 data class UserFeatureAuthorizationResponse(
     val email: String,

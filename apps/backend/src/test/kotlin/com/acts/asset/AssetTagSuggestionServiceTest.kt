@@ -1,5 +1,6 @@
 package com.acts.asset
 
+import com.acts.asset.api.AssetStructuredTagsRequest
 import com.acts.asset.tag.AssetTagSuggestionService
 import com.acts.asset.tag.AssetTagType
 import com.acts.asset.tag.CharacterTagEntity

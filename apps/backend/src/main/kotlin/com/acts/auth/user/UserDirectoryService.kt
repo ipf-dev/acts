@@ -1,8 +1,8 @@
 package com.acts.auth.user
 
-import com.acts.auth.ActsAuthProperties
-import com.acts.auth.AuthUserProfile
-import com.acts.auth.UserRole
+import com.acts.auth.domain.ActsAuthProperties
+import com.acts.auth.api.AuthUserProfile
+import com.acts.auth.domain.UserRole
 import com.acts.auth.allowlist.ViewerAllowlistEntity
 import com.acts.auth.allowlist.ViewerAllowlistEntryResponse
 import com.acts.auth.allowlist.ViewerAllowlistRepository

@@ -1,5 +1,6 @@
 package com.acts.asset.tag
 
+import com.acts.asset.api.AssetStructuredTagsRequest
 import org.springframework.stereotype.Component
 import java.util.LinkedHashMap
 
@@ -8,7 +9,7 @@ class AssetTagSuggestionService(
     private val characterTagRepository: CharacterTagRepository,
 ) {
     fun buildTags(
-        requestedTags: com.acts.asset.AssetStructuredTagsRequest,
+        requestedTags: AssetStructuredTagsRequest,
     ): List<AssetTagCandidate> {
         val tagsByNormalizedValue = LinkedHashMap<String, AssetTagCandidate>()
 

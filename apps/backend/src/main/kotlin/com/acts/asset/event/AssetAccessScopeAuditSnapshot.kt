@@ -1,6 +1,6 @@
 package com.acts.asset.event
 
-import com.acts.asset.AssetEntity
+import com.acts.asset.domain.AssetEntity
 
 data class AssetAccessScopeAuditSnapshot(
     val assetId: Long,

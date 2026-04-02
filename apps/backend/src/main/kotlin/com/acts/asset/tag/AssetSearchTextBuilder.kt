@@ -1,6 +1,6 @@
 package com.acts.asset.tag
 
-import com.acts.asset.AssetEntity
+import com.acts.asset.domain.AssetEntity
 import org.springframework.stereotype.Component
 import java.text.Normalizer
 
