@@ -1,4 +1,4 @@
-import { ApiError, type DownloadedFile } from "../../api/client";
+import { ApiError } from "../../api/client";
 import type {
   AssetStructuredTagsInput,
   AssetStructuredTagsView,
@@ -44,18 +44,16 @@ export function getAssetApiErrorMessage(
   return messages.fallback;
 }
 
-export function triggerFileDownload(file: DownloadedFile): void {
-  const url = URL.createObjectURL(file.blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = file.fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
 export function triggerFileAccessUrlDownload(accessUrl: string): void {
+  try {
+    const parsed = new URL(accessUrl, window.location.origin);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return;
+    }
+  } catch {
+    return;
+  }
+
   const anchor = document.createElement("a");
   anchor.href = accessUrl;
   document.body.appendChild(anchor);
@@ -80,6 +78,15 @@ export function getAssetPrimaryText(asset: Pick<AssetSummaryView, "description" 
 }
 
 export function openAssetExternalLink(linkUrl: string): void {
+  try {
+    const parsed = new URL(linkUrl);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return;
+    }
+  } catch {
+    return;
+  }
+
   window.open(linkUrl, "_blank", "noopener,noreferrer");
 }
 

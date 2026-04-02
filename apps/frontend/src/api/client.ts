@@ -418,6 +418,8 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
   };
 }
 
+export const dashboardApi = createDashboardApi();
+
 function parseContentDispositionFileName(contentDisposition: string | null): string | null {
   if (!contentDisposition) {
     return null;

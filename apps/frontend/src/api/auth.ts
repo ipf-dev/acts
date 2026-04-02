@@ -20,10 +20,6 @@ export function createAnonymousSession(): AuthSessionView {
   };
 }
 
-export function getLoginSuccessMessage(_search: string): string | null {
-  return null;
-}
-
 export function getLoginFailureMessage(search: string): string | null {
   const params = new URLSearchParams(search);
   const code = params.get("loginError");

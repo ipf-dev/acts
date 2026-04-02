@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import type React from "react";
-import { createDashboardApi } from "../../api/client";
+import { dashboardApi } from "../../api/client";
 import {
   clearLoginRedirectState,
-  getLoginFailureMessage,
-  getLoginSuccessMessage
+  getLoginFailureMessage
 } from "../../api/auth";
 import type {
   AdminAssetTagCatalogView,
@@ -50,9 +49,6 @@ interface LoadedAdminData {
   organizations: OrganizationOptionView[];
 }
 
-const dashboardApi = createDashboardApi();
-const initialLocationSearch = window.location.search;
-
 async function loadAdminData(): Promise<LoadedAdminData> {
   const [
     adminUsers,
@@ -88,13 +84,14 @@ interface AdminPageContainerProps {
 }
 
 export function AdminPageContainer({ session: initialSession }: AdminPageContainerProps): React.JSX.Element {
+  const [initialLocationSearch] = useState(() => window.location.search);
   const [state, setState] = useState<AdminPageState>({
     adminUsers: [],
     assetTagCatalog: null,
     assetRetentionPolicy: null,
     auditLogs: [],
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
-    authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+    authSuccessMessage: null,
     deletedAssets: [],
     isSavingAssetTags: false,
     isSavingAssignment: false,
@@ -115,7 +112,7 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
       try {
         let adminData: LoadedAdminData | null = null;
         let authErrorMessage = getLoginFailureMessage(initialLocationSearch);
-        let authSuccessMessage = getLoginSuccessMessage(initialLocationSearch);
+        let authSuccessMessage: string | null = null;
 
         if (initialSession.authenticated && initialSession.user?.role === "ADMIN") {
           try {
@@ -166,7 +163,7 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [initialSession, initialLocationSearch]);
 
   function applyAdminData(
     currentState: AdminPageState,

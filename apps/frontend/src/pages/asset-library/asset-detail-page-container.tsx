@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
-import { createDashboardApi } from "../../api/client";
+import { dashboardApi } from "../../api/client";
 import {
   clearLoginRedirectState,
-  getLoginFailureMessage,
-  getLoginSuccessMessage
+  getLoginFailureMessage
 } from "../../api/auth";
 import type {
   AssetDetailView,
@@ -47,9 +46,6 @@ interface AssetDetailPageContainerProps {
   session: AuthSessionView;
 }
 
-const dashboardApi = createDashboardApi();
-const initialLocationSearch = window.location.search;
-
 export function AssetDetailPageContainer({
   assetId,
   onBack,
@@ -57,10 +53,11 @@ export function AssetDetailPageContainer({
   onOpenRelatedAsset,
   session: initialSession
 }: AssetDetailPageContainerProps): React.JSX.Element {
+  const [initialLocationSearch] = useState(() => window.location.search);
   const [state, setState] = useState<AssetDetailPageState>({
     asset: null,
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
-    authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+    authSuccessMessage: null,
     characterOptions: [],
     isDeleting: false,
     isDownloading: false,
@@ -121,7 +118,7 @@ export function AssetDetailPageContainer({
           ...currentState,
           asset: loadedPageData.asset,
           authErrorMessage: getLoginFailureMessage(initialLocationSearch),
-          authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+          authSuccessMessage: null,
           characterOptions: loadedPageData.characterOptions,
           isLoading: false,
           isLoadingPlayback: shouldLoadPlaybackUrl(loadedPageData.asset),

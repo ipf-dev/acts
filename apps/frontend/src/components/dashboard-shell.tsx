@@ -9,7 +9,7 @@ import {
   LogOut,
   ShieldCheck
 } from "lucide-react";
-import { createDashboardApi } from "../api/client";
+import { dashboardApi } from "../api/client";
 import type { AuthSessionView } from "../api/types";
 import {
   DropdownMenu,
@@ -29,8 +29,6 @@ interface DashboardShellProps {
   onNavigate: (navigationKey: DashboardNavigationKey) => void;
   session: AuthSessionView;
 }
-
-const dashboardApi = createDashboardApi();
 
 type NavigationItem =
   | { icon: LucideIcon; key: DashboardNavigationKey; label: string; type: "internal" }

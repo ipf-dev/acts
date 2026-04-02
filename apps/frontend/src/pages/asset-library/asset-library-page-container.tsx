@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
-import { createDashboardApi } from "../../api/client";
+import { dashboardApi } from "../../api/client";
 import {
   clearLoginRedirectState,
-  getLoginFailureMessage,
-  getLoginSuccessMessage
+  getLoginFailureMessage
 } from "../../api/auth";
 import type {
   AssetCatalogFilterOptionsView,
@@ -50,8 +49,6 @@ interface AssetLibraryPageContainerProps {
   session: AuthSessionView;
 }
 
-const dashboardApi = createDashboardApi();
-const initialLocationSearch = window.location.search;
 const emptyTagOptions: AssetTagOptionCatalogView = {
   keywords: [],
   locations: []
@@ -76,10 +73,11 @@ export function AssetLibraryPageContainer({
   searchQuery,
   session: initialSession
 }: AssetLibraryPageContainerProps): React.JSX.Element {
+  const [initialLocationSearch] = useState(() => window.location.search);
   const [state, setState] = useState<AssetLibraryPageState>({
     assetCatalog: emptyCatalogPage,
     authErrorMessage: getLoginFailureMessage(initialLocationSearch),
-    authSuccessMessage: getLoginSuccessMessage(initialLocationSearch),
+    authSuccessMessage: null,
     catalogFilterOptions: emptyCatalogFilterOptions,
     characterOptions: [],
     tagOptions: emptyTagOptions,
@@ -584,7 +582,7 @@ async function runWithConcurrency<T>(
 
 function createSuccessfulResults(count: number): PromiseSettledResult<void>[] {
   return Array.from({ length: count }, () => ({
-    status: "fulfilled",
+    status: "fulfilled" as const,
     value: undefined
   }));
 }

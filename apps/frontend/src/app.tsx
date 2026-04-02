@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type React from "react";
-import { createDashboardApi } from "./api/client";
+import { dashboardApi } from "./api/client";
 import { createAnonymousSession } from "./api/auth";
 import type { AuthSessionView } from "./api/types";
 import { AssetDetailPageContainer } from "./pages/asset-library/asset-detail-page-container";
@@ -16,8 +16,6 @@ interface AppLocationState {
 
 const ASSET_ID_PARAM = "assetId";
 const SECTION_PARAM = "section";
-const dashboardApi = createDashboardApi();
-
 function readAppLocation(location: Location = window.location): AppLocationState {
   const params = new URLSearchParams(location.search);
   const activeNavigationKey = params.get(SECTION_PARAM) === "admin" ? "admin" : "assets";
@@ -40,7 +38,7 @@ function writeAppLocation(nextState: AppLocationState, method: "push" | "replace
   } else {
     nextUrl.searchParams.delete(SECTION_PARAM);
 
-    if (nextState.selectedAssetId) {
+    if (nextState.selectedAssetId !== null) {
       nextUrl.searchParams.set(ASSET_ID_PARAM, String(nextState.selectedAssetId));
     } else {
       nextUrl.searchParams.delete(ASSET_ID_PARAM);
@@ -93,31 +91,31 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener("popstate", syncLocation);
   }, []);
 
-  function navigateTo(nextState: AppLocationState, method: "push" | "replace" = "push"): void {
+  const navigateTo = useCallback((nextState: AppLocationState, method: "push" | "replace" = "push"): void => {
     setLocationState(nextState);
     writeAppLocation(nextState, method);
-  }
+  }, []);
 
-  function handleNavigation(navigationKey: DashboardNavigationKey): void {
+  const handleNavigation = useCallback((navigationKey: DashboardNavigationKey): void => {
     navigateTo({
       activeNavigationKey: navigationKey,
       selectedAssetId: null
     });
-  }
+  }, [navigateTo]);
 
-  function handleOpenAssetDetailPage(assetId: number): void {
+  const handleOpenAssetDetailPage = useCallback((assetId: number): void => {
     navigateTo({
       activeNavigationKey: "assets",
       selectedAssetId: assetId
     });
-  }
+  }, [navigateTo]);
 
-  function handleCloseAssetDetail(): void {
+  const handleCloseAssetDetail = useCallback((): void => {
     navigateTo({
       activeNavigationKey: "assets",
       selectedAssetId: null
     });
-  }
+  }, [navigateTo]);
 
   if (session === null || !session.authenticated) {
     const resolvedSession = session ?? createAnonymousSession();
@@ -133,7 +131,7 @@ export function App(): React.JSX.Element {
   return (
     <DashboardShell activeNavigationKey={locationState.activeNavigationKey} onNavigate={handleNavigation} session={session}>
       {locationState.activeNavigationKey === "assets" ? (
-        locationState.selectedAssetId ? (
+        locationState.selectedAssetId !== null ? (
           <AssetDetailPageContainer
             assetId={locationState.selectedAssetId}
             onBack={handleCloseAssetDetail}
