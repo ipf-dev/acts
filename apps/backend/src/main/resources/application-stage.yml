@@ -16,6 +16,6 @@ acts:
     backend-base-url: ${BACKEND_BASE_URL}
     frontend-base-url: ${FRONTEND_BASE_URL}
   storage:
-    bucket: acts-assets-prod
+    bucket: acts-assets-stage
   preview:
-    video-thumbnail-lambda-function-name: ${ACTS_PREVIEW_VIDEO_THUMBNAIL_LAMBDA_FUNCTION_NAME:acts-video-preview-generator}
+    video-thumbnail-lambda-function-name: ${ACTS_PREVIEW_VIDEO_THUMBNAIL_LAMBDA_FUNCTION_NAME:}

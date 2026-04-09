@@ -50,6 +50,13 @@ This runbook tracks the current AWS deployment assumptions for `acts`.
 - `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET`
 - `ACTS_PREVIEW_VIDEO_THUMBNAIL_LAMBDA_FUNCTION_NAME`
 
+## Stage Profile Notes
+
+- set `SPRING_PROFILES_ACTIVE=stage` on the stage Elastic Beanstalk environment
+- set `ACTS_STORAGE_BUCKET` to a stage-only S3 bucket so stage uploads do not land in the prod bucket
+- set stage-specific values for `SPRING_DATASOURCE_*`, `BACKEND_BASE_URL`, and `FRONTEND_BASE_URL`
+- `ACTS_PREVIEW_VIDEO_THUMBNAIL_LAMBDA_FUNCTION_NAME` is optional in stage; if left blank, video preview dispatch is skipped
+
 ## Runtime Notes
 
 - keep the first rollout public and HTTPS-enabled so Google OAuth redirect setup stays simple
