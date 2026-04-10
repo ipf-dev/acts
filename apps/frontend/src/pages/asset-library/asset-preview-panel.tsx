@@ -27,6 +27,7 @@ export function AssetPreviewPanel({
   const [hasPreviewError, setHasPreviewError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const isPreviewable = sourceKind === "FILE" && (assetType === "IMAGE" || assetType === "VIDEO");
+  const previewImageFitClassName = assetType === "IMAGE" ? "object-contain" : "object-cover";
 
   useEffect(() => {
     setHasPreviewError(false);
@@ -63,7 +64,7 @@ export function AssetPreviewPanel({
     <div className={cn("relative overflow-hidden rounded-[18px] bg-muted", className)}>
       <img
         alt={title}
-        className={cn("h-full w-full object-cover", imageClassName)}
+        className={cn("h-full w-full object-center", previewImageFitClassName, imageClassName)}
         onError={() => setHasPreviewError(true)}
         src={buildAssetPreviewUrl(assetId, `${cacheKey}-${retryCount}`)}
       />
