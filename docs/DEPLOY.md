@@ -57,6 +57,36 @@ This runbook tracks the current AWS deployment assumptions for `acts`.
 - set stage-specific values for `SPRING_DATASOURCE_*`, `BACKEND_BASE_URL`, and `FRONTEND_BASE_URL`
 - `ACTS_PREVIEW_VIDEO_THUMBNAIL_LAMBDA_FUNCTION_NAME` is optional in stage; if left blank, video preview dispatch is skipped
 
+## GitHub Actions Release Flow
+
+- pushing to the `stage` branch deploys the current commit to the stage Elastic Beanstalk environment
+- pushing a Git tag that matches `v*` deploys the tagged commit to the prod Elastic Beanstalk environment
+- prod tags must be created from the exact commit that finished stage verification so prod receives the reviewed release candidate
+- if release-only fixes are needed, create a `release/vX.Y.Z` branch from the validated stage commit, make the final fixes there, then tag that final commit
+
+## Release Commands
+
+Tag the currently checked out validated commit directly:
+
+```bash
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+Create a release branch from a validated stage commit first:
+
+```bash
+git checkout stage
+git pull origin stage
+git checkout -b release/v1.0.1 <validated-stage-commit-sha>
+
+# optional final release-only fixes
+
+git tag v1.0.1
+git push origin release/v1.0.1
+git push origin v1.0.1
+```
+
 ## Runtime Notes
 
 - keep the first rollout public and HTTPS-enabled so Google OAuth redirect setup stays simple
@@ -72,6 +102,8 @@ This runbook tracks the current AWS deployment assumptions for `acts`.
 1. Confirm `docs/BRIEF.md` still matches shipped scope.
 2. Confirm environment variables and secrets are documented.
 3. Confirm build and smoke checks pass.
-4. Confirm the Elastic Beanstalk environment is running the intended application version.
-5. Confirm rollback procedure is written here before team use.
-6. Confirm the target Lambda function points at the intended ECR image tag or digest.
+4. Confirm stage verification finished on the exact commit that will receive the release tag.
+5. Confirm the Elastic Beanstalk environment is running the intended application version.
+6. Confirm the prod deployment was triggered by the intended `vX.Y.Z` tag.
+7. Confirm rollback procedure is written here before team use.
+8. Confirm the target Lambda function points at the intended ECR image tag or digest.

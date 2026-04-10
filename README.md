@@ -26,3 +26,20 @@ starting point.
 2. Confirm or replace the default stack in `docs/ARCHITECTURE.md`.
 3. Add the first backend and frontend feature with the naming rules in `docs/FRONTEND_FILE_SUFFIX_RULES.md`.
 
+## Deployment
+
+- Web app deploy target: AWS Elastic Beanstalk in `ap-northeast-2`
+- Stage deploy trigger: push to the `stage` branch
+- Production deploy trigger: push a Git tag that matches `v*` such as `v1.0.1`
+- Production tags must be created from the exact commit that finished stage verification
+- If release-only fixes are needed, create `release/vX.Y.Z` from the validated stage commit, make the final fixes there, then tag that final commit
+
+Example production release:
+
+```bash
+git checkout <validated-commit>
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+See `docs/DEPLOY.md` for Elastic Beanstalk setup, environment variables, and the full release checklist.
