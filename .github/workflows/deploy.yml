@@ -60,13 +60,31 @@ jobs:
           role-to-assume: ${{ steps.env.outputs.role_arn }}
           aws-region: ap-northeast-2
 
-      - name: Generate source bundle
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push web image
+        id: image
+        env:
+          ECR_REPOSITORY: ${{ vars.ECR_WEB_REPOSITORY }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.env.outputs.version_label }}
         run: |
-          zip -r source-bundle.zip . \
-            -x '.git/*' \
-            -x 'node_modules/*' \
-            -x '.agents/*' \
-            -x '.claude/*'
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          docker build --tag "${IMAGE_URI}" .
+          docker push "${IMAGE_URI}"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Dockerrun bundle
+        run: |
+          mkdir bundle
+          sed "s|__IMAGE_URI__|${{ steps.image.outputs.image_uri }}|g" \
+            infra/aws/elastic-beanstalk/web/Dockerrun.aws.json.template > bundle/Dockerrun.aws.json
+          (
+            cd bundle
+            zip -r ../source-bundle.zip Dockerrun.aws.json
+          )
 
       - name: Deploy to Elastic Beanstalk
         run: |

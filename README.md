@@ -29,6 +29,7 @@ starting point.
 ## Deployment
 
 - Web app deploy target: AWS Elastic Beanstalk in `ap-northeast-2`
+- Web app images are built in GitHub Actions and pushed to Amazon ECR before Elastic Beanstalk deploys them
 - Stage deploy trigger: push to the `stage` branch
 - Production deploy trigger: push a Git tag that matches `v*` such as `v1.0.1`
 - Production tags must be created from the exact commit that finished stage verification
@@ -42,4 +43,4 @@ git tag v1.0.1
 git push origin v1.0.1
 ```
 
-See `docs/DEPLOY.md` for Elastic Beanstalk setup, environment variables, and the full release checklist.
+See `docs/DEPLOY.md` for Elastic Beanstalk setup, ECR prerequisites, environment variables, and the full release checklist.
