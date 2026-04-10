@@ -111,6 +111,7 @@ AI 기반 콘텐츠 제작 및 관리 플랫폼이다. 이 문서는 왜 지금 
 
 - Team constraints: 개발 인력 1명 기준으로 핵심 흐름만 우선 구현해야 한다.
 - Technical constraints: Gemini 및 Nano Banana 2 연동 과정에서 예기치 않은 기술 문제가 발생할 수 있다.
+- Technical constraints: stage/prod 웹 배포는 EC2 인스턴스 로컬 빌드 대신 CI에서 빌드한 ECR 이미지를 재사용해 배포 시간과 환경 드리프트를 줄여야 한다.
 - Delivery constraints: 2026년 4월 1일까지 데모 가능한 수준의 MVP를 완성해야 한다.
 - Data, security, or compliance constraints: 초기에는 내부 제작 자산과 IP 가이드를 안전하게 다뤄야 하며, AI 품질은 학습 데이터의 충분성과 정확도에 크게 의존한다.
 

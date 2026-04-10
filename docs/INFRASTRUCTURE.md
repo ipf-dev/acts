@@ -12,17 +12,18 @@ Use `infra/docker-compose.yml` for the default local stack.
   - LocalStack S3
 - AWS runtime
   - web app: `Elastic Beanstalk`
-  - runtime package: single web service for same-origin frontend + backend delivery
+  - runtime package: single web service for same-origin frontend + backend delivery, deployed from a prebuilt Amazon ECR image
   - relational database: `PostgreSQL cluster` on managed AWS database service
   - asset storage: `S3`
   - video preview worker: `Lambda`
-  - image registry: `ECR` for Lambda worker images
+  - image registry: `ECR` for the web app image and Lambda worker images
 
 ## Web App Runtime
 
 - deploy region target: `ap-northeast-2` (`Seoul`)
 - deploy target: a single containerized web service on `Elastic Beanstalk`
 - reason: keep Google SSO, session flow, and frontend `/api` calls on one origin
+- CI/CD: GitHub Actions builds the web Docker image, pushes it to ECR, and uploads a minimal `Dockerrun.aws.json` bundle to Elastic Beanstalk
 - App Runner is excluded because Seoul region support is unavailable
 - selected Beanstalk shape: single-container Docker environment
 - recommended first rollout: public HTTPS endpoint, single running instance, custom domain added after the first successful deploy

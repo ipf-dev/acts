@@ -32,6 +32,7 @@ The first product slice should support a single internal production loop:
 - reason: preserve current Google SSO redirect flow, session handling, and frontend relative `/api` calls without introducing cross-origin auth complexity
 - deploy region target: `ap-northeast-2` (`Seoul`)
 - `Elastic Beanstalk` is selected for the fastest first deployment path
+- GitHub Actions builds the web container image and pushes it to Amazon ECR, and Elastic Beanstalk deploys that prebuilt image via `Dockerrun.aws.json`
 - `stage` branch pushes deploy to the stage Beanstalk environment, while prod deploys are triggered from `v*` Git tags created on verified release commits
 - `App Runner` is excluded because Seoul region support is unavailable
 - background preview generation remains a separate Lambda container worker
