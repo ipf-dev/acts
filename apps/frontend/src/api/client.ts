@@ -102,8 +102,16 @@ export class ApiError extends Error {
 }
 
 export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi {
+  function handleSessionExpired(response: Response): void {
+    if (response.redirected || response.status === 401) {
+      window.location.assign("/");
+      throw new ApiError(401, "세션이 만료되었습니다. 다시 로그인해주세요.");
+    }
+  }
+
   async function readJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
     const response = await fetchFn(input, init);
+    handleSessionExpired(response);
     if (!response.ok) {
       throw new ApiError(response.status);
     }
@@ -113,6 +121,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
 
   async function readFile(input: RequestInfo, init?: RequestInit): Promise<DownloadedFile> {
     const response = await fetchFn(input, init);
+    handleSessionExpired(response);
     if (!response.ok) {
       throw new ApiError(response.status);
     }
@@ -134,6 +143,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
         },
         body: JSON.stringify(input)
       });
+      handleSessionExpired(response);
 
       if (!response.ok) {
         throw new ApiError(response.status);
@@ -146,6 +156,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
           method: "DELETE"
         }
       );
+      handleSessionExpired(response);
 
       if (!response.ok) {
         throw new ApiError(response.status);
@@ -155,6 +166,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       const response = await fetchFn(`/api/auth/admin/asset-tags/characters/${characterId}`, {
         method: "DELETE"
       });
+      handleSessionExpired(response);
 
       if (!response.ok) {
         throw new ApiError(response.status);
@@ -164,6 +176,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       const response = await fetchFn(`/api/assets/${assetId}`, {
         method: "DELETE"
       });
+      handleSessionExpired(response);
 
       if (!response.ok) {
         throw new ApiError(response.status);
@@ -214,6 +227,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
         },
         body: JSON.stringify(input)
       });
+      handleSessionExpired(response);
 
       if (!response.ok) {
         throw new ApiError(response.status);
@@ -236,6 +250,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
         },
         body: JSON.stringify(input)
       });
+      handleSessionExpired(response);
 
       if (!response.ok) {
         throw new ApiError(response.status);
@@ -245,6 +260,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       const response = await fetchFn(`/api/assets/${assetId}/restore`, {
         method: "POST"
       });
+      handleSessionExpired(response);
 
       if (!response.ok) {
         throw new ApiError(response.status);
@@ -336,6 +352,7 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
         },
         body: JSON.stringify(input)
       });
+      handleSessionExpired(response);
 
       if (!response.ok) {
         throw new ApiError(response.status);
