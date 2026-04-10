@@ -2,7 +2,9 @@ name: Deploy
 
 on:
   push:
-    branches: [stage, prod]
+    branches: [stage]
+    tags:
+      - 'v*'
 
 permissions:
   id-token: write
@@ -42,12 +44,14 @@ jobs:
       - name: Set environment
         id: env
         run: |
-          if [ "${{ github.ref_name }}" = "prod" ]; then
+          if [ "${{ github.ref_type }}" = "tag" ]; then
             echo "eb_env=${{ vars.EB_PROD_ENVIRONMENT }}" >> "$GITHUB_OUTPUT"
             echo "role_arn=${{ secrets.AWS_ROLE_ARN_PROD }}" >> "$GITHUB_OUTPUT"
+            echo "version_label=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           else
             echo "eb_env=${{ vars.EB_STAGE_ENVIRONMENT }}" >> "$GITHUB_OUTPUT"
             echo "role_arn=${{ secrets.AWS_ROLE_ARN_STAGE }}" >> "$GITHUB_OUTPUT"
+            echo "version_label=acts-stage-${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure AWS credentials
@@ -66,7 +70,7 @@ jobs:
 
       - name: Deploy to Elastic Beanstalk
         run: |
-          VERSION_LABEL="acts-${{ github.ref_name }}-${{ github.sha }}"
+          VERSION_LABEL="${{ steps.env.outputs.version_label }}"
           APP_NAME="${{ vars.EB_APPLICATION_NAME }}"
           S3_BUCKET="${{ vars.EB_S3_BUCKET }}"
 
