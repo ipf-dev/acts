@@ -24,6 +24,46 @@ export interface AssetStructuredTagsInput {
   keywords: string[];
 }
 
+export interface HubEpisodeNavigationView {
+  code: string;
+  key: string;
+  title: string;
+}
+
+export interface HubLevelNavigationView {
+  episodes: HubEpisodeNavigationView[];
+  key: string;
+  label: string;
+}
+
+export interface HubSeriesNavigationView {
+  key: string;
+  label: string;
+  levels: HubLevelNavigationView[];
+}
+
+export interface HubNavigationView {
+  series: HubSeriesNavigationView[];
+}
+
+export interface HubSeriesCreateInputView {
+  name: string;
+}
+
+export interface HubLevelCreateInputView {
+  levelNumber: number;
+}
+
+export interface HubEpisodeUpsertInputView {
+  description: string;
+  episodeNumber?: number;
+  name: string;
+}
+
+export interface HubEpisodeSlotCreateInputView {
+  name: string;
+}
+
 export interface CharacterTagOptionView {
   id: number;
   name: string;
@@ -236,6 +276,29 @@ export interface AssetSummaryView {
   canDownload: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface HubEpisodeSlotView {
+  slotId: number;
+  slotName: string;
+  slotOrder: number;
+  linkedAssets: AssetSummaryView[];
+}
+
+export interface HubEpisodeView {
+  seriesKey: string;
+  seriesLabel: string;
+  levelKey: string;
+  levelLabel: string;
+  episodeKey: string;
+  episodeCode: string;
+  episodeDescription: string | null;
+  episodeTitle: string;
+  slots: HubEpisodeSlotView[];
+}
+
+export interface HubEpisodeSlotAssetLinkInput {
+  assetId: number;
 }
 
 export interface AssetCatalogPageView {

@@ -127,7 +127,7 @@ class AssetLifecycleService(
                 eventType = AssetEventType.RESTORED,
                 actorEmail = actor.email,
                 actorName = actorName ?: actor.displayName,
-                detail = "자산이 휴지통에서 복구되었습니다.",
+                detail = "에셋이 휴지통에서 복구되었습니다.",
             ),
         )
 
@@ -141,7 +141,7 @@ class AssetLifecycleService(
     }
 
     private fun requireRetentionPolicy(): AssetRetentionPolicyEntity = assetRetentionPolicyRepository.findFirstByOrderByUpdatedAtDescIdDesc()
-        ?: throw IllegalStateException("자산 보관 정책이 없습니다.")
+        ?: throw IllegalStateException("에셋 보관 정책이 없습니다.")
 
     private fun requireActor(actorEmail: String) = userAccountRepository.findById(actorEmail.lowercase())
         .orElseThrow { IllegalArgumentException("로그인 사용자 정보를 찾을 수 없습니다.") }
@@ -153,10 +153,10 @@ class AssetLifecycleService(
     }
 
     private fun requireDeletedAsset(assetId: Long): AssetEntity = assetRepository.findById(assetId)
-        .orElseThrow { IllegalArgumentException("삭제된 자산을 찾을 수 없습니다.") }
+        .orElseThrow { IllegalArgumentException("삭제된 에셋을 찾을 수 없습니다.") }
         .also { asset ->
             if (asset.deletedAt == null) {
-                throw IllegalArgumentException("삭제된 자산을 찾을 수 없습니다.")
+                throw IllegalArgumentException("삭제된 에셋을 찾을 수 없습니다.")
             }
         }
 

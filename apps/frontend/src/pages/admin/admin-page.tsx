@@ -2,13 +2,8 @@ import { useEffect, useState } from "react";
 import type React from "react";
 import {
   AlertTriangle,
-  Clock3,
   RotateCcw,
-  Search,
-  Settings2,
-  SlidersHorizontal,
-  Tags,
-  Users
+  Search
 } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -21,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue
 } from "../../components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { cn, isBlank } from "../../lib/utils";
 import type {
   AdminAssetTagCatalogView,
@@ -37,7 +31,10 @@ import type {
 } from "../../api/types";
 import { AdminAssetTagManagement } from "./admin-asset-tag-management-panel";
 
+type AdminTabKey = "users" | "features" | "policy" | "asset-tags" | "audit";
+
 interface AdminPageProps {
+  activeTab: AdminTabKey;
   adminUsers: AuthUserView[];
   assetTagCatalog: AdminAssetTagCatalogView | null;
   assetRetentionPolicy: AssetRetentionPolicyView | null;
@@ -83,16 +80,39 @@ interface UserFeatureAccessDraft {
   allowedFeatureKeys: AppFeatureKeyView[];
 }
 
+const adminTabHeaders: Record<AdminTabKey, { title: string; description: string }> = {
+  users: {
+    title: "사용자 관리",
+    description: "최초 로그인 사용자는 미지정 상태로 저장되며, 관리자가 조직을 수동 지정해 계정 메타데이터를 정리합니다."
+  },
+  features: {
+    title: "기능 권한",
+    description: "사용자별 기능 접근 권한을 확인하고 Allow/Deny 상태를 관리합니다."
+  },
+  policy: {
+    title: "정책 설정",
+    description: "휴지통 보관 기간과 복구 허용 여부를 설정합니다. 정책이 바뀌면 감사 로그에 저장됩니다."
+  },
+  "asset-tags": {
+    title: "태그 관리",
+    description: "캐릭터, 장소, 키워드 태그를 등록하고 이름 변경, 병합, 삭제를 수행합니다."
+  },
+  audit: {
+    title: "감사 로그",
+    description: "로그인, 사용자 조직/역할 변경, 에셋 정책 변경, 복구 이력을 저장하고 조회합니다."
+  }
+};
+
 const auditTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "short",
   timeStyle: "short"
 });
 
 const auditActionLabelMap: Record<string, string> = {
-  ASSET_ACCESS_DENIED: "자산 접근 차단",
-  ASSET_ACCESS_SCOPE_UPDATED: "자산 열람 조직 변경",
-  ASSET_EXPORTED: "자산 내보내기",
-  ASSET_RESTORED: "자산 복구",
+  ASSET_ACCESS_DENIED: "에셋 접근 차단",
+  ASSET_ACCESS_SCOPE_UPDATED: "에셋 열람 조직 변경",
+  ASSET_EXPORTED: "에셋 내보내기",
+  ASSET_RESTORED: "에셋 복구",
   ASSET_RETENTION_POLICY_UPDATED: "정책 변경",
   LOGIN_SUCCESS: "로그인 성공",
   USER_FEATURE_ACCESS_UPDATED: "기능 권한 변경",
@@ -113,6 +133,7 @@ function formatUserRoleLabel(role: AuthUserView["role"] | UserFeatureAuthorizati
 }
 
 export function AdminPage({
+  activeTab,
   adminUsers,
   assetTagCatalog,
   assetRetentionPolicy,
@@ -367,7 +388,7 @@ export function AdminPage({
   }
 
   async function handleRestoreClick(assetId: number): Promise<void> {
-    const confirmed = window.confirm("이 자산을 휴지통에서 복구하시겠습니까?");
+    const confirmed = window.confirm("이 에셋을 휴지통에서 복구하시겠습니까?");
     if (!confirmed) {
       return;
     }
@@ -377,13 +398,11 @@ export function AdminPage({
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-[32px] font-semibold tracking-tight">관리자 설정</h1>
-          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            사용자 관리, 권한 설정, 정책 관리 및 감사 로그를 확인하세요.
-          </p>
-        </div>
+      <div className="space-y-1">
+        <h1 className="text-[32px] font-semibold tracking-tight">{adminTabHeaders[activeTab].title}</h1>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+          {adminTabHeaders[activeTab].description}
+        </p>
       </div>
 
       {authSuccessMessage ? (
@@ -399,57 +418,10 @@ export function AdminPage({
         </div>
       ) : null}
 
-      <Tabs className="space-y-6" defaultValue="users">
-        <TabsList className="h-auto flex-wrap justify-start gap-1 rounded-full bg-muted p-1">
-          <TabsTrigger
-            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-            value="users"
-          >
-            <Users className="mr-2 h-4 w-4" />
-            사용자 관리
-          </TabsTrigger>
-          <TabsTrigger
-            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-            value="features"
-          >
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
-            기능 권한
-          </TabsTrigger>
-          <TabsTrigger
-            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-            value="policy"
-          >
-            <Settings2 className="mr-2 h-4 w-4" />
-            정책 설정
-          </TabsTrigger>
-          <TabsTrigger
-            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-            value="asset-tags"
-          >
-            <Tags className="mr-2 h-4 w-4" />
-            태그 관리
-          </TabsTrigger>
-          <TabsTrigger
-            className="rounded-full px-4 py-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-            value="audit"
-          >
-            <Clock3 className="mr-2 h-4 w-4" />
-            감사 로그
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="users">
+      {activeTab === "users" ? (
           <div className="space-y-6">
             <Card className="rounded-[24px] border-border shadow-none">
               <CardHeader className="space-y-4">
-                <div>
-                  <CardTitle>사용자 관리</CardTitle>
-                  <CardDescription>
-                    최초 로그인 사용자는 미지정 상태로 저장되며, 관리자가 조직을 수동 지정해
-                    계정 메타데이터를 정리합니다.
-                  </CardDescription>
-                </div>
-
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,360px)_1fr] lg:items-center">
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -571,9 +543,7 @@ export function AdminPage({
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="features">
+      ) : activeTab === "features" ? (
           <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
             <Card className="rounded-[24px] border-border shadow-none">
               <CardHeader className="space-y-4">
@@ -671,13 +641,7 @@ export function AdminPage({
             </Card>
 
             <Card className="rounded-[24px] border-border shadow-none">
-              <CardHeader className="space-y-4">
-                <CardTitle>기능 권한</CardTitle>
-                <CardDescription>
-                  기능별 상태를 확인하고 해당 사용자의 기능별 Allow/Deny를 바꿉니다.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="space-y-5 pt-6">
                 {session.authenticated && currentUser?.role === "ADMIN" ? (
                   selectedFeatureUser ? (
                     <>
@@ -834,21 +798,13 @@ export function AdminPage({
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="policy">
+      ) : activeTab === "policy" ? (
           <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
             <Card className="rounded-[24px] border-border shadow-none">
-              <CardHeader>
-                <CardTitle>저장 및 삭제 정책</CardTitle>
-                <CardDescription>
-                  휴지통 보관 기간과 복구 허용 여부를 설정합니다. 정책이 바뀌면 감사 로그에 저장됩니다.
-                </CardDescription>
-              </CardHeader>
               <CardContent className="space-y-5">
                 {session.authenticated && currentUser?.role === "ADMIN" && policyDraft ? (
                   <>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
                       <div className="rounded-2xl border border-border bg-muted/30 p-4">
                         <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                           휴지통 보관 기간
@@ -870,7 +826,7 @@ export function AdminPage({
                           value={policyDraft.trashRetentionDays}
                         />
                         <p className="mt-2 text-sm text-muted-foreground">
-                          삭제된 자산은 휴지통에서 최대 {policyDraft.trashRetentionDays}일 동안 복구 가능합니다.
+                          삭제된 에셋은 휴지통에서 최대 {policyDraft.trashRetentionDays}일 동안 복구 가능합니다.
                         </p>
                       </div>
 
@@ -898,7 +854,7 @@ export function AdminPage({
                           </SelectContent>
                         </Select>
                         <p className="mt-2 text-sm text-muted-foreground">
-                          휴지통에서 자산을 원래 상태로 되돌릴 수 있는지 결정합니다.
+                          휴지통에서 에셋을 원래 상태로 되돌릴 수 있는지 결정합니다.
                         </p>
                       </div>
                     </div>
@@ -931,7 +887,7 @@ export function AdminPage({
               <CardHeader>
                 <CardTitle>휴지통</CardTitle>
                 <CardDescription>
-                  소프트 삭제된 자산의 복구 가능 기간을 확인하고, 아직 만료되지 않았다면 복구할 수 있습니다.
+                  소프트 삭제된 에셋의 복구 가능 기간을 확인하고, 아직 만료되지 않았다면 복구할 수 있습니다.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -980,41 +936,31 @@ export function AdminPage({
                     })
                   ) : (
                     <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                      현재 휴지통에 보관 중인 자산이 없습니다.
+                      현재 휴지통에 보관 중인 에셋이 없습니다.
                     </div>
                   )
                 ) : (
                   <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-sm text-muted-foreground">
-                    관리자 권한이 있는 계정으로 로그인하면 휴지통 자산의 복구 상태를 확인하고 복구할 수 있습니다.
+                    관리자 권한이 있는 계정으로 로그인하면 휴지통 에셋의 복구 상태를 확인하고 복구할 수 있습니다.
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="asset-tags">
-          <AdminAssetTagManagement
-            catalog={assetTagCatalog}
-            isSaving={isSavingAssetTags}
-            onCreateCharacter={onCreateCharacter}
-            onDeleteCharacter={onDeleteCharacter}
-            onDeleteTagValue={onDeleteAssetTagValue}
-            onMergeTags={onMergeAssetTags}
-            onRenameTag={onRenameAssetTag}
-            onUpdateCharacter={onUpdateCharacter}
-          />
-        </TabsContent>
-
-        <TabsContent value="audit">
+      ) : activeTab === "asset-tags" ? (
+        <AdminAssetTagManagement
+          catalog={assetTagCatalog}
+          isSaving={isSavingAssetTags}
+          onCreateCharacter={onCreateCharacter}
+          onDeleteCharacter={onDeleteCharacter}
+          onDeleteTagValue={onDeleteAssetTagValue}
+          onMergeTags={onMergeAssetTags}
+          onRenameTag={onRenameAssetTag}
+          onUpdateCharacter={onUpdateCharacter}
+        />
+      ) : activeTab === "audit" ? (
           <Card className="rounded-[24px] border-border shadow-none">
             <CardHeader className="space-y-4">
-              <div>
-                <CardTitle>감사 로그</CardTitle>
-                <CardDescription>
-                  로그인, 사용자 조직/역할 변경, 자산 정책 변경, 복구 이력을 저장하고 조회합니다.
-                </CardDescription>
-              </div>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="w-full max-w-xs">
                   <Select onValueChange={setAuditFilter} value={auditFilter}>
@@ -1094,8 +1040,7 @@ export function AdminPage({
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+      ) : null}
     </section>
   );
 }

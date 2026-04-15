@@ -3,6 +3,14 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type DialogContentSize = "default" | "form" | "wide";
+
+const dialogContentSizeClassNames: Record<DialogContentSize, string> = {
+  default: "max-w-lg",
+  form: "max-w-xl",
+  wide: "max-w-3xl"
+};
+
 function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>): React.JSX.Element {
   return <DialogPrimitive.Root {...props} />;
 }
@@ -40,9 +48,11 @@ function DialogOverlay({
 function DialogContent({
   children,
   className,
+  size = "default",
   showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  size?: DialogContentSize;
   showCloseButton?: boolean;
 }): React.JSX.Element {
   return (
@@ -50,7 +60,8 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border bg-background shadow-[0_32px_120px_rgba(17,24,39,0.24)] duration-200",
+          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border bg-background shadow-[0_32px_120px_rgba(17,24,39,0.24)] duration-200",
+          dialogContentSizeClassNames[size],
           className
         )}
         {...props}

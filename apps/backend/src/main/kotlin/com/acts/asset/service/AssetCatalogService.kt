@@ -111,8 +111,8 @@ class AssetCatalogService(
 
     internal fun requireReadyAsset(assetId: Long): AssetEntity {
         val asset = assetRepository.findByIdAndDeletedAtIsNull(assetId)
-            ?: throw IllegalArgumentException("자산을 찾을 수 없습니다.")
-        require(isReadyAsset(asset)) { "자산을 찾을 수 없습니다." }
+            ?: throw IllegalArgumentException("에셋을 찾을 수 없습니다.")
+        require(isReadyAsset(asset)) { "에셋을 찾을 수 없습니다." }
         return asset
     }
 

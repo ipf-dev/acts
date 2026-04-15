@@ -23,6 +23,16 @@ import type {
   CharacterTagOptionView,
   CharacterTagUpsertInput,
   DeletedAssetView,
+  HubNavigationView,
+  HubEpisodeSlotAssetLinkInput,
+  HubEpisodeSlotCreateInputView,
+  HubEpisodeSlotView,
+  HubEpisodeUpsertInputView,
+  HubEpisodeView,
+  HubLevelCreateInputView,
+  HubLevelNavigationView,
+  HubSeriesCreateInputView,
+  HubSeriesNavigationView,
   ManualAssignmentInput,
   OrganizationOptionView,
   UserFeatureAccessInput,
@@ -40,6 +50,8 @@ export interface DashboardApi {
   exportAssets(): Promise<DownloadedFile>;
   getAsset(assetId: number): Promise<AssetDetailView>;
   getAssetFileAccessUrl(assetId: number, mode: AssetFileAccessModeView): Promise<AssetFileAccessUrlView>;
+  getHubNavigation(): Promise<HubNavigationView>;
+  getHubEpisode(episodeKey: string): Promise<HubEpisodeView>;
   getAdminAssetTagCatalog(): Promise<AdminAssetTagCatalogView>;
   listAssetCatalogFilterOptions(): Promise<AssetCatalogFilterOptionsView>;
   getAssetRetentionPolicy(): Promise<AssetRetentionPolicyView>;
@@ -62,6 +74,23 @@ export interface DashboardApi {
   listUsers(): Promise<AuthUserView[]>;
   listViewerAllowlist(): Promise<ViewerAllowlistEntryView[]>;
   addViewerAllowlist(input: ViewerAllowlistInput): Promise<ViewerAllowlistEntryView[]>;
+  createHubLevel(seriesKey: string, input: HubLevelCreateInputView): Promise<HubLevelNavigationView>;
+  createHubEpisode(levelKey: string, input: HubEpisodeUpsertInputView): Promise<HubEpisodeView>;
+  createHubEpisodeSlot(episodeKey: string, input: HubEpisodeSlotCreateInputView): Promise<HubEpisodeSlotView>;
+  createHubSeries(input: HubSeriesCreateInputView): Promise<HubSeriesNavigationView>;
+  deleteHubEpisode(episodeKey: string): Promise<void>;
+  deleteHubEpisodeSlot(episodeKey: string, slotId: number): Promise<void>;
+  assignHubEpisodeSlotAsset(
+    episodeKey: string,
+    slotId: number,
+    input: HubEpisodeSlotAssetLinkInput
+  ): Promise<HubEpisodeSlotView>;
+  removeHubEpisodeSlotAsset(
+    episodeKey: string,
+    slotId: number,
+    assetId: number
+  ): Promise<HubEpisodeSlotView>;
+  updateHubEpisode(episodeKey: string, input: HubEpisodeUpsertInputView): Promise<HubEpisodeView>;
   removeViewerAllowlist(email: string): Promise<ViewerAllowlistEntryView[]>;
   listAuditLogs(): Promise<AuditLogView[]>;
   logout(): Promise<void>;
@@ -195,6 +224,12 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       return readJson<AssetFileAccessUrlView>(
         `/api/assets/${assetId}/file-access-url?mode=${encodeURIComponent(mode)}`
       );
+    },
+    async getHubNavigation() {
+      return readJson<HubNavigationView>("/api/hub/navigation");
+    },
+    async getHubEpisode(episodeKey) {
+      return readJson<HubEpisodeView>(`/api/hub/episodes/${encodeURIComponent(episodeKey)}`);
     },
     async getAdminAssetTagCatalog() {
       return readJson<AdminAssetTagCatalogView>("/api/auth/admin/asset-tags");
@@ -383,6 +418,94 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
           method: "POST"
         }
       );
+    },
+    async createHubLevel(seriesKey, input) {
+      return readJson<HubLevelNavigationView>(`/api/hub/series/${encodeURIComponent(seriesKey)}/levels`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+    },
+    async createHubEpisode(levelKey, input) {
+      return readJson<HubEpisodeView>(`/api/hub/levels/${encodeURIComponent(levelKey)}/episodes`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+    },
+    async createHubEpisodeSlot(episodeKey, input) {
+      return readJson<HubEpisodeSlotView>(`/api/hub/episodes/${encodeURIComponent(episodeKey)}/slots`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+    },
+    async createHubSeries(input) {
+      return readJson<HubSeriesNavigationView>("/api/hub/series", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+    },
+    async deleteHubEpisode(episodeKey) {
+      const response = await fetchFn(`/api/hub/episodes/${encodeURIComponent(episodeKey)}`, {
+        method: "DELETE"
+      });
+      handleSessionExpired(response);
+
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
+    },
+    async deleteHubEpisodeSlot(episodeKey, slotId) {
+      const response = await fetchFn(
+        `/api/hub/episodes/${encodeURIComponent(episodeKey)}/slots/${slotId}`,
+        {
+          method: "DELETE"
+        }
+      );
+      handleSessionExpired(response);
+
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
+    },
+    async assignHubEpisodeSlotAsset(episodeKey, slotId, input) {
+      return readJson<HubEpisodeSlotView>(
+        `/api/hub/episodes/${encodeURIComponent(episodeKey)}/slots/${slotId}/assets`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(input)
+        }
+      );
+    },
+    async removeHubEpisodeSlotAsset(episodeKey, slotId, assetId) {
+      return readJson<HubEpisodeSlotView>(
+        `/api/hub/episodes/${encodeURIComponent(episodeKey)}/slots/${slotId}/assets/${assetId}`,
+        {
+          method: "DELETE"
+        }
+      );
+    },
+    async updateHubEpisode(episodeKey, input) {
+      return readJson<HubEpisodeView>(`/api/hub/episodes/${encodeURIComponent(episodeKey)}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
     },
     async removeViewerAllowlist(email) {
       return readJson<ViewerAllowlistEntryView[]>(

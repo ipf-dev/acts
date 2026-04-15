@@ -144,27 +144,27 @@ fun resolveTypeMetadata(
     val normalizedAudioTtsVoice = request.audioTtsVoice.normalizedOrNull()
     return when {
         sourceKind != AssetSourceKind.FILE -> {
-            require(!request.hasAnyValue(normalizedAudioTtsVoice)) { "링크 자산에는 파일 세부 정보를 저장할 수 없습니다." }
+            require(!request.hasAnyValue(normalizedAudioTtsVoice)) { "링크 에셋에는 파일 세부 정보를 저장할 수 없습니다." }
             AssetTypeMetadataResponse()
         }
         assetType == AssetType.IMAGE -> {
-            require(request.audioRecordingType == null && normalizedAudioTtsVoice == null && request.videoStage == null && request.documentKind == null) { "이미지 자산에는 이미지 세부 정보만 저장할 수 있습니다." }
+            require(request.audioRecordingType == null && normalizedAudioTtsVoice == null && request.videoStage == null && request.documentKind == null) { "이미지 에셋에는 이미지 세부 정보만 저장할 수 있습니다." }
             AssetTypeMetadataResponse(imageArtStyle = request.imageArtStyle, imageHasLayerFile = request.imageHasLayerFile ?: false)
         }
         assetType == AssetType.AUDIO -> {
-            require(request.imageArtStyle == null && request.imageHasLayerFile == null && request.videoStage == null && request.documentKind == null) { "오디오 자산에는 오디오 세부 정보만 저장할 수 있습니다." }
+            require(request.imageArtStyle == null && request.imageHasLayerFile == null && request.videoStage == null && request.documentKind == null) { "오디오 에셋에는 오디오 세부 정보만 저장할 수 있습니다." }
             AssetTypeMetadataResponse(audioTtsVoice = normalizedAudioTtsVoice, audioRecordingType = request.audioRecordingType)
         }
         assetType == AssetType.VIDEO -> {
-            require(request.imageArtStyle == null && request.imageHasLayerFile == null && normalizedAudioTtsVoice == null && request.audioRecordingType == null && request.documentKind == null) { "영상 자산에는 영상 세부 정보만 저장할 수 있습니다." }
+            require(request.imageArtStyle == null && request.imageHasLayerFile == null && normalizedAudioTtsVoice == null && request.audioRecordingType == null && request.documentKind == null) { "영상 에셋에는 영상 세부 정보만 저장할 수 있습니다." }
             AssetTypeMetadataResponse(videoStage = request.videoStage)
         }
         assetType == AssetType.DOCUMENT -> {
-            require(request.imageArtStyle == null && request.imageHasLayerFile == null && normalizedAudioTtsVoice == null && request.audioRecordingType == null && request.videoStage == null) { "문서 자산에는 문서 세부 정보만 저장할 수 있습니다." }
+            require(request.imageArtStyle == null && request.imageHasLayerFile == null && normalizedAudioTtsVoice == null && request.audioRecordingType == null && request.videoStage == null) { "문서 에셋에는 문서 세부 정보만 저장할 수 있습니다." }
             AssetTypeMetadataResponse(documentKind = request.documentKind)
         }
         else -> {
-            require(!request.hasAnyValue(normalizedAudioTtsVoice)) { "이 자산 유형은 추가 파일 세부 정보를 지원하지 않습니다." }
+            require(!request.hasAnyValue(normalizedAudioTtsVoice)) { "이 에셋 유형은 추가 파일 세부 정보를 지원하지 않습니다." }
             AssetTypeMetadataResponse()
         }
     }

@@ -25,11 +25,11 @@ export function getAssetApiErrorMessage(
     }
 
     if (error.status === 403) {
-      return messages.denied ?? "현재 권한으로는 이 자산에 접근할 수 없습니다.";
+      return messages.denied ?? "현재 권한으로는 이 에셋에 접근할 수 없습니다.";
     }
 
     if (error.status === 404) {
-      return messages.notFound ?? "대상 자산을 찾을 수 없습니다.";
+      return messages.notFound ?? "대상 에셋을 찾을 수 없습니다.";
     }
 
     if (error.status === 400) {
@@ -148,4 +148,42 @@ function appendPendingTagValue(values: string[], inputValue: string): string[] {
   }
 
   return [...values, normalizedValue];
+}
+
+export async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<unknown>
+): Promise<PromiseSettledResult<unknown>[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+  const results: PromiseSettledResult<unknown>[] = Array.from({ length: items.length });
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+
+        try {
+          const value = await worker(items[currentIndex]);
+          results[currentIndex] = {
+            status: "fulfilled",
+            value
+          };
+        } catch (error: unknown) {
+          results[currentIndex] = {
+            reason: error,
+            status: "rejected"
+          };
+        }
+      }
+    })
+  );
+
+  return results;
 }

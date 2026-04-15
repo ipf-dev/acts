@@ -175,7 +175,7 @@ export function AssetDetailPage({
       return;
     }
 
-    const confirmed = window.confirm(`"${asset.title}" 애셋을 삭제하시겠습니까?`);
+    const confirmed = window.confirm(`"${asset.title}" 에셋을 삭제하시겠습니까?`);
     if (!confirmed) {
       return;
     }
@@ -191,7 +191,7 @@ export function AssetDetailPage({
           <div className="space-y-1">
             <h2 className="text-xl font-semibold">사내 Google 계정으로 로그인하세요.</h2>
             <p className="text-sm text-muted-foreground">
-              자산 상세 조회와 다운로드는 <code>@{session.allowedDomain}</code> 계정으로만 사용할 수 있습니다.
+              에셋 상세 조회와 다운로드는 <code>@{session.allowedDomain}</code> 계정으로만 사용할 수 있습니다.
             </p>
           </div>
           <Button asChild className="h-10 rounded-xl px-4">
@@ -206,10 +206,10 @@ export function AssetDetailPage({
     <section className="mx-auto max-w-[1240px] space-y-6">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <button className="transition-colors hover:text-foreground" onClick={onBack} type="button">
-          자산 라이브러리
+          에셋 라이브러리
         </button>
         <ChevronRight className="h-4 w-4" />
-        <span className="truncate text-foreground">{asset?.title ?? "애셋 상세"}</span>
+        <span className="truncate text-foreground">{asset?.title ?? "에셋 상세"}</span>
       </div>
 
       {authSuccessMessage ? (
@@ -226,19 +226,19 @@ export function AssetDetailPage({
 
       {isLoading ? (
         <Card className="rounded-[28px] border-border shadow-none">
-          <CardContent className="p-8 text-sm text-muted-foreground">애셋 정보를 불러오는 중입니다.</CardContent>
+          <CardContent className="p-8 text-sm text-muted-foreground">에셋 정보를 불러오는 중입니다.</CardContent>
         </Card>
       ) : !asset ? (
         <Card className="rounded-[28px] border-border shadow-none">
           <CardContent className="flex flex-col items-start gap-4 p-8">
             <div className="space-y-1">
-              <h2 className="text-xl font-semibold">애셋을 찾을 수 없습니다.</h2>
+              <h2 className="text-xl font-semibold">에셋을 찾을 수 없습니다.</h2>
               <p className="text-sm text-muted-foreground">
-                자산 라이브러리로 돌아가 다른 애셋을 선택해 주세요.
+                에셋 라이브러리로 돌아가 다른 에셋을 선택해 주세요.
               </p>
             </div>
             <Button className="h-10 rounded-xl px-4" onClick={onBack} type="button" variant="outline">
-              자산 라이브러리로 돌아가기
+              에셋 라이브러리로 돌아가기
             </Button>
           </CardContent>
         </Card>
@@ -494,7 +494,7 @@ export function AssetDetailPage({
                               <Textarea
                                 className="min-h-28 rounded-xl border-border bg-background"
                                 onChange={(event) => setDescriptionDraft(event.target.value)}
-                                placeholder="애셋 설명을 입력하세요"
+                                placeholder="에셋 설명을 입력하세요"
                                 value={descriptionDraft}
                               />
                             </div>
@@ -637,7 +637,7 @@ export function AssetDetailPage({
 
               <Card className="rounded-[24px] border-border shadow-none">
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-sm">관련 애셋</CardTitle>
+                  <CardTitle className="text-sm">관련 에셋</CardTitle>
                   <p className="text-xs text-muted-foreground">같은 조직 또는 비슷한 태그 기준</p>
                 </CardHeader>
                 <CardContent className="space-y-2">
@@ -660,7 +660,7 @@ export function AssetDetailPage({
                       </button>
                     ))
                   ) : (
-                    <p className="text-sm text-muted-foreground">표시할 관련 애셋이 없습니다.</p>
+                    <p className="text-sm text-muted-foreground">표시할 관련 에셋이 없습니다.</p>
                   )}
                 </CardContent>
               </Card>

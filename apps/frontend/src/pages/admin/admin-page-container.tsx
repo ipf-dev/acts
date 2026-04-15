@@ -80,10 +80,11 @@ async function loadAdminData(): Promise<LoadedAdminData> {
 }
 
 interface AdminPageContainerProps {
+  activeTab: "users" | "features" | "policy" | "asset-tags" | "audit";
   session: AuthSessionView;
 }
 
-export function AdminPageContainer({ session: initialSession }: AdminPageContainerProps): React.JSX.Element {
+export function AdminPageContainer({ activeTab, session: initialSession }: AdminPageContainerProps): React.JSX.Element {
   const [initialLocationSearch] = useState(() => window.location.search);
   const [state, setState] = useState<AdminPageState>({
     adminUsers: [],
@@ -242,7 +243,7 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
     await runAdminMutation(
       { isSavingPolicy: true },
       { isSavingPolicy: false },
-      "자산 보관 정책이 업데이트되었습니다.",
+      "에셋 보관 정책이 업데이트되었습니다.",
       () =>
         dashboardApi.updateAssetRetentionPolicy({
           restoreEnabled: policy.restoreEnabled,
@@ -255,7 +256,7 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
     await runAdminMutation(
       { processingDeletedAssetId: assetId },
       { processingDeletedAssetId: null },
-      "삭제된 자산을 복구했습니다.",
+      "삭제된 에셋을 복구했습니다.",
       () => dashboardApi.restoreAsset(assetId)
     );
   }
@@ -346,6 +347,7 @@ export function AdminPageContainer({ session: initialSession }: AdminPageContain
 
   return (
     <AdminPage
+      activeTab={activeTab}
       adminUsers={state.adminUsers}
       assetTagCatalog={state.assetTagCatalog}
       assetRetentionPolicy={state.assetRetentionPolicy}

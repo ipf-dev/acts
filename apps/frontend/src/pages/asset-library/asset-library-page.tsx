@@ -135,8 +135,8 @@ function AssetLibraryPageComponent({
     <section className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-1">
-          <h1 className="text-[32px] font-semibold tracking-tight">자산 라이브러리</h1>
-          <p className="text-sm text-muted-foreground">하모니 힐즈 IP 콘텐츠 애셋을 검색하고 관리하세요.</p>
+          <h1 className="text-[32px] font-semibold tracking-tight">에셋 라이브러리</h1>
+          <p className="text-sm text-muted-foreground">하모니 힐즈 IP 콘텐츠 에셋을 검색하고 관리하세요.</p>
         </div>
 
         {session.authenticated ? (
@@ -148,7 +148,7 @@ function AssetLibraryPageComponent({
               type="button"
             >
               <Sparkles className="h-4 w-4" />
-              {isUploading ? "업로드 진행 중" : "애셋 업로드"}
+              {isUploading ? "업로드 진행 중" : "에셋 업로드"}
             </Button>
           </div>
         ) : null}
@@ -173,7 +173,7 @@ function AssetLibraryPageComponent({
             <div className="space-y-1">
               <h2 className="text-xl font-semibold">사내 Google 계정으로 로그인하세요.</h2>
               <p className="text-sm text-muted-foreground">
-                자산 업로드와 검색은 <code>@{session.allowedDomain}</code> 계정으로만 사용할 수 있습니다.
+                에셋 업로드와 검색은 <code>@{session.allowedDomain}</code> 계정으로만 사용할 수 있습니다.
               </p>
             </div>
             <Button asChild className="h-10 rounded-xl px-4">
@@ -418,10 +418,10 @@ function AssetLibraryPageComponent({
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
                 <p>
                   {isLoading
-                    ? "자산을 불러오는 중..."
+                    ? "에셋을 불러오는 중..."
                     : catalogPage.totalItems === 0
-                      ? "조건에 맞는 자산이 없습니다."
-                      : `총 ${catalogPage.totalItems}개 애셋`}
+                      ? "조건에 맞는 에셋이 없습니다."
+                      : `총 ${catalogPage.totalItems}개 에셋`}
                 </p>
                 {hasActiveFilters ? (
                   <Button className="h-8 rounded-full px-3 text-xs" onClick={onResetFilters} type="button" variant="ghost">
@@ -504,7 +504,7 @@ function AssetLibraryPageComponent({
                     <table className="min-w-full divide-y divide-border text-sm">
                       <thead className="bg-muted/70 text-left text-muted-foreground">
                         <tr>
-                          <th className="px-4 py-3 font-medium">애셋명</th>
+                          <th className="px-4 py-3 font-medium">에셋명</th>
                           <th className="px-4 py-3 font-medium">유형</th>
                           <th className="px-4 py-3 font-medium">태그</th>
                           <th className="px-4 py-3 font-medium">부서</th>
@@ -578,10 +578,10 @@ function AssetLibraryPageComponent({
                 </div>
                 <div className="space-y-1">
                   <h2 className="text-lg font-semibold">
-                    {isLoading ? "자산을 불러오는 중입니다." : "조건에 맞는 자산이 없습니다."}
+                    {isLoading ? "에셋을 불러오는 중입니다." : "조건에 맞는 에셋이 없습니다."}
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    검색어와 필터를 조정하거나 첫 애셋을 업로드해 라이브러리를 시작하세요.
+                    검색어와 필터를 조정하거나 첫 에셋을 업로드해 라이브러리를 시작하세요.
                   </p>
                 </div>
               </CardContent>
