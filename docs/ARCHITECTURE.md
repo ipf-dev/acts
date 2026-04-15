@@ -70,6 +70,7 @@ Expected first-slice backend capabilities:
 - shared asset visibility for all authenticated users, with owner/Admin management rules and company-wide export privileges
 - asset catalog query endpoint with server-side pagination, search, org/creator/type metadata filters, and separate filter-option lookup for library controls
 - asset detail lookup for the dedicated detail page, image/video preview endpoint, metadata update, owner/admin soft delete, presigned download redirect endpoint, and ZIP export endpoint
+- `com.acts.hub` feature slice for 시리즈 → 레벨 → 에피소드 탐색과 episode slot linking, including user-created hierarchy tables, per-episode convenience 9-slot creation on episode create, equal add/delete treatment for all slots, slot-to-many-assets link/unlink endpoints, user-specified `EP##` codes on create, episode delete support, and episode metadata create/update endpoints for editable title and description
 - asset retention policy storage plus trash restore lifecycle endpoints
 - generation request orchestration
 - IP guide retrieval for AI workflows
@@ -90,13 +91,15 @@ Expected first-slice frontend surfaces:
 - authenticated shell navigation에서 새 탭으로 여는 정적 사용 메뉴얼 링크
 - login entry, session status, and admin override screens
 - user-facing auth failure notification after login redirects
-- Figma Make 기준의 shell 레이아웃, 현재 사용자 프로필 메뉴, 자산 검색 헤더
+- Figma Make 기준의 shell 레이아웃, 현재 사용자 프로필 메뉴, 에셋 검색 헤더
 - searchable admin user table with per-user organization assignment, role visibility, and admin-only promotion action
 - audit log views, with company-wide viewer and allowlist controls currently hidden in the frontend UI
 - admin feature authorization tab with searchable user selection, per-feature allow/deny matrix, and save flow for the currently implemented asset library feature
 - admin tag management tab with character create/edit/delete + alias support and location/keyword search, usage-sorted pagination, and unified rename/merge/delete dialogs
 - admin policy tab for retention settings and deleted asset restore status/actions
 - asset library page with file/link split upload modal, 확장자 기반 이미지/오디오/영상/문서 세부 메타데이터 입력, 링크의 `URL` 타입 분리, same-metadata-based image/audio/video/document filters, a background upload progress toast panel updated independently from the main library list render and calculated from uploaded bytes instead of completed file counts, character dropdown + location/keyword tag suggestion search, grouped tag display, server-backed search, org/creator filters, page controls, and company-wide viewer export UI currently hidden
+- Hub 2단 사이드바에서 에셋 라이브러리와 시리즈 → 레벨 → 에피소드 트리를 분리하고, 시리즈/레벨/에피소드를 사용자가 직접 구성하며, 시리즈 추가와 사용자 지정 Level 번호 기반 레벨 추가를 지원하고, 시리즈/레벨은 확장 전용 탐색, 에피소드는 메인 작업 진입점으로 사용
+- episode page with an initial 9-slot card grid created at episode creation time, equal add/delete treatment for every slot, slot-level upload action, existing-asset link modal, auto-link after slot upload, click-through from linked asset cards to the existing asset detail page, episode rows rendered as `EP code + title`, and episode create/edit flows where create accepts a free numeric `EP` code and the header includes episode delete
 - current frontend keeps version comparison, current-version labels, and checksum display hidden until those capabilities are implemented end-to-end
 - shell-level feature gating so denied users cannot enter the implemented asset library surface
 - asset detail page with image/video preview or external link summary, history, 타입별 세부 메타데이터를 포함한 editable metadata, download/open-link action, and owner/admin delete action
