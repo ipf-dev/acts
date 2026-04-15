@@ -108,7 +108,7 @@ class AdminAuditLogService(
             category = AuditLogCategory.POLICY, outcome = AuditLogOutcome.SUCCESS,
             actorEmail = actorEmail, actorName = actorName.normalizedAuditName(),
             actionType = AdminAuditLogAction.ASSET_RETENTION_POLICY_UPDATED,
-            targetEmail = actorEmail, targetName = "자산 보관 정책",
+            targetEmail = actorEmail, targetName = "에셋 보관 정책",
             detail = "휴지통 보관 정책이 변경되었습니다.",
             beforeState = objectMapper.writeValueAsString(beforeState),
             afterState = objectMapper.writeValueAsString(afterState),
@@ -121,7 +121,7 @@ class AdminAuditLogService(
             actorEmail = actorEmail, actorName = actorName.normalizedAuditName(),
             actionType = AdminAuditLogAction.ASSET_ACCESS_DENIED,
             targetEmail = asset.ownerEmail, targetName = asset.title,
-            detail = "${asset.title} 자산에 대한 ${attemptedAction.toKoreanLabel()} 요청이 차단되었습니다.",
+            detail = "${asset.title} 에셋에 대한 ${attemptedAction.toKoreanLabel()} 요청이 차단되었습니다.",
             beforeState = objectMapper.writeValueAsString(AssetAccessScopeAuditSnapshot.from(asset)),
             afterState = null,
         )
@@ -137,7 +137,7 @@ class AdminAuditLogService(
             actorEmail = actorEmail, actorName = actorName.normalizedAuditName(),
             actionType = AdminAuditLogAction.ASSET_ACCESS_SCOPE_UPDATED,
             targetEmail = asset.ownerEmail, targetName = asset.title,
-            detail = "${asset.title} 자산의 열람 조직이 변경되었습니다.",
+            detail = "${asset.title} 에셋의 열람 조직이 변경되었습니다.",
             beforeState = objectMapper.writeValueAsString(beforeState),
             afterState = objectMapper.writeValueAsString(afterState),
         )
@@ -148,8 +148,8 @@ class AdminAuditLogService(
             category = AuditLogCategory.PERMISSION, outcome = AuditLogOutcome.SUCCESS,
             actorEmail = actorEmail, actorName = actorName.normalizedAuditName(),
             actionType = AdminAuditLogAction.ASSET_EXPORTED,
-            targetEmail = actorEmail, targetName = "자산 일괄 내보내기",
-            detail = "${exportedAssetCount}개 자산이 ZIP으로 내보내기 되었습니다.",
+            targetEmail = actorEmail, targetName = "에셋 일괄 내보내기",
+            detail = "${exportedAssetCount}개 에셋이 ZIP으로 내보내기 되었습니다.",
             beforeState = null, afterState = null,
         )
     }
@@ -163,7 +163,7 @@ class AdminAuditLogService(
             actorEmail = actorEmail, actorName = actorName.normalizedAuditName(),
             actionType = AdminAuditLogAction.ASSET_RESTORED,
             targetEmail = asset.ownerEmail, targetName = asset.title,
-            detail = "${asset.title} 자산이 복구되었습니다.",
+            detail = "${asset.title} 에셋이 복구되었습니다.",
             beforeState = objectMapper.writeValueAsString(beforeState),
             afterState = objectMapper.writeValueAsString(afterState),
         )

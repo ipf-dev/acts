@@ -50,7 +50,7 @@ class AssetAuthorizationService(
             asset = asset,
             attemptedAction = AssetAccessAction.UPDATE,
         )
-        throw SecurityException("자산 편집 권한이 없습니다.")
+        throw SecurityException("에셋 편집 권한이 없습니다.")
     }
 
     fun requireDeleteAccess(actor: UserAccountEntity, asset: AssetEntity) {
@@ -65,7 +65,7 @@ class AssetAuthorizationService(
             asset = asset,
             attemptedAction = AssetAccessAction.DELETE,
         )
-        throw SecurityException("자산 삭제 권한이 없습니다.")
+        throw SecurityException("에셋 삭제 권한이 없습니다.")
     }
 
     fun requireExportAllAccess(actor: UserAccountEntity) {
@@ -74,7 +74,7 @@ class AssetAuthorizationService(
             return
         }
 
-        throw SecurityException("자산 내보내기 권한이 없습니다.")
+        throw SecurityException("에셋 내보내기 권한이 없습니다.")
     }
 
     fun canExportAll(actor: UserAccountEntity): Boolean = actor.role == UserRole.ADMIN || actor.companyWideViewer
@@ -84,7 +84,7 @@ class AssetAuthorizationService(
             return
         }
 
-        throw SecurityException("자산 라이브러리 기능 권한이 없습니다.")
+        throw SecurityException("에셋 라이브러리 기능 권한이 없습니다.")
     }
 
     private fun canEdit(actor: UserAccountEntity, asset: AssetEntity): Boolean =

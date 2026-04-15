@@ -121,7 +121,7 @@ class AssetLifecycleServiceTest @Autowired constructor(
 
     @Test
     fun `restores a deleted asset within the retention window`() {
-        val uploadedAsset = uploadAsset("복구 테스트 애셋")
+        val uploadedAsset = uploadAsset("복구 테스트 에셋")
 
         assetLibraryService.deleteAsset(
             assetId = uploadedAsset.id,

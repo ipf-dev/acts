@@ -201,14 +201,14 @@ class AssetUploadService(
 
     private fun validateUploadCompletion(assetId: Long, objectKey: String, actorEmail: String): UploadCompletionContext {
         val actor = requireActor(userAccountRepository, actorEmail)
-        val asset = assetRepository.findById(assetId).orElseThrow { IllegalArgumentException("자산을 찾을 수 없습니다.") }
-        require(asset.sourceKind == AssetSourceKind.FILE) { "파일 업로드 자산이 아닙니다." }
-        require(asset.ownerEmail == actor.email) { "자산 소유자만 업로드를 완료할 수 있습니다." }
+        val asset = assetRepository.findById(assetId).orElseThrow { IllegalArgumentException("에셋을 찾을 수 없습니다.") }
+        require(asset.sourceKind == AssetSourceKind.FILE) { "파일 업로드 에셋이 아닙니다." }
+        require(asset.ownerEmail == actor.email) { "에셋 소유자만 업로드를 완료할 수 있습니다." }
         val pendingFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("업로드 대상 파일 정보를 찾을 수 없습니다.")
         require(pendingFile.objectKey == objectKey) { "업로드 대상 파일이 일치하지 않습니다." }
         require(!assetEventRepository.existsByAsset_IdAndEventType(assetId, AssetEventType.CREATED)) {
-            "이미 업로드 완료 처리된 자산입니다."
+            "이미 업로드 완료 처리된 에셋입니다."
         }
         return UploadCompletionContext(actor = actor, asset = asset, pendingFile = pendingFile)
     }
@@ -232,7 +232,7 @@ class AssetUploadService(
             AssetEventEntity(
                 asset = asset, eventType = AssetEventType.CREATED,
                 actorEmail = actor.email, actorName = actor.displayName,
-                detail = "파일 업로드로 자산이 등록되었습니다.",
+                detail = "파일 업로드로 에셋이 등록되었습니다.",
             ),
         )
         assetEventRepository.flush()

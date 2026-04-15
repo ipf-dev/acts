@@ -46,7 +46,7 @@ class AssetFileAccessService(
         val actor = requireActor(userAccountRepository, actorEmail)
         val asset = assetCatalogService.requireReadyAsset(assetId)
         assetAuthorizationService.requireViewAccess(actor = actor, asset = asset, action = AssetAccessAction.DOWNLOAD)
-        require(asset.sourceKind == AssetSourceKind.FILE) { "링크 자산은 다운로드할 수 없습니다." }
+        require(asset.sourceKind == AssetSourceKind.FILE) { "링크 에셋은 다운로드할 수 없습니다." }
         val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("다운로드할 파일을 찾을 수 없습니다.")
         require(assetBinaryStorage.exists(bucket = currentFile.bucketName, objectKey = currentFile.objectKey)) { "다운로드할 파일을 찾을 수 없습니다." }
@@ -63,7 +63,7 @@ class AssetFileAccessService(
         val actor = requireActor(userAccountRepository, actorEmail)
         val asset = assetCatalogService.requireReadyAsset(assetId)
         assetAuthorizationService.requireViewAccess(actor = actor, asset = asset, action = AssetAccessAction.DOWNLOAD)
-        require(asset.sourceKind == AssetSourceKind.FILE) { "링크 자산은 파일 접근 URL을 발급할 수 없습니다." }
+        require(asset.sourceKind == AssetSourceKind.FILE) { "링크 에셋은 파일 접근 URL을 발급할 수 없습니다." }
         val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("다운로드할 파일을 찾을 수 없습니다.")
         require(assetBinaryStorage.exists(bucket = currentFile.bucketName, objectKey = currentFile.objectKey)) { "다운로드할 파일을 찾을 수 없습니다." }
@@ -89,7 +89,7 @@ class AssetFileAccessService(
         val actor = requireActor(userAccountRepository, actorEmail)
         val asset = assetCatalogService.requireReadyAsset(assetId)
         assetAuthorizationService.requireViewAccess(actor = actor, asset = asset, action = AssetAccessAction.DETAIL_VIEW)
-        require(asset.sourceKind == AssetSourceKind.FILE) { "링크 자산은 프리뷰를 지원하지 않습니다." }
+        require(asset.sourceKind == AssetSourceKind.FILE) { "링크 에셋은 프리뷰를 지원하지 않습니다." }
         val currentFile = assetFileRepository.findFirstByAsset_IdOrderByVersionNumberDescIdDesc(assetId)
             ?: throw IllegalArgumentException("프리뷰 대상 파일을 찾을 수 없습니다.")
 

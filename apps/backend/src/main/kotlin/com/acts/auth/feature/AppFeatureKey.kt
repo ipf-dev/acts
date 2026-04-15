@@ -7,8 +7,8 @@ enum class AppFeatureKey(
     val implemented: Boolean,
 ) {
     ASSET_LIBRARY(
-        label = "자산 라이브러리",
-        description = "자산을 업로드/조회/검색하고 상세를 확인하는 기능입니다.",
+        label = "에셋 라이브러리",
+        description = "에셋을 업로드/조회/검색하고 상세를 확인하는 기능입니다.",
         defaultAllowed = true,
         implemented = true,
     ),

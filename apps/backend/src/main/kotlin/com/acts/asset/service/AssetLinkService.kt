@@ -74,7 +74,7 @@ class AssetLinkService(
                 AssetEventEntity(
                     asset = savedAsset, eventType = AssetEventType.CREATED,
                     actorEmail = actor.email, actorName = actorName ?: actor.displayName,
-                    detail = "외부 링크로 자산이 등록되었습니다.",
+                    detail = "외부 링크로 에셋이 등록되었습니다.",
                 ),
             )
 

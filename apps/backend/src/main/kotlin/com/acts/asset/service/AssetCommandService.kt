@@ -107,7 +107,7 @@ class AssetCommandService(
             AssetEventEntity(
                 asset = asset, eventType = AssetEventType.DELETED,
                 actorEmail = actor.email, actorName = actorName ?: actor.displayName,
-                detail = "자산이 삭제되었습니다.",
+                detail = "에셋이 삭제되었습니다.",
             ),
         )
     }

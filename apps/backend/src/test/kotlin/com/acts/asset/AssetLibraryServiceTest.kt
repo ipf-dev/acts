@@ -267,13 +267,13 @@ class AssetLibraryServiceTest @Autowired constructor(
         uploadAsset(
             actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
-            title = "마케팅 자산",
+            title = "마케팅 에셋",
             fileName = "marketing-filter.txt",
         )
         uploadAsset(
             actorEmail = TEST_REVIEWER_EMAIL,
             actorName = "Tony",
-            title = "콘텐츠 자산",
+            title = "콘텐츠 에셋",
             fileName = "content-filter.txt",
         )
         assetLibraryService.initiateUpload(
@@ -281,8 +281,8 @@ class AssetLibraryServiceTest @Autowired constructor(
                 fileName = "leader-pending.txt",
                 contentType = "text/plain",
                 fileSizeBytes = 5L,
-                title = "리더 대기 자산",
-                description = "아직 완료되지 않은 자산",
+                title = "리더 대기 에셋",
+                description = "아직 완료되지 않은 에셋",
                 tags = AssetStructuredTagsRequest(),
             ),
             actorEmail = TEST_VIEWER_EMAIL,
@@ -409,7 +409,7 @@ class AssetLibraryServiceTest @Autowired constructor(
                 contentType = "video/mp4",
                 fileSizeBytes = 5L,
                 title = "업로드 중 영상",
-                description = "아직 완료되지 않은 자산",
+                description = "아직 완료되지 않은 에셋",
                 tags = AssetStructuredTagsRequest(),
             ),
             actorEmail = TEST_CREATOR_EMAIL,
@@ -945,14 +945,14 @@ class AssetLibraryServiceTest @Autowired constructor(
         val uploadedAsset = uploadAsset(
             actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
-            title = "영상 세부 정보 애셋",
+            title = "영상 세부 정보 에셋",
             fileName = "metadata-video.mp4",
             contentType = "video/mp4",
         )
 
         val updatedAsset = assetLibraryService.updateAsset(
             assetId = uploadedAsset.id,
-            title = "영상 세부 정보 애셋",
+            title = "영상 세부 정보 에셋",
             description = "설명",
             requestedTags = AssetStructuredTagsRequest(
                 keywords = listOf("태그"),
@@ -1042,7 +1042,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         val uploadedAsset = uploadAsset(
             actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
-            title = "삭제 테스트 애셋",
+            title = "삭제 테스트 에셋",
             fileName = "delete_test.txt",
         )
 
@@ -1062,7 +1062,7 @@ class AssetLibraryServiceTest @Autowired constructor(
             )
         }
             .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("자산을 찾을 수 없습니다")
+            .hasMessageContaining("에셋을 찾을 수 없습니다")
     }
 
     @Test
@@ -1070,7 +1070,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         val uploadedAsset = uploadAsset(
             actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
-            title = "삭제 권한 테스트 애셋",
+            title = "삭제 권한 테스트 에셋",
             fileName = "delete_permission_test.txt",
         )
         assertThatThrownBy {
@@ -1089,13 +1089,13 @@ class AssetLibraryServiceTest @Autowired constructor(
         val marketingAsset = uploadAsset(
             actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
-            title = "마케팅 전용 애셋",
+            title = "마케팅 전용 에셋",
             fileName = "marketing.txt",
         )
         val contentAsset = uploadAsset(
             actorEmail = TEST_REVIEWER_EMAIL,
             actorName = "Tony",
-            title = "콘텐츠 전용 애셋",
+            title = "콘텐츠 전용 에셋",
             fileName = "content.txt",
         )
 
@@ -1111,7 +1111,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         val uploadedAsset = uploadAsset(
             actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
-            title = "마케팅 전용 애셋",
+            title = "마케팅 전용 에셋",
             fileName = "marketing-detail.txt",
         )
 
@@ -1133,13 +1133,13 @@ class AssetLibraryServiceTest @Autowired constructor(
         uploadAsset(
             actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
-            title = "마케팅 애셋",
+            title = "마케팅 에셋",
             fileName = "marketing-export.txt",
         )
         uploadAsset(
             actorEmail = TEST_REVIEWER_EMAIL,
             actorName = "Tony",
-            title = "콘텐츠 애셋",
+            title = "콘텐츠 에셋",
             fileName = "content-export.txt",
         )
         assetLibraryService.registerLinks(
@@ -1174,7 +1174,7 @@ class AssetLibraryServiceTest @Autowired constructor(
         uploadAsset(
             actorEmail = TEST_CREATOR_EMAIL,
             actorName = "Coco",
-            title = "권한 테스트 애셋",
+            title = "권한 테스트 에셋",
             fileName = "permission.txt",
         )
         userDirectoryService.syncLogin(
@@ -1192,7 +1192,7 @@ class AssetLibraryServiceTest @Autowired constructor(
             assetLibraryService.listAssets(actorEmail = TEST_RESTRICTED_EMAIL)
         }
             .isInstanceOf(SecurityException::class.java)
-            .hasMessageContaining("자산 라이브러리")
+            .hasMessageContaining("에셋 라이브러리")
     }
 
     private fun uploadAsset(
