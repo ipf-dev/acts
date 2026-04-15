@@ -2,15 +2,20 @@ import { useEffect, useState } from "react";
 import type React from "react";
 import {
   BookOpenText,
-  ChevronLeft,
-  ChevronRight,
-  FolderOpen,
+  Clock3,
+  LayoutGrid,
   type LucideIcon,
   LogOut,
-  ShieldCheck
+  Settings2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Tags,
+  Users
 } from "lucide-react";
 import { dashboardApi } from "../api/client";
 import type { AuthSessionView } from "../api/types";
+import { cn } from "../lib/utils";
+import { HubSidebarPanel } from "../pages/hub/hub-sidebar-panel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,40 +24,82 @@ import {
   DropdownMenuTrigger
 } from "./ui/dropdown-menu";
 import { ActsLogo } from "./acts-logo";
-import { cn } from "../lib/utils";
 
 export type DashboardNavigationKey = "assets" | "admin";
+export type AdminTabKey = "users" | "features" | "policy" | "asset-tags" | "audit";
+type PrimaryNavigationKey = "hub" | "admin";
 
 interface DashboardShellProps {
+  activeAdminTab: AdminTabKey;
   activeNavigationKey: DashboardNavigationKey;
   children: React.ReactNode;
+  hubNavigationRefreshKey: number;
+  isAssetLibraryActive: boolean;
+  onAdminTabChange: (tab: AdminTabKey) => void;
   onNavigate: (navigationKey: DashboardNavigationKey) => void;
+  onOpenAssetLibrary: () => void;
+  onOpenHubEpisode: (episodeKey: string) => void;
+  selectedHubEpisodeKey: string | null;
   session: AuthSessionView;
 }
 
-type NavigationItem =
-  | { icon: LucideIcon; key: DashboardNavigationKey; label: string; type: "internal" }
-  | { href: string; icon: LucideIcon; key: "manual"; label: string; type: "external" };
+interface PrimaryInternalNavigationItem {
+  icon: LucideIcon;
+  key: PrimaryNavigationKey;
+  label: string;
+  type: "internal";
+}
 
-const navigationItems = [
-  { icon: FolderOpen, key: "assets", label: "자산 라이브러리", type: "internal" },
-  {
-    href: "/acts-user-manual.html",
-    icon: BookOpenText,
-    key: "manual",
-    label: "사용 메뉴얼",
-    type: "external"
-  },
-  { icon: ShieldCheck, key: "admin", label: "관리자 설정", type: "internal" }
-] satisfies NavigationItem[];
+type PrimaryNavigationItem = PrimaryInternalNavigationItem;
+
+const primaryNavigationItems: readonly PrimaryNavigationItem[] = [
+  { icon: LayoutGrid, key: "hub", label: "Hub", type: "internal" },
+  { icon: ShieldCheck, key: "admin", label: "관리자", type: "internal" }
+];
+
+interface AdminSidebarItem {
+  description: string;
+  icon: LucideIcon;
+  key: AdminTabKey;
+  label: string;
+}
+
+const adminSidebarItems: readonly AdminSidebarItem[] = [
+  { description: "조직 지정, 역할 관리", icon: Users, key: "users", label: "사용자 관리" },
+  { description: "사용자별 기능 접근 권한", icon: SlidersHorizontal, key: "features", label: "기능 권한" },
+  { description: "보관 기간, 복구 정책", icon: Settings2, key: "policy", label: "정책 설정" },
+  { description: "캐릭터, 장소, 키워드 태그", icon: Tags, key: "asset-tags", label: "태그 관리" },
+  { description: "로그인, 권한, 정책 이력", icon: Clock3, key: "audit", label: "감사 로그" }
+];
+
+function isPrimaryNavigationVisible(
+  item: PrimaryInternalNavigationItem,
+  options: { hasAssetLibraryAccess: boolean; isAdmin: boolean }
+): boolean {
+  if (item.key === "hub") {
+    return options.hasAssetLibraryAccess;
+  }
+
+  if (item.key === "admin") {
+    return options.isAdmin;
+  }
+
+  return true;
+}
 
 export function DashboardShell({
+  activeAdminTab,
   activeNavigationKey,
   children,
+  hubNavigationRefreshKey,
+  isAssetLibraryActive,
+  onAdminTabChange,
   onNavigate,
+  onOpenAssetLibrary,
+  onOpenHubEpisode,
+  selectedHubEpisodeKey,
   session
 }: DashboardShellProps): React.JSX.Element {
-  const [collapsed, setCollapsed] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -63,6 +110,23 @@ export function DashboardShell({
 
   const hasAssetLibraryAccess =
     !session.authenticated || session.allowedFeatureKeys.includes("ASSET_LIBRARY");
+  const isAdmin = session.user?.role === "ADMIN";
+  const activePrimaryNavigationKey: PrimaryNavigationKey =
+    activeNavigationKey === "admin" ? "admin" : "hub";
+  const visiblePrimaryNavigationItems = primaryNavigationItems.filter((item) =>
+    isPrimaryNavigationVisible(item, {
+      hasAssetLibraryAccess,
+      isAdmin
+    })
+  );
+  const currentUser = session.user;
+  const roleLabel =
+    currentUser?.role === "ADMIN" ? "관리자" : currentUser?.role === "USER" ? "일반 사용자" : "게스트";
+  const accountSummaryItems = [
+    { label: "이름", value: currentUser?.displayName ?? "게스트" },
+    { label: "역할", value: roleLabel },
+    { label: "조직", value: currentUser?.organizationName ?? "조직 미지정" }
+  ];
 
   async function handleLogout(): Promise<void> {
     setIsLoggingOut(true);
@@ -74,19 +138,14 @@ export function DashboardShell({
     }
   }
 
-  const visibleNavigationItems = navigationItems.filter(
-    (item) =>
-      item.key === "manual" ||
-      ((item.key !== "admin" || session.user?.role === "ADMIN") &&
-        (item.key !== "assets" || hasAssetLibraryAccess))
-  );
-  const currentUser = session.user;
-  const roleLabel = currentUser?.role === "ADMIN" ? "관리자" : currentUser?.role === "USER" ? "일반 사용자" : "게스트";
-  const accountSummaryItems = [
-    { label: "이름", value: currentUser?.displayName ?? "게스트" },
-    { label: "역할", value: roleLabel },
-    { label: "조직", value: currentUser?.organizationName ?? "조직 미지정" }
-  ];
+  function handlePrimaryNavigation(key: PrimaryNavigationKey): void {
+    if (key === "hub") {
+      onOpenAssetLibrary();
+      return;
+    }
+
+    onNavigate("admin");
+  }
 
   function renderAccountMenuContent(): React.JSX.Element {
     return (
@@ -114,137 +173,159 @@ export function DashboardShell({
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="grid min-h-screen lg:grid-cols-[250px_1fr]">
-        <aside
-          className={cn(
-            "hidden border-r border-sidebar-border bg-sidebar transition-all duration-200 lg:flex lg:flex-col",
-            collapsed ? "lg:w-[68px]" : "lg:w-[250px]"
-          )}
-        >
-          <div className="border-b border-sidebar-border px-2.5 py-2">
-            <button
-              className={cn(
-                "flex w-full items-center rounded-2xl transition-colors hover:bg-accent/60",
-                collapsed ? "justify-center px-0 py-0.5" : "gap-2 px-2.5 py-1.5"
-              )}
-              onClick={() => onNavigate("assets")}
-              type="button"
-            >
-              {collapsed ? (
-                <div className="flex h-12 w-12 items-center justify-center p-1">
-                  <img alt="ACTS" className="h-full w-full object-contain" src="/acts-logo.svg" />
-                </div>
-              ) : (
-                <>
-                  <ActsLogo imageClassName="h-9" />
-                  <div className="min-w-0 text-left">
-                    <p className="text-sm font-bold uppercase tracking-[0.2em]">
-                      ACTS
-                    </p>
-                  </div>
-                </>
-              )}
-            </button>
+  function renderAdminSidebar(): React.JSX.Element {
+    return (
+      <aside className="hidden border-r border-sidebar-border bg-white/88 backdrop-blur-sm lg:flex lg:flex-col">
+        <div className="flex h-[84px] items-center border-b border-sidebar-border px-5">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Admin
+            </p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+              관리자 설정
+            </h2>
           </div>
+        </div>
 
-          <nav className="flex-1 space-y-1 px-2 py-3">
-            {visibleNavigationItems.map((item) => {
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="space-y-1">
+            {adminSidebarItems.map((item) => {
               const Icon = item.icon;
-              const navigationBody = (
-                <>
-                  <Icon className="h-5 w-5 shrink-0" />
-                  {!collapsed ? <span>{item.label}</span> : null}
-                </>
-              );
-
-              if (item.type === "external") {
-                return (
-                  <a
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground"
-                    href={item.href}
-                    key={item.key}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    {navigationBody}
-                  </a>
-                );
-              }
+              const isActive = item.key === activeAdminTab;
 
               return (
                 <button
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground",
-                    item.key === activeNavigationKey && "bg-accent text-foreground"
+                    "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm transition-all",
+                    isActive
+                      ? "border border-border bg-card text-foreground shadow-sm"
+                      : "border border-transparent text-muted-foreground hover:border-border hover:bg-card/80 hover:text-foreground"
                   )}
                   key={item.key}
-                  onClick={() => onNavigate(item.key)}
+                  onClick={() => onAdminTabChange(item.key)}
                   type="button"
                 >
-                  {navigationBody}
+                  <div
+                    className={cn(
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+                      isActive
+                        ? "bg-accent text-foreground"
+                        : "bg-accent/50 text-muted-foreground"
+                    )}
+                  >
+                    <Icon className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{item.label}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {item.description}
+                    </p>
+                  </div>
                 </button>
               );
             })}
-          </nav>
-
-          <div className="px-2 pb-2">
-            <button
-              className="flex h-9 w-full items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              onClick={() => setCollapsed((currentValue) => !currentValue)}
-              type="button"
-            >
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </button>
           </div>
+        </div>
+      </aside>
+    );
+  }
 
-          <div className="border-t border-sidebar-border p-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-accent/70"
-                  type="button"
-                >
-                  <div className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-violet-100 text-sm font-medium text-violet-700">
-                    {(currentUser?.displayName ?? "A").slice(0, 1)}
-                  </div>
-                  {!collapsed ? (
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-medium">
-                        {currentUser?.displayName ?? "게스트"}
-                      </p>
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {currentUser ? "이름을 눌러 계정 정보 보기" : "로그인이 필요합니다"}
-                      </p>
+  return (
+    <>
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="grid min-h-screen lg:grid-cols-[96px_320px_1fr]">
+          <aside className="hidden border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col">
+            <div className="border-b border-sidebar-border px-3 py-3">
+              <button
+                className="flex w-full items-center justify-center rounded-2xl px-2 py-3 transition-colors hover:bg-accent/70"
+                onClick={() => handlePrimaryNavigation("hub")}
+                type="button"
+              >
+                <ActsLogo className="items-center" imageClassName="h-9" />
+              </button>
+            </div>
+
+            <nav className="flex-1 space-y-2 px-3 py-4">
+              {visiblePrimaryNavigationItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = item.key === activePrimaryNavigationKey;
+
+                return (
+                  <button
+                    className={cn(
+                      "flex w-full flex-col items-center gap-2 rounded-2xl px-2 py-3 text-[11px] font-medium transition-all",
+                      isActive
+                        ? "bg-accent text-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                    )}
+                    key={item.key}
+                    onClick={() => handlePrimaryNavigation(item.key)}
+                    type="button"
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="space-y-2 border-t border-sidebar-border px-3 py-3">
+              <a
+                className="flex w-full flex-col items-center gap-2 rounded-2xl px-2 py-3 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                href="/acts-user-manual.html"
+                rel="noreferrer"
+                target="_blank"
+              >
+                <BookOpenText className="h-5 w-5" />
+                <span>매뉴얼</span>
+              </a>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="flex w-full items-center justify-center rounded-2xl px-2 py-2 transition-colors hover:bg-accent"
+                    type="button"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-sm font-medium text-violet-700">
+                      {(currentUser?.displayName ?? "A").slice(0, 1)}
                     </div>
-                  ) : null}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-64 rounded-2xl" side="top">
-                {renderAccountMenuContent()}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </aside>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64 rounded-2xl" side="right">
+                  {renderAccountMenuContent()}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </aside>
 
-        <div className="flex min-h-screen flex-col">
-          <main className="flex-1 px-4 py-6 lg:px-6 lg:py-6">
-            {visibleNavigationItems.length === 0 ? (
-              <div className="flex min-h-[60vh] items-center justify-center">
-                <div className="max-w-md rounded-[28px] border border-border bg-card p-8 text-center shadow-sm">
-                  <p className="text-lg font-semibold">허용된 기능이 없습니다</p>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                    현재 계정에는 접근 가능한 좌측 기능이 없습니다. 관리자에게 기능 권한 Allow 설정을 요청하세요.
-                  </p>
+          {activePrimaryNavigationKey === "hub" ? (
+            <HubSidebarPanel
+              hasAssetLibraryAccess={hasAssetLibraryAccess}
+              hubNavigationRefreshKey={hubNavigationRefreshKey}
+              isAssetLibraryActive={isAssetLibraryActive}
+              onOpenAssetLibrary={onOpenAssetLibrary}
+              onOpenHubEpisode={onOpenHubEpisode}
+              selectedHubEpisodeKey={selectedHubEpisodeKey}
+            />
+          ) : renderAdminSidebar()}
+
+          <div className="flex min-h-screen flex-col">
+            <main className="flex-1 px-4 py-6 lg:px-6 lg:py-6">
+              {visiblePrimaryNavigationItems.length === 0 ? (
+                <div className="flex min-h-[60vh] items-center justify-center">
+                  <div className="max-w-md rounded-[28px] border border-border bg-card p-8 text-center shadow-sm">
+                    <p className="text-lg font-semibold">허용된 기능이 없습니다</p>
+                    <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                      현재 계정에는 접근 가능한 기능이 없습니다. 관리자에게 권한 설정을 요청하세요.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              children
-            )}
-          </main>
+              ) : (
+                children
+              )}
+            </main>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

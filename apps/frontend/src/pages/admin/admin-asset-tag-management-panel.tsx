@@ -626,12 +626,9 @@ function TagActionDialog({
   return (
     <Dialog onOpenChange={(open) => (!open ? onClose() : undefined)} open={isOpen}>
       <DialogContent
-        className="max-w-none overflow-hidden rounded-[24px] border border-border bg-background p-0 shadow-[0_24px_80px_rgba(15,23,42,0.20)]"
+        className="overflow-hidden rounded-[24px] border border-border bg-background p-0 shadow-[0_24px_80px_rgba(15,23,42,0.20)]"
+        size="form"
         showCloseButton={false}
-        style={{
-          width: "min(460px, calc(100vw - 32px))",
-          maxWidth: "460px"
-        }}
       >
         {state ? (
           <div className="p-6">
@@ -681,7 +678,7 @@ function TagActionDialog({
                 </div>
               ) : (
                 <div className="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm leading-6 text-rose-700">
-                  이 작업은 현재 태그를 자산 메타데이터와 검색 인덱스에서 제거합니다.
+                  이 작업은 현재 태그를 에셋 메타데이터와 검색 인덱스에서 제거합니다.
                 </div>
               )}
             </div>
