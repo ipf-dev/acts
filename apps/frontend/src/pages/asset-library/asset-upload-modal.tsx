@@ -285,9 +285,9 @@ export function AssetUploadModal({
 
   return (
     <Dialog onOpenChange={(open) => (!open ? onClose() : undefined)} open={isOpen}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-hidden p-0">
+      <DialogContent className="max-h-[90vh] overflow-hidden p-0" size="wide">
         <DialogHeader className="border-b border-border px-6 py-5 text-left">
-          <DialogTitle className="text-xl tracking-tight">애셋 업로드</DialogTitle>
+          <DialogTitle className="text-xl tracking-tight">에셋 업로드</DialogTitle>
           <DialogDescription className="mt-1">
             가지고 있는 파일은 업로드로, 유투브 영상이나 작업중인 구글 Docs 시나리오는 링크 등록으로 간편하게 추가해 보세요.
           </DialogDescription>
@@ -353,7 +353,7 @@ export function AssetUploadModal({
                         <Textarea
                           className="min-h-20 rounded-2xl bg-white"
                           onChange={(event) => handleDescriptionChange(draft.id, event.target.value)}
-                          placeholder="애셋 설명을 입력하세요"
+                          placeholder="에셋 설명을 입력하세요"
                           value={draft.description}
                         />
 

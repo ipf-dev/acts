@@ -13,7 +13,7 @@ import type {
   AuthSessionView,
   CharacterTagOptionView
 } from "../../api/types";
-import { assetTagDraftToInput, getAssetApiErrorMessage } from "./asset-library-utils";
+import { assetTagDraftToInput, getAssetApiErrorMessage, runWithConcurrency } from "./asset-library-utils";
 import { AssetLibraryPage } from "./asset-library-page";
 import { AssetUploadToastPanel } from "./asset-upload-toast-panel";
 import type {
@@ -167,7 +167,7 @@ export function AssetLibraryPageContainer({
         setState((currentState) => ({
           ...currentState,
           authErrorMessage: getAssetApiErrorMessage(error, {
-            fallback: "자산 라이브러리 보조 정보를 불러오지 못했습니다."
+            fallback: "에셋 라이브러리 보조 정보를 불러오지 못했습니다."
           }),
           authSuccessMessage: null,
           isLoading: false,
@@ -235,8 +235,8 @@ export function AssetLibraryPageContainer({
         setState((currentState) => ({
           ...currentState,
           authErrorMessage: getAssetApiErrorMessage(error, {
-            denied: "현재 권한으로는 자산 라이브러리에 접근할 수 없습니다.",
-            fallback: "자산 목록을 불러오지 못했습니다."
+            denied: "현재 권한으로는 에셋 라이브러리에 접근할 수 없습니다.",
+            fallback: "에셋 목록을 불러오지 못했습니다."
           }),
           authSuccessMessage: null,
           isLoading: false,
@@ -416,11 +416,11 @@ export function AssetLibraryPageContainer({
     const successMessage =
       failureCount === 0
         ? kind === "FILE"
-          ? `${successCount}개 애셋 업로드가 완료되었습니다.`
+          ? `${successCount}개 에셋 업로드가 완료되었습니다.`
           : `${successCount}개 링크 등록이 완료되었습니다.`
         : successCount > 0
           ? kind === "FILE"
-            ? `${successCount}개 애셋 업로드가 완료되었습니다.`
+            ? `${successCount}개 에셋 업로드가 완료되었습니다.`
             : `${successCount}개 링크 등록이 완료되었습니다.`
           : null;
 
@@ -540,44 +540,6 @@ export function AssetLibraryPageContainer({
       <AssetUploadToastPanel batch={uploadBatch} onDismiss={handleDismissUploadBatch} />
     </>
   );
-}
-
-async function runWithConcurrency<T>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T) => Promise<unknown>
-): Promise<PromiseSettledResult<unknown>[]> {
-  if (items.length === 0) {
-    return [];
-  }
-
-  let nextIndex = 0;
-  const workerCount = Math.min(concurrency, items.length);
-  const results: PromiseSettledResult<unknown>[] = Array.from({ length: items.length });
-
-  await Promise.all(
-    Array.from({ length: workerCount }, async () => {
-      while (nextIndex < items.length) {
-        const currentIndex = nextIndex;
-        nextIndex += 1;
-
-        try {
-          const value = await worker(items[currentIndex]);
-          results[currentIndex] = {
-            status: "fulfilled",
-            value
-          };
-        } catch (error: unknown) {
-          results[currentIndex] = {
-            reason: error,
-            status: "rejected"
-          };
-        }
-      }
-    })
-  );
-
-  return results;
 }
 
 function createSuccessfulResults(count: number): PromiseSettledResult<void>[] {

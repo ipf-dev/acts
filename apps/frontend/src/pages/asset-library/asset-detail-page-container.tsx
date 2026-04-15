@@ -140,9 +140,9 @@ export function AssetDetailPageContainer({
           ...currentState,
           asset: null,
           authErrorMessage: getAssetApiErrorMessage(error, {
-            denied: "현재 권한으로는 이 자산에 접근할 수 없습니다.",
-            fallback: "자산 상세 정보를 불러오지 못했습니다.",
-            notFound: "대상 자산을 찾을 수 없습니다."
+            denied: "현재 권한으로는 이 에셋에 접근할 수 없습니다.",
+            fallback: "에셋 상세 정보를 불러오지 못했습니다.",
+            notFound: "대상 에셋을 찾을 수 없습니다."
           }),
           authSuccessMessage: null,
           isLoading: false,
@@ -215,7 +215,7 @@ export function AssetDetailPageContainer({
       setState((currentState) => ({
         ...currentState,
         asset: loadedPageData.asset,
-        authSuccessMessage: "애셋 정보가 업데이트되었습니다.",
+        authSuccessMessage: "에셋 정보가 업데이트되었습니다.",
         characterOptions: loadedPageData.characterOptions,
         isSaving: false,
         relatedAssets: loadedPageData.relatedAssets
@@ -224,9 +224,9 @@ export function AssetDetailPageContainer({
       setState((currentState) => ({
         ...currentState,
         authErrorMessage: getAssetApiErrorMessage(error, {
-          denied: "이 자산을 수정할 권한이 없습니다.",
-          fallback: "자산 정보 저장에 실패했습니다.",
-          notFound: "저장할 자산을 찾을 수 없습니다."
+          denied: "이 에셋을 수정할 권한이 없습니다.",
+          fallback: "에셋 정보 저장에 실패했습니다.",
+          notFound: "저장할 에셋을 찾을 수 없습니다."
         }),
         isSaving: false
       }));
@@ -249,8 +249,8 @@ export function AssetDetailPageContainer({
         ...currentState,
         authErrorMessage: getAssetApiErrorMessage(error, {
           denied: "삭제 권한이 없습니다.",
-          fallback: "자산 삭제에 실패했습니다.",
-          notFound: "삭제할 자산을 찾을 수 없습니다."
+          fallback: "에셋 삭제에 실패했습니다.",
+          notFound: "삭제할 에셋을 찾을 수 없습니다."
         }),
         isDeleting: false
       }));
@@ -277,9 +277,9 @@ export function AssetDetailPageContainer({
       setState((currentState) => ({
         ...currentState,
         authErrorMessage: getAssetApiErrorMessage(error, {
-          denied: "현재 권한으로는 이 자산을 다운로드할 수 없습니다.",
-          fallback: "자산 다운로드에 실패했습니다.",
-          notFound: "다운로드할 자산을 찾을 수 없습니다."
+          denied: "현재 권한으로는 이 에셋을 다운로드할 수 없습니다.",
+          fallback: "에셋 다운로드에 실패했습니다.",
+          notFound: "다운로드할 에셋을 찾을 수 없습니다."
         }),
         isDownloading: false
       }));

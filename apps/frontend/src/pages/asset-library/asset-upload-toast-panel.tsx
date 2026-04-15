@@ -30,7 +30,7 @@ export function AssetUploadToastPanel({
     batch.kind === "FILE"
       ? resolveBatchProgressPercent(batch)
       : null;
-  const title = batch.kind === "FILE" ? "애셋 업로드" : "링크 등록";
+  const title = batch.kind === "FILE" ? "에셋 업로드" : "링크 등록";
 
   return (
     <div className="pointer-events-none fixed bottom-6 right-4 z-40 w-[min(420px,calc(100vw-2rem))] lg:right-6">
@@ -216,7 +216,7 @@ function formatUploadedBytes(bytes: number): string {
 const taskStatusLabelMap: Record<AssetUploadTaskStatusView, string> = {
   COMPLETED: "업로드가 완료되었습니다.",
   FAILED: "업로드에 실패했습니다.",
-  FINALIZING: "애셋 등록을 마무리하는 중입니다.",
+  FINALIZING: "에셋 등록을 마무리하는 중입니다.",
   PENDING: "업로드를 준비하는 중입니다.",
   UPLOADING: "파일을 업로드하는 중입니다."
 };
