@@ -274,21 +274,24 @@ export function HubEpisodePageContainer({
     setIsSlotCreatorOpen(false);
   }
 
-  async function handleSelectExistingAsset(assetId: number): Promise<void> {
-    if (state.activePickerSlotId === null) {
+  async function handleConfirmAssetSelection(assetIds: number[]): Promise<void> {
+    if (state.activePickerSlotId === null || assetIds.length === 0) {
       return;
     }
 
+    const slotId = state.activePickerSlotId;
+
     setState((currentState) => ({
       ...currentState,
-      busySlotId: currentState.activePickerSlotId,
+      busySlotId: slotId,
       busySlotMode: "LINK"
     }));
 
     try {
-      const updatedSlot = await dashboardApi.assignHubEpisodeSlotAsset(episodeKey, state.activePickerSlotId, {
-        assetId
-      });
+      let latestSlot: HubEpisodeSlotView | null = null;
+      for (const assetId of assetIds) {
+        latestSlot = await dashboardApi.assignHubEpisodeSlotAsset(episodeKey, slotId, { assetId });
+      }
 
       setState((currentState) => ({
         ...currentState,
@@ -296,7 +299,9 @@ export function HubEpisodePageContainer({
         assetPickerSearchQuery: "",
         assetPickerAssets: []
       }));
-      applySlotUpdate(updatedSlot);
+      if (latestSlot) {
+        applySlotUpdate(latestSlot);
+      }
     } catch {
       setState((currentState) => ({
         ...currentState,
@@ -686,6 +691,7 @@ export function HubEpisodePageContainer({
       <HubEpisodeAssetPickerModal
         assets={state.assetPickerAssets}
         errorMessage={state.assetPickerErrorMessage}
+        isLinking={state.busySlotMode === "LINK"}
         isLoading={state.isAssetPickerLoading}
         isOpen={state.activePickerSlotId !== null}
         linkedAssetIds={activePickerSlot?.linkedAssets.map((asset) => asset.id) ?? []}
@@ -698,13 +704,13 @@ export function HubEpisodePageContainer({
             assetPickerSearchQuery: ""
           }))
         }
+        onConfirmSelection={handleConfirmAssetSelection}
         onSearchQueryChange={(value) =>
           setState((currentState) => ({
             ...currentState,
             assetPickerSearchQuery: value
           }))
         }
-        onSelectAsset={handleSelectExistingAsset}
         searchQuery={state.assetPickerSearchQuery}
         slotName={activePickerSlot?.slotName ?? null}
       />
