@@ -304,14 +304,14 @@ export function AssetDetailPage({
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-6">
               <Tabs className="space-y-4" defaultValue="summary">
-                <TabsList className="h-auto rounded-full bg-muted p-1">
-                  <TabsTrigger className="rounded-full px-4 py-2" value="summary">
+                <TabsList className="h-auto self-start rounded-full bg-muted p-1">
+                  <TabsTrigger className="rounded-full px-4 py-2 text-sm" value="summary">
                     상세 정보
                   </TabsTrigger>
-                  <TabsTrigger className="rounded-full px-4 py-2" value="history">
+                  <TabsTrigger className="rounded-full px-4 py-2 text-sm" value="history">
                     변경 이력
                   </TabsTrigger>
-                  <TabsTrigger className="rounded-full px-4 py-2" value="metadata">
+                  <TabsTrigger className="rounded-full px-4 py-2 text-sm" value="metadata">
                     메타데이터
                   </TabsTrigger>
                 </TabsList>
