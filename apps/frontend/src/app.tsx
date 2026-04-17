@@ -9,6 +9,8 @@ import { AdminPageContainer } from "./pages/admin/admin-page-container";
 import { HubEpisodePageContainer } from "./pages/hub/hub-episode-page-container";
 import { LandingPage } from "./pages/landing/landing-page";
 import { type AdminTabKey, type DashboardNavigationKey, DashboardShell } from "./components/dashboard-shell";
+import { PatchNotesModal } from "./components/patch-notes-modal";
+import { usePatchNotes } from "./lib/use-patch-notes";
 
 interface AppLocationState {
   activeNavigationKey: DashboardNavigationKey;
@@ -80,6 +82,7 @@ export function App(): React.JSX.Element {
   const [hubNavigationRefreshKey, setHubNavigationRefreshKey] = useState(0);
   const [locationState, setLocationState] = useState<AppLocationState>(() => readAppLocation());
   const [session, setSession] = useState<AuthSessionView | null>(null);
+  const patchNotesController = usePatchNotes(session?.authenticated === true);
 
   useEffect(() => {
     let isActive = true;
@@ -181,16 +184,17 @@ export function App(): React.JSX.Element {
   }
 
   return (
-    <DashboardShell
-      activeAdminTab={activeAdminTab}
-      activeNavigationKey={locationState.activeNavigationKey}
-      hubNavigationRefreshKey={hubNavigationRefreshKey}
-      onAdminTabChange={setActiveAdminTab}
-      onNavigate={handleNavigation}
-      onOpenHubEpisode={handleOpenHubEpisode}
-      selectedHubEpisodeKey={locationState.selectedHubEpisodeKey}
-      session={session}
-    >
+    <>
+      <DashboardShell
+        activeAdminTab={activeAdminTab}
+        activeNavigationKey={locationState.activeNavigationKey}
+        hubNavigationRefreshKey={hubNavigationRefreshKey}
+        onAdminTabChange={setActiveAdminTab}
+        onNavigate={handleNavigation}
+        onOpenHubEpisode={handleOpenHubEpisode}
+        selectedHubEpisodeKey={locationState.selectedHubEpisodeKey}
+        session={session}
+      >
       {locationState.activeNavigationKey === "assets" ? (
         locationState.selectedAssetId !== null ? (
           <AssetDetailPageContainer
@@ -230,5 +234,12 @@ export function App(): React.JSX.Element {
         <AdminPageContainer activeTab={activeAdminTab} session={session} />
       )}
     </DashboardShell>
+      <PatchNotesModal
+        isOpen={patchNotesController.isOpen}
+        latestPatchNote={patchNotesController.latestPatchNote}
+        onClose={patchNotesController.close}
+        onDismissForWeek={patchNotesController.dismissForWeek}
+      />
+    </>
   );
 }

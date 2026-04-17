@@ -232,13 +232,13 @@ export function DashboardShell({
             : "lg:grid-cols-[96px_320px_1fr]"
         )}>
           <aside className="sticky top-0 hidden max-h-screen border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col">
-            <div className="border-b border-sidebar-border px-2 py-3">
+            <div className="border-b border-sidebar-border px-3 py-3">
               <button
-                className="flex w-full items-center justify-center rounded-2xl px-1 py-3 transition-colors hover:bg-accent/70"
+                className="flex w-full items-center justify-center rounded-2xl px-2 py-3 transition-colors hover:bg-accent/70"
                 onClick={() => handlePrimaryNavigation("assets")}
                 type="button"
               >
-                <ActsLogo className="items-center" imageClassName="h-auto w-full" />
+                <ActsLogo className="items-center" imageClassName="h-9" />
               </button>
             </div>
 

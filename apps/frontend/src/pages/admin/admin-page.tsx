@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import type React from "react";
 import {
   AlertTriangle,
-  Check,
   RotateCcw,
+  Save,
   Search,
   Trash2,
   Undo2
@@ -493,14 +493,22 @@ export function AdminPage({
                   <div className="overflow-hidden rounded-[20px] border border-border">
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-border text-sm">
+                        <colgroup>
+                          <col className="w-52" />
+                          <col />
+                          <col className="w-52" />
+                          <col className="w-40" />
+                          <col className="w-24" />
+                          <col className="w-36" />
+                        </colgroup>
                         <thead className="bg-muted/70 text-left text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                           <tr>
-                            <th className="px-4 py-3 font-medium">이름</th>
-                            <th className="px-4 py-3 font-medium">이메일</th>
-                            <th className="px-4 py-3 font-medium">조직</th>
-                            <th className="px-4 py-3 font-medium">역할</th>
-                            <th className="px-4 py-3 font-medium">상태</th>
-                            <th className="px-4 py-3 text-right font-medium">액션</th>
+                            <th className="px-5 py-3.5 font-medium">이름</th>
+                            <th className="px-5 py-3.5 font-medium">이메일</th>
+                            <th className="px-5 py-3.5 font-medium">조직</th>
+                            <th className="px-5 py-3.5 font-medium">역할</th>
+                            <th className="px-5 py-3.5 font-medium">상태</th>
+                            <th className="px-5 py-3.5 text-right font-medium">액션</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border bg-card">
@@ -531,7 +539,7 @@ export function AdminPage({
                                   className={`align-middle ${isDeactivated ? "bg-muted/30 text-muted-foreground" : ""}`}
                                   key={user.email}
                                 >
-                                  <td className="min-w-48 px-4 py-3.5">
+                                  <td className="px-5 py-4 align-middle">
                                     <Input
                                       className="h-10 rounded-xl"
                                       disabled={isDeactivated}
@@ -542,8 +550,10 @@ export function AdminPage({
                                       value={draft.displayName}
                                     />
                                   </td>
-                                  <td className="px-4 py-3.5 text-sm text-muted-foreground">{user.email}</td>
-                                  <td className="min-w-48 px-4 py-3.5">
+                                  <td className="px-5 py-4 align-middle text-sm text-muted-foreground">
+                                    <span className="block truncate" title={user.email}>{user.email}</span>
+                                  </td>
+                                  <td className="px-5 py-4 align-middle">
                                     <Select
                                       disabled={isDeactivated}
                                       onValueChange={(value) =>
@@ -566,7 +576,7 @@ export function AdminPage({
                                       </SelectContent>
                                     </Select>
                                   </td>
-                                  <td className="min-w-40 px-4 py-3.5">
+                                  <td className="px-5 py-4 align-middle">
                                     <Select
                                       disabled={
                                         Boolean(promotingUserEmail) || user.role === "ADMIN" || isDeactivated
@@ -587,15 +597,15 @@ export function AdminPage({
                                       </SelectContent>
                                     </Select>
                                   </td>
-                                  <td className="px-4 py-3.5">
+                                  <td className="px-5 py-4 align-middle">
                                     {isDeactivated ? (
                                       <Badge variant="warning">비활성</Badge>
                                     ) : (
                                       <Badge variant="secondary">활성</Badge>
                                     )}
                                   </td>
-                                  <td className="px-4 py-3.5">
-                                    <div className="flex items-center justify-end gap-1">
+                                  <td className="px-5 py-4 align-middle">
+                                    <div className="flex items-center justify-end gap-2">
                                       <Button
                                         aria-label="저장"
                                         className="h-9 w-9 rounded-xl"
@@ -606,7 +616,7 @@ export function AdminPage({
                                         type="button"
                                         variant="secondary"
                                       >
-                                        <Check className="h-4 w-4" />
+                                        <Save className="h-4 w-4" />
                                       </Button>
                                       {isDeactivated ? (
                                         <Button
