@@ -2,6 +2,7 @@ package com.acts.auth.api
 
 import com.acts.auth.domain.ActsAuthProperties
 import com.acts.auth.feature.UserFeatureAccessService
+import com.acts.auth.user.UserAccountDeactivatedException
 import com.acts.auth.user.UserDirectoryService
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -33,25 +34,37 @@ class AuthController(
     }
 
     @GetMapping("/me")
-    fun getSession(authentication: Authentication?): AuthSessionResponse {
+    fun getSession(
+        authentication: Authentication?,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+    ): AuthSessionResponse {
         val oidcUser = authentication?.principal as? OidcUser
             ?: return AuthSessionResponse(
                 authenticated = false, loginConfigured = googleLoginAvailability.isConfigured(),
-                allowedDomain = authProperties.allowedDomain, allowedFeatureKeys = emptyList(), user = null,
+                allowedDomains = authProperties.allowedDomains, allowedFeatureKeys = emptyList(), user = null,
             )
 
         val email = oidcUser.email?.lowercase()
             ?: return AuthSessionResponse(
                 authenticated = false, loginConfigured = googleLoginAvailability.isConfigured(),
-                allowedDomain = authProperties.allowedDomain, allowedFeatureKeys = emptyList(), user = null,
+                allowedDomains = authProperties.allowedDomains, allowedFeatureKeys = emptyList(), user = null,
             )
 
         val displayName = oidcUser.fullName ?: oidcUser.givenName ?: email.substringBefore("@")
-        val userProfile = userDirectoryService.syncLogin(email = email, displayName = displayName)
+        val userProfile = try {
+            userDirectoryService.syncLogin(email = email, displayName = displayName)
+        } catch (_: UserAccountDeactivatedException) {
+            SecurityContextLogoutHandler().logout(request, response, authentication)
+            return AuthSessionResponse(
+                authenticated = false, loginConfigured = googleLoginAvailability.isConfigured(),
+                allowedDomains = authProperties.allowedDomains, allowedFeatureKeys = emptyList(), user = null,
+            )
+        }
 
         return AuthSessionResponse(
             authenticated = true, loginConfigured = googleLoginAvailability.isConfigured(),
-            allowedDomain = authProperties.allowedDomain,
+            allowedDomains = authProperties.allowedDomains,
             allowedFeatureKeys = userFeatureAccessService.resolveAllowedFeatureKeys(email = email, role = userProfile.role),
             user = userProfile,
         )

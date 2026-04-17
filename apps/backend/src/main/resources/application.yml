@@ -8,6 +8,8 @@ spring:
 
 acts:
   auth:
-    allowed-domain: iportfolio.co.kr
+    allowed-domains:
+      - iportfolio.co.kr
+      - spindlebooks.com
   storage:
     region: ap-northeast-2

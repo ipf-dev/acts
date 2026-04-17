@@ -38,6 +38,43 @@ class AdminAuditLogService(
         )
     }
 
+    fun recordUserDisplayNameUpdated(actorEmail: String, actorName: String?, beforeProfile: AuthUserProfile, afterProfile: AuthUserProfile) {
+        if (beforeProfile.displayName == afterProfile.displayName) return
+        saveAuditLog(
+            category = AuditLogCategory.PERMISSION, outcome = AuditLogOutcome.SUCCESS,
+            actorEmail = actorEmail, actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.USER_DISPLAY_NAME_UPDATED,
+            targetEmail = afterProfile.email, targetName = afterProfile.displayName,
+            detail = "${afterProfile.email}: ${beforeProfile.displayName} -> ${afterProfile.displayName}",
+            beforeState = objectMapper.writeValueAsString(UserAssignmentAuditSnapshot.from(beforeProfile)),
+            afterState = objectMapper.writeValueAsString(UserAssignmentAuditSnapshot.from(afterProfile)),
+        )
+    }
+
+    fun recordUserReactivated(actorEmail: String, actorName: String?, afterProfile: AuthUserProfile) {
+        saveAuditLog(
+            category = AuditLogCategory.PERMISSION, outcome = AuditLogOutcome.SUCCESS,
+            actorEmail = actorEmail, actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.USER_REACTIVATED,
+            targetEmail = afterProfile.email, targetName = afterProfile.displayName,
+            detail = "${afterProfile.displayName} (${afterProfile.email}) 사용자 복구",
+            beforeState = null,
+            afterState = objectMapper.writeValueAsString(UserAssignmentAuditSnapshot.from(afterProfile)),
+        )
+    }
+
+    fun recordUserDeleted(actorEmail: String, actorName: String?, beforeProfile: AuthUserProfile) {
+        saveAuditLog(
+            category = AuditLogCategory.PERMISSION, outcome = AuditLogOutcome.SUCCESS,
+            actorEmail = actorEmail, actorName = actorName.normalizedAuditName(),
+            actionType = AdminAuditLogAction.USER_DELETED,
+            targetEmail = beforeProfile.email, targetName = beforeProfile.displayName,
+            detail = "${beforeProfile.displayName} (${beforeProfile.email}) 사용자 삭제",
+            beforeState = objectMapper.writeValueAsString(UserAssignmentAuditSnapshot.from(beforeProfile)),
+            afterState = null,
+        )
+    }
+
     fun recordUserRolePromoted(actorEmail: String, actorName: String?, beforeProfile: AuthUserProfile, afterProfile: AuthUserProfile) {
         if (beforeProfile == afterProfile) return
         saveAuditLog(

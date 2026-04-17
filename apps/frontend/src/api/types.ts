@@ -179,12 +179,13 @@ export interface AuthUserView {
   role: UserRole;
   companyWideViewer: boolean;
   manualAssignmentRequired: boolean;
+  deactivatedAt: string | null;
 }
 
 export interface AuthSessionView {
   authenticated: boolean;
   loginConfigured: boolean;
-  allowedDomain: string;
+  allowedDomains: string[];
   allowedFeatureKeys: AppFeatureKeyView[];
   user: AuthUserView | null;
 }

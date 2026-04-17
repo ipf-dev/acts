@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import type React from "react";
 import {
   AlertTriangle,
+  Check,
   RotateCcw,
-  Search
+  Search,
+  Trash2,
+  Undo2
 } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -46,6 +49,10 @@ interface AdminPageProps {
   isSavingAssignment: boolean;
   isSavingAssetTags: boolean;
   isSavingFeatureAccess: boolean;
+  isSavingDisplayName: boolean;
+  onDeactivateUser: (email: string) => Promise<void>;
+  onReactivateUser: (email: string) => Promise<void>;
+  onUpdateUserDisplayName: (email: string, displayName: string) => Promise<void>;
   onPromoteUserToAdmin: (email: string) => Promise<void>;
   onCreateCharacter: (name: { name: string; aliases: string[] }) => Promise<void>;
   onDeleteAssetTagValue: (tagType: "CHARACTER" | "LOCATION" | "KEYWORD", value: string) => Promise<void>;
@@ -66,6 +73,7 @@ interface AdminPageProps {
   onSaveUserFeatureAccess: (email: string, allowedFeatureKeys: AppFeatureKeyView[]) => Promise<void>;
   onSaveManualAssignment: (email: string, organizationId: number) => Promise<void>;
   organizations: OrganizationOptionView[];
+  processingUserEmail: string | null;
   promotingUserEmail: string | null;
   processingDeletedAssetId: number | null;
   session: AuthSessionView;
@@ -74,6 +82,7 @@ interface AdminPageProps {
 
 interface UserAssignmentDraft {
   organizationId: string;
+  displayName: string;
 }
 
 interface UserFeatureAccessDraft {
@@ -117,6 +126,9 @@ const auditActionLabelMap: Record<string, string> = {
   LOGIN_SUCCESS: "로그인 성공",
   USER_FEATURE_ACCESS_UPDATED: "기능 권한 변경",
   USER_ASSIGNMENT_UPDATED: "사용자 조직 변경",
+  USER_DISPLAY_NAME_UPDATED: "사용자 이름 변경",
+  USER_DELETED: "사용자 삭제",
+  USER_REACTIVATED: "사용자 복구",
   USER_ROLE_PROMOTED: "관리자 승격",
   VIEWER_ALLOWLIST_ADDED: "전사 열람자 추가",
   VIEWER_ALLOWLIST_REMOVED: "전사 열람자 제거"
@@ -145,6 +157,10 @@ export function AdminPage({
   isSavingAssignment,
   isSavingAssetTags,
   isSavingFeatureAccess,
+  isSavingDisplayName,
+  onDeactivateUser,
+  onReactivateUser,
+  onUpdateUserDisplayName,
   onPromoteUserToAdmin,
   onCreateCharacter,
   onDeleteAssetTagValue,
@@ -157,6 +173,7 @@ export function AdminPage({
   onSaveUserFeatureAccess,
   onSaveManualAssignment,
   organizations,
+  processingUserEmail,
   promotingUserEmail,
   processingDeletedAssetId,
   session,
@@ -267,14 +284,16 @@ export function AdminPage({
 
   function getDraft(user: AuthUserView): UserAssignmentDraft {
     return draftsByEmail[user.email] ?? {
-      organizationId: user.organizationId?.toString() ?? ""
+      organizationId: user.organizationId?.toString() ?? "",
+      displayName: user.displayName
     };
   }
 
   function updateDraft(email: string, partialDraft: Partial<UserAssignmentDraft>): void {
     setDraftsByEmail((currentDrafts) => {
       const previousDraft = currentDrafts[email] ?? {
-        organizationId: ""
+        organizationId: "",
+        displayName: ""
       };
 
       return {
@@ -339,19 +358,54 @@ export function AdminPage({
     });
   }
 
-  async function handleAssignmentSave(user: AuthUserView): Promise<void> {
+  async function handleSaveUser(user: AuthUserView): Promise<void> {
     const draft = getDraft(user);
+    const nextDisplayName = draft.displayName.trim();
+    const currentOrganizationId = user.organizationId?.toString() ?? "";
+    const hasDisplayNameChanged =
+      nextDisplayName.length > 0 && nextDisplayName !== user.displayName;
+    const hasOrganizationChanged =
+      !isBlank(draft.organizationId) && draft.organizationId !== currentOrganizationId;
 
-    if (isBlank(draft.organizationId)) {
+    if (!hasDisplayNameChanged && !hasOrganizationChanged) {
       return;
     }
 
-    await onSaveManualAssignment(user.email, Number(draft.organizationId));
+    if (hasDisplayNameChanged) {
+      await onUpdateUserDisplayName(user.email, nextDisplayName);
+    }
+
+    if (hasOrganizationChanged) {
+      await onSaveManualAssignment(user.email, Number(draft.organizationId));
+    }
+
     setDraftsByEmail((currentDrafts) => {
       const nextDrafts = { ...currentDrafts };
       delete nextDrafts[user.email];
       return nextDrafts;
     });
+  }
+
+  async function handleDeactivateUser(user: AuthUserView): Promise<void> {
+    const confirmed = window.confirm(
+      `${user.displayName} (${user.email}) 사용자를 삭제하시겠습니까?\n삭제된 사용자는 다시 로그인할 수 없으며, 업로드한 에셋과 과거 기록은 그대로 보존됩니다.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    await onDeactivateUser(user.email);
+  }
+
+  async function handleReactivateUser(user: AuthUserView): Promise<void> {
+    const confirmed = window.confirm(
+      `${user.displayName} (${user.email}) 사용자를 복구하시겠습니까?\n복구된 사용자는 다시 로그인할 수 있습니다.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    await onReactivateUser(user.email);
   }
 
   async function handleRoleSelectChange(user: AuthUserView, nextRole: AuthUserView["role"]): Promise<void> {
@@ -441,11 +495,12 @@ export function AdminPage({
                       <table className="min-w-full divide-y divide-border text-sm">
                         <thead className="bg-muted/70 text-left text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                           <tr>
-                            <th className="px-4 py-3 font-medium">사용자</th>
+                            <th className="px-4 py-3 font-medium">이름</th>
                             <th className="px-4 py-3 font-medium">이메일</th>
                             <th className="px-4 py-3 font-medium">조직</th>
                             <th className="px-4 py-3 font-medium">역할</th>
-                            <th className="px-4 py-3 font-medium">액션</th>
+                            <th className="px-4 py-3 font-medium">상태</th>
+                            <th className="px-4 py-3 text-right font-medium">액션</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border bg-card">
@@ -453,23 +508,44 @@ export function AdminPage({
                             visibleUsers.map((user) => {
                               const draft = getDraft(user);
                               const currentOrganizationId = user.organizationId?.toString() ?? "";
-                              const canSaveAssignment =
-                                !isSavingAssignment &&
-                                !promotingUserEmail &&
+                              const isDeactivated = user.deactivatedAt !== null;
+                              const isProcessingUser = processingUserEmail === user.email;
+                              const nextDisplayName = draft.displayName.trim();
+                              const hasDisplayNameChanged =
+                                nextDisplayName.length > 0 && nextDisplayName !== user.displayName;
+                              const hasOrganizationChanged =
                                 !isBlank(draft.organizationId) &&
                                 draft.organizationId !== currentOrganizationId;
+                              const isSaving = isSavingDisplayName || isSavingAssignment;
+                              const canSaveUser =
+                                !isSaving &&
+                                !promotingUserEmail &&
+                                !isProcessingUser &&
+                                !isDeactivated &&
+                                (hasDisplayNameChanged || hasOrganizationChanged);
                               const isPromotingUser = promotingUserEmail === user.email;
+                              const isSelf = session.user?.email === user.email;
 
                               return (
-                                <tr className="align-middle" key={user.email}>
-                                  <td className="px-4 py-3.5">
-                                    <div className="space-y-1">
-                                      <p className="text-sm font-semibold leading-5">{user.displayName}</p>
-                                    </div>
+                                <tr
+                                  className={`align-middle ${isDeactivated ? "bg-muted/30 text-muted-foreground" : ""}`}
+                                  key={user.email}
+                                >
+                                  <td className="min-w-48 px-4 py-3.5">
+                                    <Input
+                                      className="h-10 rounded-xl"
+                                      disabled={isDeactivated}
+                                      onChange={(event) =>
+                                        updateDraft(user.email, { displayName: event.target.value })
+                                      }
+                                      placeholder="사용자 이름"
+                                      value={draft.displayName}
+                                    />
                                   </td>
                                   <td className="px-4 py-3.5 text-sm text-muted-foreground">{user.email}</td>
                                   <td className="min-w-48 px-4 py-3.5">
                                     <Select
+                                      disabled={isDeactivated}
                                       onValueChange={(value) =>
                                         updateDraft(user.email, { organizationId: value })
                                       }
@@ -492,7 +568,9 @@ export function AdminPage({
                                   </td>
                                   <td className="min-w-40 px-4 py-3.5">
                                     <Select
-                                      disabled={Boolean(promotingUserEmail) || user.role === "ADMIN"}
+                                      disabled={
+                                        Boolean(promotingUserEmail) || user.role === "ADMIN" || isDeactivated
+                                      }
                                       onValueChange={(value) =>
                                         void handleRoleSelectChange(user, value as AuthUserView["role"])
                                       }
@@ -510,23 +588,61 @@ export function AdminPage({
                                     </Select>
                                   </td>
                                   <td className="px-4 py-3.5">
-                                    <Button
-                                      className="h-9 rounded-xl px-3"
-                                      disabled={!canSaveAssignment}
-                                      onClick={() => void handleAssignmentSave(user)}
-                                      size="sm"
-                                      type="button"
-                                      variant="secondary"
-                                    >
-                                      {isSavingAssignment ? "저장 중..." : "조직 저장"}
-                                    </Button>
+                                    {isDeactivated ? (
+                                      <Badge variant="warning">비활성</Badge>
+                                    ) : (
+                                      <Badge variant="secondary">활성</Badge>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3.5">
+                                    <div className="flex items-center justify-end gap-1">
+                                      <Button
+                                        aria-label="저장"
+                                        className="h-9 w-9 rounded-xl"
+                                        disabled={!canSaveUser}
+                                        onClick={() => void handleSaveUser(user)}
+                                        size="icon"
+                                        title="저장"
+                                        type="button"
+                                        variant="secondary"
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </Button>
+                                      {isDeactivated ? (
+                                        <Button
+                                          aria-label="복구"
+                                          className="h-9 w-9 rounded-xl"
+                                          disabled={isProcessingUser}
+                                          onClick={() => void handleReactivateUser(user)}
+                                          size="icon"
+                                          title="복구"
+                                          type="button"
+                                          variant="secondary"
+                                        >
+                                          <Undo2 className="h-4 w-4" />
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          aria-label="삭제"
+                                          className="h-9 w-9 rounded-xl"
+                                          disabled={isProcessingUser || isSelf}
+                                          onClick={() => void handleDeactivateUser(user)}
+                                          size="icon"
+                                          title={isSelf ? "본인 계정은 삭제할 수 없습니다" : "삭제"}
+                                          type="button"
+                                          variant="destructive"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               );
                             })
                           ) : (
                             <tr>
-                              <td className="px-4 py-8 text-center text-muted-foreground" colSpan={5}>
+                              <td className="px-4 py-8 text-center text-muted-foreground" colSpan={6}>
                                 검색 조건에 맞는 사용자가 없습니다. 먼저 사용자가 로그인하면 여기에 나타납니다.
                               </td>
                             </tr>

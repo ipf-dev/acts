@@ -3,6 +3,7 @@ package com.acts.auth.service
 import com.acts.auth.api.AuthFailureReason
 import com.acts.auth.domain.ActsAuthProperties
 import com.acts.auth.domain.UserRole
+import com.acts.auth.user.UserAccountDeactivatedException
 import com.acts.auth.user.UserDirectoryService
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.authority.SimpleGrantedAuthority
@@ -26,7 +27,7 @@ class ActsOidcUserService(
         val email = oidcUser.email?.lowercase()
             ?: throw oauth2Exception(AuthFailureReason.EMAIL_MISSING)
 
-        if (!email.endsWith("@${authProperties.allowedDomain.lowercase()}")) {
+        if (!authProperties.isEmailDomainAllowed(email)) {
             throw oauth2Exception(AuthFailureReason.DOMAIN_MISMATCH)
         }
 
@@ -35,10 +36,14 @@ class ActsOidcUserService(
         }
 
         val displayName = oidcUser.fullName ?: oidcUser.givenName ?: email.substringBefore("@")
-        val profile = userDirectoryService.syncLogin(
-            email = email,
-            displayName = displayName,
-        )
+        val profile = try {
+            userDirectoryService.syncLogin(
+                email = email,
+                displayName = displayName,
+            )
+        } catch (_: UserAccountDeactivatedException) {
+            throw oauth2Exception(AuthFailureReason.ACCOUNT_DEACTIVATED)
+        }
 
         val authorities = mutableSetOf<GrantedAuthority>(SimpleGrantedAuthority("ROLE_USER"))
         if (profile.role == UserRole.ADMIN) {

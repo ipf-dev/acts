@@ -30,9 +30,11 @@ interface AdminPageState {
   deletedAssets: DeletedAssetView[];
   isSavingAssetTags: boolean;
   isSavingAssignment: boolean;
+  isSavingDisplayName: boolean;
   isSavingFeatureAccess: boolean;
   isSavingPolicy: boolean;
   organizations: OrganizationOptionView[];
+  processingUserEmail: string | null;
   promotingUserEmail: string | null;
   processingDeletedAssetId: number | null;
   session: AuthSessionView;
@@ -96,9 +98,11 @@ export function AdminPageContainer({ activeTab, session: initialSession }: Admin
     deletedAssets: [],
     isSavingAssetTags: false,
     isSavingAssignment: false,
+    isSavingDisplayName: false,
     isSavingFeatureAccess: false,
     isSavingPolicy: false,
     organizations: [],
+    processingUserEmail: null,
     promotingUserEmail: null,
     processingDeletedAssetId: null,
     session: initialSession,
@@ -134,9 +138,11 @@ export function AdminPageContainer({ activeTab, session: initialSession }: Admin
           deletedAssets: adminData?.deletedAssets ?? [],
           isSavingAssetTags: false,
           isSavingAssignment: false,
+          isSavingDisplayName: false,
           isSavingFeatureAccess: false,
           isSavingPolicy: false,
           organizations: adminData?.organizations ?? [],
+          processingUserEmail: null,
           promotingUserEmail: null,
           processingDeletedAssetId: null,
           session: initialSession,
@@ -236,6 +242,33 @@ export function AdminPageContainer({ activeTab, session: initialSession }: Admin
       { promotingUserEmail: null },
       "사용자를 ADMIN으로 승격했습니다.",
       () => dashboardApi.promoteUserToAdmin(email).then(() => undefined)
+    );
+  }
+
+  async function handleUpdateUserDisplayName(email: string, displayName: string): Promise<void> {
+    await runAdminMutation(
+      { isSavingDisplayName: true, processingUserEmail: email },
+      { isSavingDisplayName: false, processingUserEmail: null },
+      "사용자 이름이 업데이트되었습니다.",
+      () => dashboardApi.updateUserDisplayName(email, displayName).then(() => undefined)
+    );
+  }
+
+  async function handleDeactivateUser(email: string): Promise<void> {
+    await runAdminMutation(
+      { processingUserEmail: email },
+      { processingUserEmail: null },
+      "사용자가 삭제되었습니다. 업로드한 에셋과 과거 기록은 그대로 유지됩니다.",
+      () => dashboardApi.deactivateUser(email).then(() => undefined)
+    );
+  }
+
+  async function handleReactivateUser(email: string): Promise<void> {
+    await runAdminMutation(
+      { processingUserEmail: email },
+      { processingUserEmail: null },
+      "사용자가 복구되었습니다.",
+      () => dashboardApi.reactivateUser(email).then(() => undefined)
     );
   }
 
@@ -357,20 +390,25 @@ export function AdminPageContainer({ activeTab, session: initialSession }: Admin
       deletedAssets={state.deletedAssets}
       isSavingAssetTags={state.isSavingAssetTags}
       isSavingAssignment={state.isSavingAssignment}
+      isSavingDisplayName={state.isSavingDisplayName}
       isSavingFeatureAccess={state.isSavingFeatureAccess}
       isSavingPolicy={state.isSavingPolicy}
       onCreateCharacter={handleCreateCharacter}
+      onDeactivateUser={handleDeactivateUser}
       onDeleteAssetTagValue={handleDeleteAssetTagValue}
       onDeleteCharacter={handleDeleteCharacter}
       onMergeAssetTags={handleMergeAssetTags}
       onPromoteUserToAdmin={handlePromoteUserToAdmin}
+      onReactivateUser={handleReactivateUser}
       onRenameAssetTag={handleRenameAssetTag}
       onRestoreDeletedAsset={handleRestoreDeletedAsset}
       onSaveAssetRetentionPolicy={handleSaveAssetRetentionPolicy}
       onSaveManualAssignment={handleSaveManualAssignment}
       onSaveUserFeatureAccess={handleSaveUserFeatureAccess}
       onUpdateCharacter={handleUpdateCharacter}
+      onUpdateUserDisplayName={handleUpdateUserDisplayName}
       organizations={state.organizations}
+      processingUserEmail={state.processingUserEmail}
       promotingUserEmail={state.promotingUserEmail}
       processingDeletedAssetId={state.processingDeletedAssetId}
       session={state.session}

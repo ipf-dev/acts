@@ -95,6 +95,9 @@ export interface DashboardApi {
   listAuditLogs(): Promise<AuditLogView[]>;
   logout(): Promise<void>;
   promoteUserToAdmin(email: string): Promise<AuthUserView>;
+  updateUserDisplayName(email: string, displayName: string): Promise<AuthUserView>;
+  deactivateUser(email: string): Promise<AuthUserView>;
+  reactivateUser(email: string): Promise<AuthUserView>;
   saveManualAssignment(email: string, input: ManualAssignmentInput): Promise<AuthUserView>;
   saveUserFeatureAccess(
     email: string,
@@ -531,6 +534,27 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
       return readJson<AuthUserView>(`/api/auth/admin/users/${encodeURIComponent(email)}/promote`, {
         method: "POST"
       });
+    },
+    async updateUserDisplayName(email, displayName) {
+      return readJson<AuthUserView>(
+        `/api/auth/admin/users/${encodeURIComponent(email)}/display-name`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ displayName })
+        }
+      );
+    },
+    async deactivateUser(email) {
+      return readJson<AuthUserView>(`/api/auth/admin/users/${encodeURIComponent(email)}`, {
+        method: "DELETE"
+      });
+    },
+    async reactivateUser(email) {
+      return readJson<AuthUserView>(
+        `/api/auth/admin/users/${encodeURIComponent(email)}/reactivate`,
+        { method: "POST" }
+      );
     },
     async saveManualAssignment(email, input) {
       return readJson<AuthUserView>(`/api/auth/admin/users/${encodeURIComponent(email)}/assignment`, {
