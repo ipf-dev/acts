@@ -21,8 +21,10 @@ const EPISODE_PARAM = "episode";
 const SECTION_PARAM = "section";
 function readAppLocation(location: Location = window.location): AppLocationState {
   const params = new URLSearchParams(location.search);
-  const activeNavigationKey = params.get(SECTION_PARAM) === "admin" ? "admin" : "assets";
-  const rawEpisodeKey = activeNavigationKey === "assets" ? params.get(EPISODE_PARAM)?.trim() : null;
+  const sectionParam = params.get(SECTION_PARAM);
+  const activeNavigationKey: DashboardNavigationKey =
+    sectionParam === "admin" ? "admin" : sectionParam === "series" ? "series" : "assets";
+  const rawEpisodeKey = activeNavigationKey === "series" ? params.get(EPISODE_PARAM)?.trim() : null;
   const rawAssetId = activeNavigationKey === "assets" ? params.get(ASSET_ID_PARAM) : null;
   const parsedAssetId = rawAssetId ? Number(rawAssetId) : Number.NaN;
 
@@ -37,27 +39,28 @@ function readAppLocation(location: Location = window.location): AppLocationState
 function writeAppLocation(nextState: AppLocationState, method: "push" | "replace" = "push"): void {
   const nextUrl = new URL(window.location.href);
 
-  if (nextState.activeNavigationKey === "admin") {
-    nextUrl.searchParams.set(SECTION_PARAM, "admin");
-    nextUrl.searchParams.delete(ASSET_ID_PARAM);
-    nextUrl.searchParams.delete(EPISODE_PARAM);
-  } else {
+  if (nextState.activeNavigationKey === "assets") {
     nextUrl.searchParams.delete(SECTION_PARAM);
+    nextUrl.searchParams.delete(EPISODE_PARAM);
 
     if (nextState.selectedAssetId !== null) {
       nextUrl.searchParams.set(ASSET_ID_PARAM, String(nextState.selectedAssetId));
-      if (nextState.selectedHubEpisodeKey !== null) {
-        nextUrl.searchParams.set(EPISODE_PARAM, nextState.selectedHubEpisodeKey);
-      } else {
-        nextUrl.searchParams.delete(EPISODE_PARAM);
-      }
-    } else if (nextState.selectedHubEpisodeKey !== null) {
-      nextUrl.searchParams.delete(ASSET_ID_PARAM);
-      nextUrl.searchParams.set(EPISODE_PARAM, nextState.selectedHubEpisodeKey);
     } else {
       nextUrl.searchParams.delete(ASSET_ID_PARAM);
+    }
+  } else if (nextState.activeNavigationKey === "series") {
+    nextUrl.searchParams.set(SECTION_PARAM, "series");
+    nextUrl.searchParams.delete(ASSET_ID_PARAM);
+
+    if (nextState.selectedHubEpisodeKey !== null) {
+      nextUrl.searchParams.set(EPISODE_PARAM, nextState.selectedHubEpisodeKey);
+    } else {
       nextUrl.searchParams.delete(EPISODE_PARAM);
     }
+  } else {
+    nextUrl.searchParams.set(SECTION_PARAM, "admin");
+    nextUrl.searchParams.delete(ASSET_ID_PARAM);
+    nextUrl.searchParams.delete(EPISODE_PARAM);
   }
 
   const nextSearch = nextUrl.searchParams.toString();
@@ -121,14 +124,6 @@ export function App(): React.JSX.Element {
     });
   }, [navigateTo]);
 
-  const handleOpenAssetLibrary = useCallback((): void => {
-    navigateTo({
-      activeNavigationKey: "assets",
-      selectedAssetId: null,
-      selectedHubEpisodeKey: null
-    });
-  }, [navigateTo]);
-
   const handleOpenAssetDetailPage = useCallback((assetId: number): void => {
     navigateTo({
       activeNavigationKey: "assets",
@@ -141,13 +136,13 @@ export function App(): React.JSX.Element {
     navigateTo({
       activeNavigationKey: "assets",
       selectedAssetId: assetId,
-      selectedHubEpisodeKey: locationState.selectedHubEpisodeKey
+      selectedHubEpisodeKey: null
     });
-  }, [locationState.selectedHubEpisodeKey, navigateTo]);
+  }, [navigateTo]);
 
   const handleOpenHubEpisode = useCallback((episodeKey: string): void => {
     navigateTo({
-      activeNavigationKey: "assets",
+      activeNavigationKey: "series",
       selectedAssetId: null,
       selectedHubEpisodeKey: episodeKey
     });
@@ -157,9 +152,9 @@ export function App(): React.JSX.Element {
     navigateTo({
       activeNavigationKey: "assets",
       selectedAssetId: null,
-      selectedHubEpisodeKey: locationState.selectedHubEpisodeKey
+      selectedHubEpisodeKey: null
     });
-  }, [locationState.selectedHubEpisodeKey, navigateTo]);
+  }, [navigateTo]);
 
   const handleHubStructureChanged = useCallback((): void => {
     setHubNavigationRefreshKey((currentValue) => currentValue + 1);
@@ -168,7 +163,7 @@ export function App(): React.JSX.Element {
   const handleHubEpisodeDeleted = useCallback((): void => {
     setHubNavigationRefreshKey((currentValue) => currentValue + 1);
     navigateTo({
-      activeNavigationKey: "assets",
+      activeNavigationKey: "series",
       selectedAssetId: null,
       selectedHubEpisodeKey: null
     });
@@ -190,12 +185,8 @@ export function App(): React.JSX.Element {
       activeAdminTab={activeAdminTab}
       activeNavigationKey={locationState.activeNavigationKey}
       hubNavigationRefreshKey={hubNavigationRefreshKey}
-      isAssetLibraryActive={
-        locationState.activeNavigationKey === "assets" && locationState.selectedHubEpisodeKey === null
-      }
       onAdminTabChange={setActiveAdminTab}
       onNavigate={handleNavigation}
-      onOpenAssetLibrary={handleOpenAssetLibrary}
       onOpenHubEpisode={handleOpenHubEpisode}
       selectedHubEpisodeKey={locationState.selectedHubEpisodeKey}
       session={session}
@@ -209,13 +200,6 @@ export function App(): React.JSX.Element {
             onOpenRelatedAsset={handleOpenAssetDetailPage}
             session={session}
           />
-        ) : locationState.selectedHubEpisodeKey !== null ? (
-          <HubEpisodePageContainer
-            episodeKey={locationState.selectedHubEpisodeKey}
-            onDeleted={handleHubEpisodeDeleted}
-            onHubStructureChanged={handleHubStructureChanged}
-            onOpenAssetPage={handleOpenAssetDetailPageFromEpisode}
-          />
         ) : (
           <AssetLibraryPageContainer
             onOpenAssetPage={handleOpenAssetDetailPage}
@@ -223,6 +207,24 @@ export function App(): React.JSX.Element {
             searchQuery={assetSearchQuery}
             session={session}
           />
+        )
+      ) : locationState.activeNavigationKey === "series" ? (
+        locationState.selectedHubEpisodeKey !== null ? (
+          <HubEpisodePageContainer
+            episodeKey={locationState.selectedHubEpisodeKey}
+            onDeleted={handleHubEpisodeDeleted}
+            onHubStructureChanged={handleHubStructureChanged}
+            onOpenAssetPage={handleOpenAssetDetailPageFromEpisode}
+          />
+        ) : (
+          <div className="flex min-h-[60vh] items-center justify-center">
+            <div className="max-w-md rounded-[28px] border border-border bg-card p-8 text-center shadow-sm">
+              <p className="text-lg font-semibold">에피소드를 선택하세요</p>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                왼쪽 시리즈 트리에서 에피소드를 선택하면 슬롯 관리 화면이 표시됩니다.
+              </p>
+            </div>
+          </div>
         )
       ) : (
         <AdminPageContainer activeTab={activeAdminTab} session={session} />

@@ -16,7 +16,7 @@ export function ActsLogo({
 }: ActsLogoProps): React.JSX.Element {
   return (
     <div className={cn("flex flex-col items-start gap-2", className)}>
-      <img alt="ACTS" className={cn("h-10 w-auto", imageClassName)} src="/acts-logo.svg" />
+      <img alt="ACTS" className={cn("h-10 w-auto", imageClassName)} src="/acts-logo.png" />
       {tagline ? (
         <p className={cn("text-[11px] font-medium uppercase tracking-[0.26em] text-slate-500", taglineClassName)}>
           {tagline}

@@ -3,7 +3,6 @@ import type React from "react";
 import {
   BookMarked,
   ChevronDown,
-  FolderOpen,
   Plus
 } from "lucide-react";
 import { dashboardApi } from "../../api/client";
@@ -14,10 +13,7 @@ import { HubLevelFormModal } from "./hub-level-form-modal";
 import { HubSeriesFormModal } from "./hub-series-form-modal";
 
 interface HubSidebarPanelProps {
-  hasAssetLibraryAccess: boolean;
   hubNavigationRefreshKey: number;
-  isAssetLibraryActive: boolean;
-  onOpenAssetLibrary: () => void;
   onOpenHubEpisode: (episodeKey: string) => void;
   selectedHubEpisodeKey: string | null;
 }
@@ -26,13 +22,11 @@ const secondaryActionButtonClassName =
   "flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none";
 
 export function HubSidebarPanel({
-  hasAssetLibraryAccess,
   hubNavigationRefreshKey,
-  isAssetLibraryActive,
-  onOpenAssetLibrary,
   onOpenHubEpisode,
   selectedHubEpisodeKey
 }: HubSidebarPanelProps): React.JSX.Element {
+  const hasAssetLibraryAccess = true;
   const [createLevelErrorMessage, setCreateLevelErrorMessage] = useState<string | null>(null);
   const [createLevelNumber, setCreateLevelNumber] = useState("1");
   const [createLevelSeries, setCreateLevelSeries] = useState<{ key: string; label: string } | null>(null);
@@ -267,56 +261,20 @@ export function HubSidebarPanel({
 
   return (
     <>
-      <aside className="hidden border-r border-sidebar-border bg-white/88 backdrop-blur-sm lg:flex lg:flex-col">
+      <aside className="sticky top-0 hidden max-h-screen border-r border-sidebar-border bg-white/88 backdrop-blur-sm lg:flex lg:flex-col">
         <div className="flex h-[84px] items-center border-b border-sidebar-border px-5">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Hub
+              Series
             </p>
             <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
-              콘텐츠 허브
+              시리즈
             </h2>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
-          {!hasAssetLibraryAccess ? (
-            <div className="rounded-3xl border border-border bg-card px-4 py-5 shadow-sm">
-              <p className="text-sm font-semibold text-foreground">Hub 접근 권한이 없습니다</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                현재 계정에는 Hub 내부 기능이 허용되지 않았습니다. 관리자에게 권한을 요청하세요.
-              </p>
-            </div>
-          ) : (
             <div className="space-y-6">
-              <section>
-                <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Browse
-                </p>
-                <div className="mt-3 space-y-1">
-                  <button
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left text-sm transition-all",
-                      isAssetLibraryActive
-                        ? "border-border bg-card text-foreground shadow-sm"
-                        : "border-transparent text-muted-foreground hover:border-border hover:bg-card/80 hover:text-foreground"
-                    )}
-                    onClick={onOpenAssetLibrary}
-                    type="button"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-foreground">
-                      <FolderOpen className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">에셋 라이브러리</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        파일, 링크, 메타데이터 탐색
-                      </p>
-                    </div>
-                  </button>
-                </div>
-              </section>
-
               <section className="rounded-[26px] border border-border bg-card/95 p-3 shadow-sm">
                 <div className="flex items-center justify-between gap-3 px-2 py-2">
                   <div className="min-w-0">
@@ -490,7 +448,6 @@ export function HubSidebarPanel({
                 </div>
               </section>
             </div>
-          )}
         </div>
       </aside>
 

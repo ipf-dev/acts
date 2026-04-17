@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import type React from "react";
 import {
+  BookMarked,
   BookOpenText,
   Clock3,
-  LayoutGrid,
+  FolderOpen,
   type LucideIcon,
   LogOut,
   Settings2,
@@ -25,19 +26,17 @@ import {
 } from "./ui/dropdown-menu";
 import { ActsLogo } from "./acts-logo";
 
-export type DashboardNavigationKey = "assets" | "admin";
+export type DashboardNavigationKey = "assets" | "series" | "admin";
 export type AdminTabKey = "users" | "features" | "policy" | "asset-tags" | "audit";
-type PrimaryNavigationKey = "hub" | "admin";
+type PrimaryNavigationKey = DashboardNavigationKey;
 
 interface DashboardShellProps {
   activeAdminTab: AdminTabKey;
   activeNavigationKey: DashboardNavigationKey;
   children: React.ReactNode;
   hubNavigationRefreshKey: number;
-  isAssetLibraryActive: boolean;
   onAdminTabChange: (tab: AdminTabKey) => void;
   onNavigate: (navigationKey: DashboardNavigationKey) => void;
-  onOpenAssetLibrary: () => void;
   onOpenHubEpisode: (episodeKey: string) => void;
   selectedHubEpisodeKey: string | null;
   session: AuthSessionView;
@@ -53,7 +52,8 @@ interface PrimaryInternalNavigationItem {
 type PrimaryNavigationItem = PrimaryInternalNavigationItem;
 
 const primaryNavigationItems: readonly PrimaryNavigationItem[] = [
-  { icon: LayoutGrid, key: "hub", label: "Hub", type: "internal" },
+  { icon: FolderOpen, key: "assets", label: "에셋", type: "internal" },
+  { icon: BookMarked, key: "series", label: "시리즈", type: "internal" },
   { icon: ShieldCheck, key: "admin", label: "관리자", type: "internal" }
 ];
 
@@ -76,7 +76,7 @@ function isPrimaryNavigationVisible(
   item: PrimaryInternalNavigationItem,
   options: { hasAssetLibraryAccess: boolean; isAdmin: boolean }
 ): boolean {
-  if (item.key === "hub") {
+  if (item.key === "assets" || item.key === "series") {
     return options.hasAssetLibraryAccess;
   }
 
@@ -92,10 +92,8 @@ export function DashboardShell({
   activeNavigationKey,
   children,
   hubNavigationRefreshKey,
-  isAssetLibraryActive,
   onAdminTabChange,
   onNavigate,
-  onOpenAssetLibrary,
   onOpenHubEpisode,
   selectedHubEpisodeKey,
   session
@@ -111,8 +109,7 @@ export function DashboardShell({
   const hasAssetLibraryAccess =
     !session.authenticated || session.allowedFeatureKeys.includes("ASSET_LIBRARY");
   const isAdmin = session.user?.role === "ADMIN";
-  const activePrimaryNavigationKey: PrimaryNavigationKey =
-    activeNavigationKey === "admin" ? "admin" : "hub";
+  const activePrimaryNavigationKey: PrimaryNavigationKey = activeNavigationKey;
   const visiblePrimaryNavigationItems = primaryNavigationItems.filter((item) =>
     isPrimaryNavigationVisible(item, {
       hasAssetLibraryAccess,
@@ -139,12 +136,7 @@ export function DashboardShell({
   }
 
   function handlePrimaryNavigation(key: PrimaryNavigationKey): void {
-    if (key === "hub") {
-      onOpenAssetLibrary();
-      return;
-    }
-
-    onNavigate("admin");
+    onNavigate(key);
   }
 
   function renderAccountMenuContent(): React.JSX.Element {
@@ -175,7 +167,7 @@ export function DashboardShell({
 
   function renderAdminSidebar(): React.JSX.Element {
     return (
-      <aside className="hidden border-r border-sidebar-border bg-white/88 backdrop-blur-sm lg:flex lg:flex-col">
+      <aside className="sticky top-0 hidden max-h-screen border-r border-sidebar-border bg-white/88 backdrop-blur-sm lg:flex lg:flex-col">
         <div className="flex h-[84px] items-center border-b border-sidebar-border px-5">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -233,19 +225,24 @@ export function DashboardShell({
   return (
     <>
       <div className="min-h-screen bg-background text-foreground">
-        <div className="grid min-h-screen lg:grid-cols-[96px_320px_1fr]">
-          <aside className="hidden border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col">
-            <div className="border-b border-sidebar-border px-3 py-3">
+        <div className={cn(
+          "grid min-h-screen",
+          activePrimaryNavigationKey === "assets"
+            ? "lg:grid-cols-[96px_1fr]"
+            : "lg:grid-cols-[96px_320px_1fr]"
+        )}>
+          <aside className="sticky top-0 hidden max-h-screen border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col">
+            <div className="border-b border-sidebar-border px-2 py-3">
               <button
-                className="flex w-full items-center justify-center rounded-2xl px-2 py-3 transition-colors hover:bg-accent/70"
-                onClick={() => handlePrimaryNavigation("hub")}
+                className="flex w-full items-center justify-center rounded-2xl px-1 py-3 transition-colors hover:bg-accent/70"
+                onClick={() => handlePrimaryNavigation("assets")}
                 type="button"
               >
-                <ActsLogo className="items-center" imageClassName="h-9" />
+                <ActsLogo className="items-center" imageClassName="h-auto w-full" />
               </button>
             </div>
 
-            <nav className="flex-1 space-y-2 px-3 py-4">
+            <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-4">
               {visiblePrimaryNavigationItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = item.key === activePrimaryNavigationKey;
@@ -297,16 +294,13 @@ export function DashboardShell({
             </div>
           </aside>
 
-          {activePrimaryNavigationKey === "hub" ? (
+          {activePrimaryNavigationKey === "series" ? (
             <HubSidebarPanel
-              hasAssetLibraryAccess={hasAssetLibraryAccess}
               hubNavigationRefreshKey={hubNavigationRefreshKey}
-              isAssetLibraryActive={isAssetLibraryActive}
-              onOpenAssetLibrary={onOpenAssetLibrary}
               onOpenHubEpisode={onOpenHubEpisode}
               selectedHubEpisodeKey={selectedHubEpisodeKey}
             />
-          ) : renderAdminSidebar()}
+          ) : activePrimaryNavigationKey === "admin" ? renderAdminSidebar() : null}
 
           <div className="flex min-h-screen flex-col">
             <main className="flex-1 px-4 py-6 lg:px-6 lg:py-6">
