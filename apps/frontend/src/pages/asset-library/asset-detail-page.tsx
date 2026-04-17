@@ -28,7 +28,7 @@ import type {
   AuthSessionView,
   CharacterTagOptionView
 } from "../../api/types";
-import { GOOGLE_LOGIN_PATH } from "../../api/auth";
+import { formatAllowedDomains, GOOGLE_LOGIN_PATH } from "../../api/auth";
 import {
   detailDateFormatter,
   formatFileSize,
@@ -191,7 +191,7 @@ export function AssetDetailPage({
           <div className="space-y-1">
             <h2 className="text-xl font-semibold">사내 Google 계정으로 로그인하세요.</h2>
             <p className="text-sm text-muted-foreground">
-              에셋 상세 조회와 다운로드는 <code>@{session.allowedDomain}</code> 계정으로만 사용할 수 있습니다.
+              에셋 상세 조회와 다운로드는 <code>{formatAllowedDomains(session.allowedDomains)}</code> 계정으로만 사용할 수 있습니다.
             </p>
           </div>
           <Button asChild className="h-10 rounded-xl px-4">

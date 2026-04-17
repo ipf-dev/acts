@@ -10,7 +10,8 @@ spring:
 
 acts:
   auth:
-    allowed-domain: example.test
+    allowed-domains:
+      - example.test
   storage:
     bucket: acts-assets-test
     region: ap-northeast-2

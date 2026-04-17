@@ -28,6 +28,11 @@ class UserDirectoryService(
         val normalizedEmail = email.lowercase()
         val resolvedDisplayName = displayName.trim().ifBlank { normalizedEmail.substringBefore("@") }
         val existingAccount = userAccountRepository.findById(normalizedEmail).orElse(null)
+
+        if (existingAccount?.deactivatedAt != null) {
+            throw UserAccountDeactivatedException(normalizedEmail)
+        }
+
         val resolvedRole = existingAccount?.role ?: UserRole.USER
         val account = existingAccount ?: UserAccountEntity(
             email = normalizedEmail,
@@ -45,6 +50,98 @@ class UserDirectoryService(
         account.lastLoginAt = Instant.now()
 
         return userAccountRepository.save(account).toProfile()
+    }
+
+    @Transactional
+    fun renameUser(
+        email: String,
+        displayName: String,
+        actorEmail: String,
+        actorName: String?,
+    ): AuthUserProfile {
+        val normalizedEmail = email.lowercase()
+        val trimmedName = displayName.trim()
+        if (trimmedName.isBlank()) {
+            throw IllegalArgumentException("사용자 이름을 입력해주세요.")
+        }
+
+        val account = userAccountRepository.findById(normalizedEmail)
+            .orElseThrow { IllegalArgumentException("변경할 사용자를 찾을 수 없습니다.") }
+        val beforeProfile = account.toProfile()
+
+        if (account.displayName == trimmedName) {
+            return beforeProfile
+        }
+
+        account.displayName = trimmedName
+        val savedProfile = userAccountRepository.save(account).toProfile()
+
+        adminAuditLogService.recordUserDisplayNameUpdated(
+            actorEmail = actorEmail,
+            actorName = actorName,
+            beforeProfile = beforeProfile,
+            afterProfile = savedProfile,
+        )
+
+        return savedProfile
+    }
+
+    @Transactional
+    fun deactivateUser(
+        email: String,
+        actorEmail: String,
+        actorName: String?,
+    ): AuthUserProfile {
+        val normalizedEmail = email.lowercase()
+        if (normalizedEmail == actorEmail.lowercase()) {
+            throw IllegalArgumentException("본인 계정은 삭제할 수 없습니다.")
+        }
+
+        val account = userAccountRepository.findById(normalizedEmail)
+            .orElseThrow { IllegalArgumentException("삭제할 사용자를 찾을 수 없습니다.") }
+        val beforeProfile = account.toProfile()
+
+        if (account.deactivatedAt != null) {
+            return beforeProfile
+        }
+
+        account.deactivatedAt = Instant.now()
+        val savedProfile = userAccountRepository.save(account).toProfile()
+
+        adminAuditLogService.recordUserDeleted(
+            actorEmail = actorEmail,
+            actorName = actorName,
+            beforeProfile = beforeProfile,
+        )
+
+        return savedProfile
+    }
+
+    @Transactional
+    fun reactivateUser(
+        email: String,
+        actorEmail: String,
+        actorName: String?,
+    ): AuthUserProfile {
+        val normalizedEmail = email.lowercase()
+        val account = userAccountRepository.findById(normalizedEmail)
+            .orElseThrow { IllegalArgumentException("복구할 사용자를 찾을 수 없습니다.") }
+        val beforeProfile = account.toProfile()
+
+        if (account.deactivatedAt == null) {
+            return beforeProfile
+        }
+
+        account.deactivatedAt = null
+        val savedProfile = userAccountRepository.save(account).toProfile()
+
+        adminAuditLogService.recordUserReactivated(
+            actorEmail = actorEmail,
+            actorName = actorName,
+            afterProfile = savedProfile,
+        )
+
+        return savedProfile
     }
 
     @Transactional
@@ -217,7 +314,7 @@ class UserDirectoryService(
     }
 
     private fun validateAllowedDomain(email: String) {
-        if (!email.endsWith("@${authProperties.allowedDomain.lowercase()}")) {
+        if (!authProperties.isEmailDomainAllowed(email)) {
             throw IllegalArgumentException("Only the internal domain can be allowlisted.")
         }
     }
@@ -242,4 +339,5 @@ private fun UserAccountEntity.toProfile(): AuthUserProfile = AuthUserProfile(
     role = role,
     companyWideViewer = companyWideViewer,
     manualAssignmentRequired = organization == null,
+    deactivatedAt = deactivatedAt,
 )

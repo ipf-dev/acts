@@ -8,6 +8,7 @@ import com.acts.auth.feature.UserFeatureAuthorizationResponse
 import com.acts.auth.org.OrganizationOptionResponse
 import com.acts.auth.user.ManualAssignmentRequest
 import com.acts.auth.user.UserDirectoryService
+import com.acts.auth.user.UserDisplayNameUpdateRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
@@ -86,6 +87,46 @@ class AdminController(
             )
         } catch (_: IllegalArgumentException) { ResponseEntity.status(HttpStatus.BAD_REQUEST).build() }
     }
+
+    @PutMapping("/users/{email}/display-name")
+    fun updateUserDisplayName(
+        @PathVariable email: String,
+        @RequestBody request: UserDisplayNameUpdateRequest,
+        authentication: Authentication?,
+    ): ResponseEntity<AuthUserProfile> = try {
+        ResponseEntity.ok(
+            userDirectoryService.renameUser(
+                email = email, displayName = request.displayName,
+                actorEmail = currentActorEmail(authentication), actorName = currentActorName(authentication),
+            ),
+        )
+    } catch (_: IllegalArgumentException) { ResponseEntity.status(HttpStatus.BAD_REQUEST).build() }
+
+    @DeleteMapping("/users/{email}")
+    fun deactivateUser(
+        @PathVariable email: String,
+        authentication: Authentication?,
+    ): ResponseEntity<AuthUserProfile> = try {
+        ResponseEntity.ok(
+            userDirectoryService.deactivateUser(
+                email = email,
+                actorEmail = currentActorEmail(authentication), actorName = currentActorName(authentication),
+            ),
+        )
+    } catch (_: IllegalArgumentException) { ResponseEntity.status(HttpStatus.BAD_REQUEST).build() }
+
+    @PostMapping("/users/{email}/reactivate")
+    fun reactivateUser(
+        @PathVariable email: String,
+        authentication: Authentication?,
+    ): ResponseEntity<AuthUserProfile> = try {
+        ResponseEntity.ok(
+            userDirectoryService.reactivateUser(
+                email = email,
+                actorEmail = currentActorEmail(authentication), actorName = currentActorName(authentication),
+            ),
+        )
+    } catch (_: IllegalArgumentException) { ResponseEntity.status(HttpStatus.NOT_FOUND).build() }
 
     @PostMapping("/users/{email}/promote")
     fun promoteUserToAdmin(

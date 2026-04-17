@@ -3,7 +3,8 @@ import type { AuthSessionView } from "./types";
 export const GOOGLE_LOGIN_PATH = "/api/auth/login/google";
 
 const LOGIN_FAILURE_MESSAGES: Record<string, string> = {
-  domain_mismatch: "@iportfolio.co.kr 계정만 ACTS에 로그인할 수 있습니다.",
+  domain_mismatch: "허용된 Google Workspace 도메인 계정만 ACTS에 로그인할 수 있습니다.",
+  account_deactivated: "비활성화된 계정입니다. 관리자에게 문의해 주세요.",
   email_missing: "Google 계정에서 이메일 정보를 가져오지 못했습니다.",
   email_not_verified: "Google 계정 이메일 인증이 필요합니다.",
   google_oauth_not_configured: "백엔드에 Google OAuth 설정이 아직 연결되지 않았습니다.",
@@ -14,10 +15,14 @@ export function createAnonymousSession(): AuthSessionView {
   return {
     authenticated: false,
     loginConfigured: false,
-    allowedDomain: "iportfolio.co.kr",
+    allowedDomains: ["iportfolio.co.kr", "spindlebooks.com"],
     allowedFeatureKeys: [],
     user: null
   };
+}
+
+export function formatAllowedDomains(allowedDomains: readonly string[]): string {
+  return allowedDomains.map((domain) => `@${domain}`).join(", ");
 }
 
 export function getLoginFailureMessage(search: string): string | null {

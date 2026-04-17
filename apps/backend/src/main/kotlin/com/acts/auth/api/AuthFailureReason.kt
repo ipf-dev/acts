@@ -8,7 +8,11 @@ enum class AuthFailureReason(
 ) {
     DOMAIN_MISMATCH(
         code = "domain_mismatch",
-        description = "Only @iportfolio.co.kr accounts may sign in.",
+        description = "Only accounts from the allowed Google workspace domains may sign in.",
+    ),
+    ACCOUNT_DEACTIVATED(
+        code = "account_deactivated",
+        description = "This account has been deactivated. Contact an administrator.",
     ),
     EMAIL_MISSING(
         code = "email_missing",

@@ -40,6 +40,8 @@ class UserAccountEntity(
     var updatedAt: Instant = Instant.now(),
     @Column(name = "last_login_at")
     var lastLoginAt: Instant? = null,
+    @Column(name = "deactivated_at")
+    var deactivatedAt: Instant? = null,
 ) {
     @PrePersist
     fun prePersist() {
