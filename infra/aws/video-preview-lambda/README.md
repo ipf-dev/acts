@@ -47,6 +47,9 @@
 - 별도 DB row를 만들지 않고 파생 object로만 관리
 - Lambda 시작 시 preview 존재 여부를 먼저 확인해 중복 생성을 피함
 - preview는 immutable cache header로 저장
+- 원본은 Lambda로 다운로드하지 않고 S3 presigned URL을 ffmpeg 입력으로 직접 전달해 필요한 구간만 HTTP Range로 스트리밍
+  - 디스크 사용 최소화 → 대용량 영상에서도 `ENOSPC` 없음
+  - 전체 다운로드 제거 → 실행 시간 단축
 
 ## IAM
 

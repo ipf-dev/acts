@@ -1,9 +1,11 @@
 import json
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import boto3
 from botocore.exceptions import ClientError
@@ -32,11 +34,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             "previewObjectKey": preview_object_key,
         }
 
+    source_url = build_source_presigned_url(bucket=bucket, object_key=object_key)
+
     with tempfile.TemporaryDirectory(prefix="acts-video-preview-") as temp_dir:
-        source_path = Path(temp_dir) / "source"
         output_path = Path(temp_dir) / "preview.jpg"
-        download_source_object(bucket=bucket, object_key=object_key, output_path=source_path)
-        run_ffmpeg(source_path=source_path, output_path=output_path, context=context)
+        run_ffmpeg(source_url=source_url, output_path=output_path, context=context)
 
         with output_path.open("rb") as preview_file:
             s3.put_object(
@@ -46,8 +48,10 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 ContentType="image/jpeg",
                 CacheControl=PREVIEW_CACHE_CONTROL,
                 Metadata={
-                    "source-object-key": object_key,
-                    "source-original-file-name": original_file_name,
+                    # S3 user metadata must be ASCII-only, so percent-encode any non-ASCII
+                    # characters (e.g. Korean) present in the source key or original file name.
+                    "source-object-key": quote(object_key, safe="/"),
+                    "source-original-file-name": quote(original_file_name, safe=""),
                 },
             )
 
@@ -59,14 +63,18 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     }
 
 
-def download_source_object(bucket: str, object_key: str, output_path: Path) -> None:
+def build_source_presigned_url(bucket: str, object_key: str) -> str:
     try:
-        s3.download_file(bucket, object_key, str(output_path))
+        return s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": object_key},
+            ExpiresIn=SOURCE_URL_EXPIRATION_SECONDS,
+        )
     except ClientError as exception:
         raise RuntimeError(
             json.dumps(
                 {
-                    "message": "failed to download source object",
+                    "message": "failed to generate presigned url for source object",
                     "bucket": bucket,
                     "objectKey": object_key,
                     "errorCode": exception.response.get("Error", {}).get("Code"),
@@ -77,7 +85,7 @@ def download_source_object(bucket: str, object_key: str, output_path: Path) -> N
         ) from exception
 
 
-def run_ffmpeg(source_path: Path, output_path: Path, context: Any) -> None:
+def run_ffmpeg(source_url: str, output_path: Path, context: Any) -> None:
     timeout_seconds = 55
     if context is not None and hasattr(context, "get_remaining_time_in_millis"):
         timeout_seconds = max(5, int(context.get_remaining_time_in_millis() / 1000) - 3)
@@ -92,7 +100,7 @@ def run_ffmpeg(source_path: Path, output_path: Path, context: Any) -> None:
         "-ss",
         THUMBNAIL_AT,
         "-i",
-        str(source_path),
+        source_url,
         "-frames:v",
         "1",
         "-vf",
@@ -116,8 +124,8 @@ def run_ffmpeg(source_path: Path, output_path: Path, context: Any) -> None:
                 {
                     "message": "ffmpeg thumbnail generation failed",
                     "returnCode": completed.returncode,
-                    "stderr": completed.stderr[-4000:],
-                    "stdout": completed.stdout[-4000:],
+                    "stderr": redact_presigned_url(completed.stderr)[-4000:],
+                    "stdout": redact_presigned_url(completed.stdout)[-4000:],
                 },
                 ensure_ascii=False,
             ),
@@ -144,6 +152,17 @@ def preview_exists(bucket: str, object_key: str) -> bool:
                 )
             return False
         raise
+
+
+_PRESIGNED_URL_PATTERN = re.compile(r"(https?://[^\s?]+)\?[^\s]*")
+
+
+def redact_presigned_url(text: str) -> str:
+    # ffmpeg may echo the presigned URL on errors. The query string carries AWS SigV4
+    # credentials, so strip it before logging to CloudWatch.
+    if not text:
+        return text
+    return _PRESIGNED_URL_PATTERN.sub(r"\1?<redacted>", text)
 
 
 def required_string(event: dict[str, Any], key: str) -> str:
