@@ -37,6 +37,7 @@ import {
 } from "./asset-detail-model";
 import {
   AssetDataField,
+  AssetDescriptionText,
   AssetTagChip,
   AssetTypeIcon
 } from "./asset-detail-section";
@@ -48,6 +49,7 @@ import {
   findSelectedCharacterTagIds,
   flattenAssetTags,
   getAssetPrimaryText,
+  handleMarkdownLinkPaste,
   normalizeTagValue,
   openAssetExternalLink
 } from "./asset-library-utils";
@@ -342,9 +344,7 @@ export function AssetDetailPage({
 
                       <section className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground">설명</p>
-                        <p className="text-sm leading-7 text-foreground">
-                          {getAssetPrimaryText(asset)}
-                        </p>
+                        <AssetDescriptionText text={getAssetPrimaryText(asset)} />
                       </section>
 
                       <section className="grid gap-6 border-y border-border py-5 sm:grid-cols-2">
@@ -494,9 +494,13 @@ export function AssetDetailPage({
                               <Textarea
                                 className="min-h-28 rounded-xl border-border bg-background"
                                 onChange={(event) => setDescriptionDraft(event.target.value)}
+                                onPaste={(event) => handleMarkdownLinkPaste(event, setDescriptionDraft)}
                                 placeholder="에셋 설명을 입력하세요"
                                 value={descriptionDraft}
                               />
+                              <p className="text-[11px] text-muted-foreground">
+                                텍스트를 선택한 뒤 URL을 붙여넣으면 링크로 변환됩니다.
+                              </p>
                             </div>
 
                             <AssetTypeMetadataEditorSection

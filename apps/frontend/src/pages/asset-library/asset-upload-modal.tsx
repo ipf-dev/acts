@@ -14,7 +14,12 @@ import { Input } from "../../components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Textarea } from "../../components/ui/textarea";
 import type { AssetTagOptionCatalogView, CharacterTagOptionView } from "../../api/types";
-import { commitPendingTagInputs, normalizeTagValue, toggleCharacterTagId } from "./asset-library-utils";
+import {
+  commitPendingTagInputs,
+  handleMarkdownLinkPaste,
+  normalizeTagValue,
+  toggleCharacterTagId
+} from "./asset-library-utils";
 import { formatFileSize, typeLabelMap } from "./asset-detail-model";
 import type {
   AssetFileUploadDraftView,
@@ -353,9 +358,15 @@ export function AssetUploadModal({
                         <Textarea
                           className="min-h-20 rounded-2xl bg-white"
                           onChange={(event) => handleDescriptionChange(draft.id, event.target.value)}
+                          onPaste={(event) =>
+                            handleMarkdownLinkPaste(event, (next) => handleDescriptionChange(draft.id, next))
+                          }
                           placeholder="에셋 설명을 입력하세요"
                           value={draft.description}
                         />
+                        <p className="text-[11px] text-muted-foreground">
+                          텍스트를 선택한 뒤 URL을 붙여넣으면 링크로 변환됩니다.
+                        </p>
 
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <Badge variant="secondary">{typeLabelMap[draft.type]}</Badge>

@@ -1,3 +1,4 @@
+import type React from "react";
 import { ApiError } from "../../api/client";
 import type {
   AssetStructuredTagsInput,
@@ -75,6 +76,52 @@ export function getAssetPrimaryText(asset: Pick<AssetSummaryView, "description" 
   }
 
   return asset.originalFileName;
+}
+
+function isPasteableUrl(text: string): boolean {
+  if (text.length === 0 || /\s/.test(text)) {
+    return false;
+  }
+  if (!/^(https?:\/\/|www\.)/i.test(text)) {
+    return false;
+  }
+  try {
+    const normalized = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+    const parsed = new URL(normalized);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export function handleMarkdownLinkPaste(
+  event: React.ClipboardEvent<HTMLTextAreaElement>,
+  setValue: (next: string) => void
+): void {
+  const textarea = event.currentTarget;
+  const { selectionStart, selectionEnd, value } = textarea;
+
+  if (selectionStart === null || selectionEnd === null || selectionStart === selectionEnd) {
+    return;
+  }
+
+  const clipboardText = event.clipboardData.getData("text/plain").trim();
+  if (!isPasteableUrl(clipboardText)) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const selectedText = value.slice(selectionStart, selectionEnd);
+  const wrapped = `[${selectedText}](${clipboardText})`;
+  const nextValue = value.slice(0, selectionStart) + wrapped + value.slice(selectionEnd);
+
+  setValue(nextValue);
+
+  const cursorPos = selectionStart + wrapped.length;
+  queueMicrotask(() => {
+    textarea.setSelectionRange(cursorPos, cursorPos);
+  });
 }
 
 export function openAssetExternalLink(linkUrl: string): void {
