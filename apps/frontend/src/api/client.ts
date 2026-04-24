@@ -35,6 +35,12 @@ import type {
   HubSeriesNavigationView,
   ManualAssignmentInput,
   OrganizationOptionView,
+  ProjectAssetLinkInputView,
+  ProjectCreateInputView,
+  ProjectDetailView,
+  ProjectNavigationView,
+  ProjectOrganizationOptionView,
+  ProjectUpdateInputView,
   UserFeatureAccessInput,
   UserFeatureAuthorizationView,
   ViewerAllowlistEntryView,
@@ -91,6 +97,14 @@ export interface DashboardApi {
     assetId: number
   ): Promise<HubEpisodeSlotView>;
   updateHubEpisode(episodeKey: string, input: HubEpisodeUpsertInputView): Promise<HubEpisodeView>;
+  getProjectNavigation(): Promise<ProjectNavigationView>;
+  listProjectOrganizations(): Promise<ProjectOrganizationOptionView[]>;
+  getProject(projectKey: string): Promise<ProjectDetailView>;
+  createProject(input: ProjectCreateInputView): Promise<ProjectDetailView>;
+  updateProject(projectKey: string, input: ProjectUpdateInputView): Promise<ProjectDetailView>;
+  deleteProject(projectKey: string): Promise<void>;
+  linkProjectAsset(projectKey: string, input: ProjectAssetLinkInputView): Promise<ProjectDetailView>;
+  unlinkProjectAsset(projectKey: string, assetId: number): Promise<ProjectDetailView>;
   removeViewerAllowlist(email: string): Promise<ViewerAllowlistEntryView[]>;
   listAuditLogs(): Promise<AuditLogView[]>;
   logout(): Promise<void>;
@@ -509,6 +523,63 @@ export function createDashboardApi(fetchFn: typeof fetch = fetch): DashboardApi 
         },
         body: JSON.stringify(input)
       });
+    },
+    async getProjectNavigation() {
+      return readJson<ProjectNavigationView>("/api/projects/navigation");
+    },
+    async listProjectOrganizations() {
+      return readJson<ProjectOrganizationOptionView[]>("/api/projects/organizations");
+    },
+    async getProject(projectKey) {
+      return readJson<ProjectDetailView>(`/api/projects/${encodeURIComponent(projectKey)}`);
+    },
+    async createProject(input) {
+      return readJson<ProjectDetailView>("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+    },
+    async updateProject(projectKey, input) {
+      return readJson<ProjectDetailView>(`/api/projects/${encodeURIComponent(projectKey)}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(input)
+      });
+    },
+    async deleteProject(projectKey) {
+      const response = await fetchFn(`/api/projects/${encodeURIComponent(projectKey)}`, {
+        method: "DELETE"
+      });
+      handleSessionExpired(response);
+
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
+    },
+    async linkProjectAsset(projectKey, input) {
+      return readJson<ProjectDetailView>(
+        `/api/projects/${encodeURIComponent(projectKey)}/assets`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(input)
+        }
+      );
+    },
+    async unlinkProjectAsset(projectKey, assetId) {
+      return readJson<ProjectDetailView>(
+        `/api/projects/${encodeURIComponent(projectKey)}/assets/${assetId}`,
+        {
+          method: "DELETE"
+        }
+      );
     },
     async removeViewerAllowlist(email) {
       return readJson<ViewerAllowlistEntryView[]>(

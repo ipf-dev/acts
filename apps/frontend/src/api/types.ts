@@ -302,6 +302,62 @@ export interface HubEpisodeSlotAssetLinkInput {
   assetId: number;
 }
 
+export type ProjectStatusView = "ONGOING" | "IN_PROGRESS" | "COMPLETED";
+
+export interface ProjectSummaryView {
+  key: string;
+  name: string;
+  organizationId: number;
+  organizationName: string;
+  deadline: string | null;
+  completedAt: string | null;
+  status: ProjectStatusView;
+}
+
+export interface ProjectDetailView {
+  key: string;
+  name: string;
+  description: string | null;
+  organizationId: number;
+  organizationName: string;
+  deadline: string | null;
+  completedAt: string | null;
+  status: ProjectStatusView;
+  createdAt: string;
+  updatedAt: string;
+  linkedAssets: AssetSummaryView[];
+}
+
+export interface ProjectNavigationView {
+  ongoing: ProjectSummaryView[];
+  inProgress: ProjectSummaryView[];
+  completed: ProjectSummaryView[];
+}
+
+export interface ProjectOrganizationOptionView {
+  id: number;
+  name: string;
+}
+
+export interface ProjectCreateInputView {
+  name: string;
+  description?: string | null;
+  organizationId: number;
+  deadline?: string | null;
+}
+
+export interface ProjectUpdateInputView {
+  name: string;
+  description?: string | null;
+  organizationId: number;
+  deadline?: string | null;
+  completed: boolean;
+}
+
+export interface ProjectAssetLinkInputView {
+  assetId: number;
+}
+
 export interface AssetCatalogPageView {
   items: AssetSummaryView[];
   page: number;
