@@ -3,6 +3,7 @@ import type React from "react";
 import {
   BookMarked,
   BookOpenText,
+  Briefcase,
   Clock3,
   FolderOpen,
   type LucideIcon,
@@ -17,6 +18,7 @@ import { dashboardApi } from "../api/client";
 import type { AuthSessionView } from "../api/types";
 import { cn } from "../lib/utils";
 import { HubSidebarPanel } from "../pages/hub/hub-sidebar-panel";
+import { ProjectSidebarPanel } from "../pages/project/project-sidebar-panel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +28,7 @@ import {
 } from "./ui/dropdown-menu";
 import { ActsLogo } from "./acts-logo";
 
-export type DashboardNavigationKey = "assets" | "series" | "admin";
+export type DashboardNavigationKey = "assets" | "series" | "projects" | "admin";
 export type AdminTabKey = "users" | "features" | "policy" | "asset-tags" | "audit";
 type PrimaryNavigationKey = DashboardNavigationKey;
 
@@ -38,7 +40,10 @@ interface DashboardShellProps {
   onAdminTabChange: (tab: AdminTabKey) => void;
   onNavigate: (navigationKey: DashboardNavigationKey) => void;
   onOpenHubEpisode: (episodeKey: string) => void;
+  onOpenProject: (projectKey: string) => void;
+  projectNavigationRefreshKey: number;
   selectedHubEpisodeKey: string | null;
+  selectedProjectKey: string | null;
   session: AuthSessionView;
 }
 
@@ -54,6 +59,7 @@ type PrimaryNavigationItem = PrimaryInternalNavigationItem;
 const primaryNavigationItems: readonly PrimaryNavigationItem[] = [
   { icon: FolderOpen, key: "assets", label: "에셋", type: "internal" },
   { icon: BookMarked, key: "series", label: "시리즈", type: "internal" },
+  { icon: Briefcase, key: "projects", label: "프로젝트", type: "internal" },
   { icon: ShieldCheck, key: "admin", label: "관리자", type: "internal" }
 ];
 
@@ -76,7 +82,7 @@ function isPrimaryNavigationVisible(
   item: PrimaryInternalNavigationItem,
   options: { hasAssetLibraryAccess: boolean; isAdmin: boolean }
 ): boolean {
-  if (item.key === "assets" || item.key === "series") {
+  if (item.key === "assets" || item.key === "series" || item.key === "projects") {
     return options.hasAssetLibraryAccess;
   }
 
@@ -95,7 +101,10 @@ export function DashboardShell({
   onAdminTabChange,
   onNavigate,
   onOpenHubEpisode,
+  onOpenProject,
+  projectNavigationRefreshKey,
   selectedHubEpisodeKey,
+  selectedProjectKey,
   session
 }: DashboardShellProps): React.JSX.Element {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -299,6 +308,12 @@ export function DashboardShell({
               hubNavigationRefreshKey={hubNavigationRefreshKey}
               onOpenHubEpisode={onOpenHubEpisode}
               selectedHubEpisodeKey={selectedHubEpisodeKey}
+            />
+          ) : activePrimaryNavigationKey === "projects" ? (
+            <ProjectSidebarPanel
+              onOpenProject={onOpenProject}
+              projectNavigationRefreshKey={projectNavigationRefreshKey}
+              selectedProjectKey={selectedProjectKey}
             />
           ) : activePrimaryNavigationKey === "admin" ? renderAdminSidebar() : null}
 
